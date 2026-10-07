@@ -1,8 +1,8 @@
 // Guards what can enter the public repository. Run by the git hooks in
 // .githooks/ and, later, by CI.
 //
-//   node scripts/check-repo.mjs                 checks the files staged for commit
-//   node scripts/check-repo.mjs --message FILE  also checks a commit message
+//   node scripts/check-repo.mts                 checks the files staged for commit
+//   node scripts/check-repo.mts --message FILE  also checks a commit message
 //
 // The confidential terms are read from .forbidden-terms, which is untracked:
 // a public list would name the very terms it exists to keep out.
@@ -21,9 +21,9 @@ const NEVER_TRACKED = ["docs/", ".claude/", "_bmad/"];
 const EM_DASH = new RegExp(String.fromCharCode(0x2014));
 const TERMS_FILE = ".forbidden-terms";
 
-const git = (...args) => execFileSync("git", args, { maxBuffer: 64 * 1024 * 1024 });
+const git = (...args: string[]): Buffer => execFileSync("git", args, { maxBuffer: 64 * 1024 * 1024 });
 
-function loadTerms() {
+function loadTerms(): RegExp[] {
   if (!existsSync(TERMS_FILE)) {
     console.error(`check-repo: ${TERMS_FILE} is missing, so confidential terms cannot be checked.`);
     process.exit(1);
@@ -35,7 +35,7 @@ function loadTerms() {
     .map((line) => new RegExp(line, "i"));
 }
 
-function scanText(label, text, terms, failures) {
+function scanText(label: string, text: string, terms: RegExp[], failures: string[]): void {
   text.split("\n").forEach((line, i) => {
     if (EM_DASH.test(line)) failures.push(`${label}:${i + 1}: em dash`);
     for (const term of terms) {
@@ -44,7 +44,7 @@ function scanText(label, text, terms, failures) {
   });
 }
 
-const failures = [];
+const failures: string[] = [];
 const terms = loadTerms();
 const tracked = git("ls-files", "-z").toString().split("\0").filter(Boolean);
 

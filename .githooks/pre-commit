@@ -1,5 +1,5 @@
 #!/bin/sh
 set -e
-node --test "scripts/**/*.test.mjs"
-node scripts/check-repo.mjs
-node scripts/check-tokens.mjs
+node --test "scripts/**/*.test.mts"
+node scripts/check-repo.mts
+node scripts/check-tokens.mts
