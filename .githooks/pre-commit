@@ -1,2 +1,5 @@
 #!/bin/sh
-exec node scripts/check-repo.mjs
+set -e
+node --test "scripts/**/*.test.mjs"
+node scripts/check-repo.mjs
+node scripts/check-tokens.mjs

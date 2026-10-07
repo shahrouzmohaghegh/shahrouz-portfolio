@@ -1,0 +1,349 @@
+/*
+ * Design tokens. The single source of every design value on the site.
+ *
+ * Transcribed from the frontmatter of DESIGN.md
+ * (_bmad-output/planning-artifacts/ux-designs/ux-ShahrouzPortfolio-2026-09-23/DESIGN.md),
+ * which is final and wins over this file. scripts/check-tokens.mjs fails if
+ * the two drift apart.
+ *
+ * Naming:
+ *   --color-<key>                      colors.<key>
+ *   --font-serif, --font-sans          typography.serif-stack, sans-stack
+ *   --type-<role>-<prop>               typography.<role>, prop is one of
+ *                                      family, size, weight, leading, tracking
+ *   --type-<role>-mobile-<prop>        typography.<role>-mobile, copied, never computed
+ *   --radius-<key>                     rounded.<key> (DEFAULT becomes default)
+ *   --space-<key>                      spacing.<key>; a composite "W x H"
+ *                                      splits into -width and -height
+ *   --space-<pair>                     neutral token for a desktop/mobile pair;
+ *                                      points at the desktop value here and at
+ *                                      the mobile value in breakpoints.css
+ *   --component-<name>-<prop>          literal lengths inside components
+ *
+ * Base --type-* tokens hold the desktop value; breakpoints.css points every
+ * property a -mobile entry states at its mobile token below 768px. Roles
+ * without a -mobile entry keep the desktop value at every width. Nothing is
+ * scaled.
+ *
+ * Type floor: nothing renders below 13.5px except the four roles DESIGN.md
+ * sets below it: meta-label, nameline, kicker and stage-number.
+ */
+
+:root {
+  /* colors */
+  --color-paper: #FBF7F1;
+  --color-paper-alt: #F4EDE2;
+  --color-panel: #F6EFE4;
+  --color-ink: #181310;
+  --color-muted: #55473B;
+  --color-rule: #E6DCCD;
+  --color-chip-border: #8E7E68;
+  --color-tone: #EFE4D3;
+  --color-tone-2: #DCCDB6;
+  --color-accent: #7E2E16;
+  --color-on-accent: #FCF6F0;
+  --color-deep: #241D18;
+  --color-on-deep: #F6F0E7;
+  --color-deep-muted: #CBBCA8;
+  --color-deep-rule: #4A3E34;
+  --color-deep-accent: #E3A57E;
+  --color-studio-ground: #0C0A08;
+  --color-focus-ring: #7E2E16;
+  --color-focus-ring-on-deep: #E3A57E;
+
+  /* font stacks: system fonts only, no web font */
+  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  /* type: display-hero */
+  --type-display-hero-family: var(--font-serif);
+  --type-display-hero-size: 76px;
+  --type-display-hero-weight: 600;
+  --type-display-hero-leading: 1.02;
+  --type-display-hero-tracking: -0.025em;
+  --type-display-hero-mobile-family: var(--font-serif);
+  --type-display-hero-mobile-size: 34px;
+  --type-display-hero-mobile-weight: 600;
+  --type-display-hero-mobile-leading: 1.06;
+  --type-display-hero-mobile-tracking: -0.02em;
+
+  /* type: pull-quote */
+  --type-pull-quote-family: var(--font-serif);
+  --type-pull-quote-size: 31px;
+  --type-pull-quote-weight: 400;
+  --type-pull-quote-leading: 1.34;
+  --type-pull-quote-tracking: -0.015em;
+  --type-pull-quote-mobile-family: var(--font-serif);
+  --type-pull-quote-mobile-size: 23px;
+  --type-pull-quote-mobile-weight: 400;
+  --type-pull-quote-mobile-leading: 1.34;
+  --type-pull-quote-mobile-tracking: -0.015em;
+
+  /* type: figure (tabular-nums) */
+  --type-figure-family: var(--font-serif);
+  --type-figure-size: 164px;
+  --type-figure-weight: 600;
+  --type-figure-leading: 0.9;
+  --type-figure-tracking: -0.04em;
+  --type-figure-mobile-family: var(--font-serif);
+  --type-figure-mobile-size: 80px;
+  --type-figure-mobile-weight: 600;
+  --type-figure-mobile-leading: 0.9;
+
+  /* type: figure-small */
+  --type-figure-small-family: var(--font-serif);
+  --type-figure-small-size: 104px;
+  --type-figure-small-weight: 600;
+  --type-figure-small-leading: 0.9;
+  --type-figure-small-tracking: -0.04em;
+  --type-figure-small-mobile-family: var(--font-serif);
+  --type-figure-small-mobile-size: 40px;
+  --type-figure-small-mobile-weight: 600;
+  --type-figure-small-mobile-leading: 1.04;
+
+  /* type: figure-inline (no mobile token by decision) */
+  --type-figure-inline-family: var(--font-serif);
+  --type-figure-inline-size: 23px;
+  --type-figure-inline-weight: 600;
+  --type-figure-inline-leading: 1.2;
+  --type-figure-inline-tracking: -0.02em;
+
+  /* type: page-title */
+  --type-page-title-family: var(--font-serif);
+  --type-page-title-size: 60px;
+  --type-page-title-weight: 600;
+  --type-page-title-leading: 1.05;
+  --type-page-title-tracking: -0.025em;
+  --type-page-title-mobile-family: var(--font-serif);
+  --type-page-title-mobile-size: 33px;
+  --type-page-title-mobile-weight: 600;
+  --type-page-title-mobile-leading: 1.06;
+  --type-page-title-mobile-tracking: -0.02em;
+
+  /* type: section-title */
+  --type-section-title-family: var(--font-sans);
+  --type-section-title-size: 35px;
+  --type-section-title-weight: 600;
+  --type-section-title-leading: 1.15;
+  --type-section-title-tracking: -0.03em;
+  --type-section-title-mobile-family: var(--font-sans);
+  --type-section-title-mobile-size: 24px;
+  --type-section-title-mobile-weight: 600;
+  --type-section-title-mobile-leading: 1.18;
+  --type-section-title-mobile-tracking: -0.03em;
+
+  /* type: subsection-title */
+  --type-subsection-title-family: var(--font-sans);
+  --type-subsection-title-size: 31px;
+  --type-subsection-title-weight: 600;
+  --type-subsection-title-leading: 1.18;
+  --type-subsection-title-tracking: -0.03em;
+  --type-subsection-title-mobile-family: var(--font-sans);
+  --type-subsection-title-mobile-size: 21px;
+  --type-subsection-title-mobile-weight: 600;
+  --type-subsection-title-mobile-leading: 1.2;
+  --type-subsection-title-mobile-tracking: -0.03em;
+
+  /* type: card-title */
+  --type-card-title-family: var(--font-sans);
+  --type-card-title-size: 20.5px;
+  --type-card-title-weight: 600;
+  --type-card-title-leading: 1.24;
+  --type-card-title-tracking: -0.02em;
+  --type-card-title-mobile-family: var(--font-sans);
+  --type-card-title-mobile-size: 18px;
+  --type-card-title-mobile-weight: 600;
+  --type-card-title-mobile-leading: 1.26;
+  --type-card-title-mobile-tracking: -0.02em;
+
+  /* type: support */
+  --type-support-family: var(--font-sans);
+  --type-support-size: 19.5px;
+  --type-support-weight: 400;
+  --type-support-leading: 1.56;
+  --type-support-mobile-family: var(--font-sans);
+  --type-support-mobile-size: 15px;
+  --type-support-mobile-weight: 400;
+  --type-support-mobile-leading: 1.6;
+
+  /* type: dek */
+  --type-dek-family: var(--font-sans);
+  --type-dek-size: 20px;
+  --type-dek-weight: 400;
+  --type-dek-leading: 1.6;
+  --type-dek-mobile-family: var(--font-sans);
+  --type-dek-mobile-size: 17.5px;
+  --type-dek-mobile-weight: 400;
+  --type-dek-mobile-leading: 1.6;
+
+  /* type: body-lead */
+  --type-body-lead-family: var(--font-sans);
+  --type-body-lead-size: 19.5px;
+  --type-body-lead-weight: 400;
+  --type-body-lead-leading: 1.65;
+  --type-body-lead-mobile-family: var(--font-sans);
+  --type-body-lead-mobile-size: 17.5px;
+  --type-body-lead-mobile-weight: 400;
+  --type-body-lead-mobile-leading: 1.68;
+
+  /* type: body */
+  --type-body-family: var(--font-sans);
+  --type-body-size: 17px;
+  --type-body-weight: 400;
+  --type-body-leading: 1.72;
+  --type-body-mobile-family: var(--font-sans);
+  --type-body-mobile-size: 16px;
+  --type-body-mobile-weight: 400;
+  --type-body-mobile-leading: 1.7;
+
+  /* type: ui */
+  --type-ui-family: var(--font-sans);
+  --type-ui-size: 14.5px;
+  --type-ui-weight: 400;
+  --type-ui-leading: 1.5;
+
+  /* type: small */
+  --type-small-family: var(--font-sans);
+  --type-small-size: 13.5px;
+  --type-small-weight: 400;
+  --type-small-leading: 1.6;
+
+  /* type: meta-label (uppercase; below the floor by design) */
+  --type-meta-label-family: var(--font-sans);
+  --type-meta-label-size: 11.5px;
+  --type-meta-label-weight: 400;
+  --type-meta-label-leading: 1.4;
+  --type-meta-label-tracking: 0.26em;
+
+  /* type: wordmark (nav) */
+  --type-wordmark-family: var(--font-sans);
+  --type-wordmark-size: 17.5px;
+  --type-wordmark-weight: 600;
+  --type-wordmark-leading: 1.2;
+  --type-wordmark-tracking: -0.01em;
+  --type-wordmark-mobile-family: var(--font-sans);
+  --type-wordmark-mobile-size: 13.5px;
+  --type-wordmark-mobile-weight: 600;
+  --type-wordmark-mobile-leading: 1.2;
+  --type-wordmark-mobile-tracking: -0.01em;
+
+  /* type: wordmark-footer */
+  --type-wordmark-footer-family: var(--font-sans);
+  --type-wordmark-footer-size: 20px;
+  --type-wordmark-footer-weight: 600;
+  --type-wordmark-footer-leading: 1.2;
+  --type-wordmark-footer-tracking: -0.01em;
+  --type-wordmark-footer-mobile-family: var(--font-sans);
+  --type-wordmark-footer-mobile-size: 17px;
+  --type-wordmark-footer-mobile-weight: 600;
+  --type-wordmark-footer-mobile-leading: 1.2;
+  --type-wordmark-footer-mobile-tracking: -0.01em;
+
+  /* type: nameline (uppercase; below the floor by design) */
+  --type-nameline-family: var(--font-sans);
+  --type-nameline-size: 12.5px;
+  --type-nameline-weight: 400;
+  --type-nameline-leading: 1.4;
+  --type-nameline-tracking: 0.32em;
+
+  /* type: kicker (uppercase; below the floor by design) */
+  --type-kicker-family: var(--font-sans);
+  --type-kicker-size: 13px;
+  --type-kicker-weight: 600;
+  --type-kicker-leading: 1.4;
+  --type-kicker-tracking: 0.3em;
+
+  /* type: stage-number (tabular-nums; below the floor by design) */
+  --type-stage-number-family: var(--font-sans);
+  --type-stage-number-size: 10.5px;
+  --type-stage-number-weight: 400;
+  --type-stage-number-leading: 1.4;
+  --type-stage-number-tracking: 0.2em;
+
+  /* type: data-row */
+  --type-data-row-family: var(--font-sans);
+  --type-data-row-size: 15.5px;
+  --type-data-row-weight: 400;
+  --type-data-row-leading: 1.62;
+  --type-data-row-mobile-family: var(--font-sans);
+  --type-data-row-mobile-size: 14.5px;
+  --type-data-row-mobile-weight: 400;
+  --type-data-row-mobile-leading: 1.6;
+
+  /* type: route-link (contact hero routes only) */
+  --type-route-link-family: var(--font-sans);
+  --type-route-link-size: 25.5px;
+  --type-route-link-weight: 400;
+  --type-route-link-leading: 1.24;
+  --type-route-link-tracking: -0.015em;
+  --type-route-link-mobile-family: var(--font-sans);
+  --type-route-link-mobile-size: 21px;
+  --type-route-link-mobile-weight: 400;
+  --type-route-link-mobile-leading: 1.26;
+  --type-route-link-mobile-tracking: -0.015em;
+
+  /* rounded */
+  --radius-default: 0;
+  --radius-full: 9999px;
+  --radius-dot: 50%;
+
+  /* spacing */
+  --space-margin-desktop: 84px;
+  --space-margin-mobile: 22px;
+  --space-section-desktop: 150px;
+  --space-section-mobile: 62px;
+  --space-band-desktop: 120px;
+  --space-band-mobile: 56px;
+  --space-column-gap-desktop: 76px;
+  --space-card-gap: 26px;
+  --space-stack-xl: 44px;
+  --space-stack-lg: 34px;
+  --space-stack-md: 26px;
+  --space-stack-sm: 14px;
+  --space-stack-xs: 8px;
+  --space-rule-hairline: 1px;
+  --space-rule-card: 2px;
+  --space-measure-body: 66ch;
+  --space-measure-caption: 34em;
+  --space-hero-plate-desktop-width: 480px;
+  --space-hero-plate-desktop-height: 372px;
+  --space-hero-plate-mobile-width: 264px;
+  --space-hero-plate-mobile-height: 330px;
+  --space-contact-plate-desktop-width: 420px;
+  --space-contact-plate-desktop-height: 520px;
+  --space-contact-plate-mobile-width: 264px;
+  --space-contact-plate-mobile-height: 340px;
+  --space-handson-plate-width: 168px;
+  --space-handson-plate-height: 168px;
+
+  /* spacing, neutral: desktop here, mobile below 768px (breakpoints.css) */
+  --space-margin: var(--space-margin-desktop);
+  --space-section: var(--space-section-desktop);
+  --space-band: var(--space-band-desktop);
+  --space-hero-plate-width: var(--space-hero-plate-desktop-width);
+  --space-hero-plate-height: var(--space-hero-plate-desktop-height);
+  --space-contact-plate-width: var(--space-contact-plate-desktop-width);
+  --space-contact-plate-height: var(--space-contact-plate-desktop-height);
+
+  /* components: literal lengths from DESIGN.md components */
+  --component-nav-padding-block: 30px;
+  --component-nav-padding: var(--component-nav-padding-block) var(--space-margin);
+  --component-nav-current-underline-width: 1px;
+  --component-hero-plate-background: linear-gradient(168deg, var(--color-tone) 0%, var(--color-tone-2) 100%);
+  --component-figure-pair-label-gap: 4px;
+  --component-figure-pair-row-gap: 12px;
+  --component-cta-link-underline-width: 1.5px;
+  --component-capability-chip-padding-mobile: 9px 15px;
+  --component-capability-chip-padding: 11px 20px;
+  --component-cross-listing-link-underline-width: 1px;
+  --component-cross-listing-link-underline-offset: 3px;
+  --component-empty-state-padding: 36px 40px;
+  --component-sequence-stage-dot-size: 19px;
+  --component-sequence-stage-dot-border-width: 1.5px;
+  --component-footer-link-underline-width: 1px;
+  --component-rail-group-header-tracking: 0.18em;
+  --component-contact-hero-route-link-underline-width: 1.5px;
+  --component-repo-cta-padding: 26px 30px 28px;
+  --component-repo-cta-max-width: 660px;
+  --component-repo-cta-rail-padding: 14px 15px 15px;
+}
