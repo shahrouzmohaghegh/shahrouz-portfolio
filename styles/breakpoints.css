@@ -1,0 +1,106 @@
+/*
+ * Breakpoints. The only file allowed to hold a media query or a breakpoint
+ * width. No other stylesheet may use @media; scripts/check-tokens.mjs fails
+ * if one does.
+ *
+ * Documented widths (DESIGN.md):
+ *   375px   the mobile reference width every mobile token is drawn at
+ *   768px   the switch: below it the mobile values apply, from it upward
+ *           the desktop values apply
+ *   1440px  the desktop reference width every desktop token is drawn at
+ *
+ * Below 768px this file points each base token that has a mobile value at
+ * that mobile token. Only the properties a DESIGN.md -mobile entry states
+ * are remapped: figure and figure-small state no letterSpacing on mobile, so
+ * their tracking stays at the desktop value. Roles with no -mobile entry
+ * keep their desktop value at every width. Nothing is scaled.
+ *
+ * Must be imported after tokens.css: both rules target :root with equal
+ * specificity, so source order decides.
+ */
+
+@media (max-width: 767px) {
+  :root {
+    --type-display-hero-family: var(--type-display-hero-mobile-family);
+    --type-display-hero-size: var(--type-display-hero-mobile-size);
+    --type-display-hero-weight: var(--type-display-hero-mobile-weight);
+    --type-display-hero-leading: var(--type-display-hero-mobile-leading);
+    --type-display-hero-tracking: var(--type-display-hero-mobile-tracking);
+    --type-figure-family: var(--type-figure-mobile-family);
+    --type-figure-size: var(--type-figure-mobile-size);
+    --type-figure-weight: var(--type-figure-mobile-weight);
+    --type-figure-leading: var(--type-figure-mobile-leading);
+    --type-figure-small-family: var(--type-figure-small-mobile-family);
+    --type-figure-small-size: var(--type-figure-small-mobile-size);
+    --type-figure-small-weight: var(--type-figure-small-mobile-weight);
+    --type-figure-small-leading: var(--type-figure-small-mobile-leading);
+    --type-page-title-family: var(--type-page-title-mobile-family);
+    --type-page-title-size: var(--type-page-title-mobile-size);
+    --type-page-title-weight: var(--type-page-title-mobile-weight);
+    --type-page-title-leading: var(--type-page-title-mobile-leading);
+    --type-page-title-tracking: var(--type-page-title-mobile-tracking);
+    --type-section-title-family: var(--type-section-title-mobile-family);
+    --type-section-title-size: var(--type-section-title-mobile-size);
+    --type-section-title-weight: var(--type-section-title-mobile-weight);
+    --type-section-title-leading: var(--type-section-title-mobile-leading);
+    --type-section-title-tracking: var(--type-section-title-mobile-tracking);
+    --type-support-family: var(--type-support-mobile-family);
+    --type-support-size: var(--type-support-mobile-size);
+    --type-support-weight: var(--type-support-mobile-weight);
+    --type-support-leading: var(--type-support-mobile-leading);
+    --type-body-family: var(--type-body-mobile-family);
+    --type-body-size: var(--type-body-mobile-size);
+    --type-body-weight: var(--type-body-mobile-weight);
+    --type-body-leading: var(--type-body-mobile-leading);
+    --type-data-row-family: var(--type-data-row-mobile-family);
+    --type-data-row-size: var(--type-data-row-mobile-size);
+    --type-data-row-weight: var(--type-data-row-mobile-weight);
+    --type-data-row-leading: var(--type-data-row-mobile-leading);
+    --type-route-link-family: var(--type-route-link-mobile-family);
+    --type-route-link-size: var(--type-route-link-mobile-size);
+    --type-route-link-weight: var(--type-route-link-mobile-weight);
+    --type-route-link-leading: var(--type-route-link-mobile-leading);
+    --type-route-link-tracking: var(--type-route-link-mobile-tracking);
+    --type-wordmark-family: var(--type-wordmark-mobile-family);
+    --type-wordmark-size: var(--type-wordmark-mobile-size);
+    --type-wordmark-weight: var(--type-wordmark-mobile-weight);
+    --type-wordmark-leading: var(--type-wordmark-mobile-leading);
+    --type-wordmark-tracking: var(--type-wordmark-mobile-tracking);
+    --type-wordmark-footer-family: var(--type-wordmark-footer-mobile-family);
+    --type-wordmark-footer-size: var(--type-wordmark-footer-mobile-size);
+    --type-wordmark-footer-weight: var(--type-wordmark-footer-mobile-weight);
+    --type-wordmark-footer-leading: var(--type-wordmark-footer-mobile-leading);
+    --type-wordmark-footer-tracking: var(--type-wordmark-footer-mobile-tracking);
+    --type-card-title-family: var(--type-card-title-mobile-family);
+    --type-card-title-size: var(--type-card-title-mobile-size);
+    --type-card-title-weight: var(--type-card-title-mobile-weight);
+    --type-card-title-leading: var(--type-card-title-mobile-leading);
+    --type-card-title-tracking: var(--type-card-title-mobile-tracking);
+    --type-subsection-title-family: var(--type-subsection-title-mobile-family);
+    --type-subsection-title-size: var(--type-subsection-title-mobile-size);
+    --type-subsection-title-weight: var(--type-subsection-title-mobile-weight);
+    --type-subsection-title-leading: var(--type-subsection-title-mobile-leading);
+    --type-subsection-title-tracking: var(--type-subsection-title-mobile-tracking);
+    --type-pull-quote-family: var(--type-pull-quote-mobile-family);
+    --type-pull-quote-size: var(--type-pull-quote-mobile-size);
+    --type-pull-quote-weight: var(--type-pull-quote-mobile-weight);
+    --type-pull-quote-leading: var(--type-pull-quote-mobile-leading);
+    --type-pull-quote-tracking: var(--type-pull-quote-mobile-tracking);
+    --type-dek-family: var(--type-dek-mobile-family);
+    --type-dek-size: var(--type-dek-mobile-size);
+    --type-dek-weight: var(--type-dek-mobile-weight);
+    --type-dek-leading: var(--type-dek-mobile-leading);
+    --type-body-lead-family: var(--type-body-lead-mobile-family);
+    --type-body-lead-size: var(--type-body-lead-mobile-size);
+    --type-body-lead-weight: var(--type-body-lead-mobile-weight);
+    --type-body-lead-leading: var(--type-body-lead-mobile-leading);
+    --space-margin: var(--space-margin-mobile);
+    --space-section: var(--space-section-mobile);
+    --space-band: var(--space-band-mobile);
+    --space-hero-plate-width: var(--space-hero-plate-mobile-width);
+    --space-hero-plate-height: var(--space-hero-plate-mobile-height);
+    --space-contact-plate-width: var(--space-contact-plate-mobile-width);
+    --space-contact-plate-height: var(--space-contact-plate-mobile-height);
+    --component-capability-chip-padding: var(--component-capability-chip-padding-mobile);
+  }
+}
