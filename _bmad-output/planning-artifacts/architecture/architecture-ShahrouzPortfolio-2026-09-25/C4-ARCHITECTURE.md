@@ -155,8 +155,8 @@ flowchart TB
   TOK["styles/tokens.css<br/>109 tokens, AD-8<br/>styles/reveal.css, global, AD-14"]
 
   subgraph scripts["scripts/, CI only"]
-    SC1["check-content.mjs<br/>FR-29 conditional rules, FR-27 links"]
-    SC2["check-tokens.mjs<br/>DESIGN.md to tokens.css parity"]
+    SC1["check-content.mts<br/>FR-29 conditional rules, FR-27 links"]
+    SC2["check-tokens.mts<br/>DESIGN.md to tokens.css parity"]
   end
 
   RHOME --> CARD

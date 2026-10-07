@@ -1,2 +1,2 @@
 #!/bin/sh
-exec node scripts/check-repo.mjs --message "$1"
+exec node scripts/check-repo.mts --message "$1"

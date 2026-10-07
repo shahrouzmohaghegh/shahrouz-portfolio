@@ -1,4 +1,4 @@
-// Tests for check-tokens.mjs. Run with: npm run test:scripts
+// Tests for check-tokens.mts. Run with: npm run test:scripts
 
 import assert from "node:assert/strict";
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -23,10 +23,10 @@ import {
   parseFrontmatter,
   run,
   scanStylesheet,
-} from "./check-tokens.mjs";
+} from "./check-tokens.mts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const read = (path) => readFileSync(join(ROOT, path), "utf8");
+const read = (path: string): string => readFileSync(join(ROOT, path), "utf8");
 const DESIGN = read(DESIGN_PATH);
 const TOKENS_CSS = read(TOKENS_PATH);
 const BREAKPOINTS_CSS = read(BREAKPOINTS_PATH);
@@ -41,11 +41,11 @@ const MOBILE_ROLES = [
   "wordmark-footer", "pull-quote",
 ];
 
-const fixtures = [];
+const fixtures: string[] = [];
 after(() => fixtures.forEach((dir) => rmSync(dir, { recursive: true, force: true })));
 
 // A copy of the repo's token inputs, with `files` overriding or adding paths.
-function fixture(files = {}) {
+function fixture(files: Record<string, string> = {}): string {
   const dir = mkdtempSync(join(tmpdir(), "check-tokens-"));
   fixtures.push(dir);
   for (const path of [DESIGN_PATH, TOKENS_PATH, BREAKPOINTS_PATH, LAYOUT_PATH]) {
@@ -59,17 +59,17 @@ function fixture(files = {}) {
   return dir;
 }
 
-const scan = (css) => scanStylesheet("x.module.css", css, defined);
+const scan = (css: string): string[] => scanStylesheet("x.module.css", css, defined);
 
 describe("the real repository", () => {
   test("passes", () => {
     const { failures, summary } = run(ROOT);
     assert.deepEqual(failures, []);
-    assert.match(summary, /^232 tokens checked/);
+    assert.match(summary ?? "", /^232 tokens checked/);
   });
 
   test("every one of the 16 roles has mobile tokens equal to its -mobile entry", () => {
-    const props = { fontFamily: "family", fontSize: "size", fontWeight: "weight", lineHeight: "leading", letterSpacing: "tracking" };
+    const props: Record<string, string> = { fontFamily: "family", fontSize: "size", fontWeight: "weight", lineHeight: "leading", letterSpacing: "tracking" };
     for (const role of MOBILE_ROLES) {
       const entry = groups.typography[`${role}-mobile`];
       assert.ok(entry, `${role}-mobile exists in DESIGN.md`);
@@ -323,7 +323,7 @@ describe("stylesheet scan", () => {
 
 describe("breakpoints.css", () => {
   const remaps = expectedRemaps(groups);
-  const check = (css) => checkBreakpoints(css, remaps, tokens);
+  const check = (css: string): string[] => checkBreakpoints(css, remaps, tokens);
 
   test("the real file passes", () => {
     assert.deepEqual(check(BREAKPOINTS_CSS), []);
@@ -376,7 +376,7 @@ describe("run() over a fixture repository", () => {
     const dir = fixture({ "components/card.module.css": ".card { padding: var(--space-stack-md); }\n" });
     const { failures, summary } = run(dir);
     assert.deepEqual(failures, []);
-    assert.match(summary, /1 other stylesheet/);
+    assert.match(summary ?? "", /1 other stylesheet/);
   });
 
   test("a stylesheet under a nested docs/ directory is scanned", () => {

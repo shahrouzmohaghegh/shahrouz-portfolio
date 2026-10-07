@@ -1,6 +1,6 @@
 /*
  * Breakpoints. The only file allowed to hold a media query or a breakpoint
- * width. No other stylesheet may use @media; scripts/check-tokens.mjs fails
+ * width. No other stylesheet may use @media; scripts/check-tokens.mts fails
  * if one does.
  *
  * Documented widths (DESIGN.md):

@@ -7,7 +7,7 @@ paradigm: islands
 scope: The whole site. Six routes, one typed content model, one client island, static hosting on Vercel.
 status: final
 created: '2026-09-25'
-updated: '2026-10-07'
+updated: '2026-10-08'
 binds: [FR-1, FR-2, FR-3, FR-4, FR-5, FR-7, FR-8, FR-9, FR-13, FR-14, FR-16, FR-17, FR-18, FR-19, FR-20, FR-21, FR-23, FR-25, FR-26, FR-27, FR-28, FR-29, FR-30, FR-31, FR-33, FR-34, FR-35, FR-36, FR-37, NFR-1, NFR-2, NFR-3, NFR-4, NFR-5, NFR-6, NFR-7, NFR-8]
 sources:
   - _bmad-output/planning-artifacts/prds/prd-ShahrouzPortfolio-2026-09-23/prd.md
@@ -104,7 +104,7 @@ There are exactly two islands: `RevealOnScroll` (AD-1) and `SectionRail` (AD-19)
 - **Rule:** Every design value is a CSS custom property in `styles/tokens.css`: colour, spacing, type size, line height, letter spacing, rule weight and radius. **No literal colour, length or font-size appears in any CSS Module.** Breakpoints are the single exception, since custom properties cannot be used in media queries; they are declared once as documented constants in `styles/breakpoints.css` and referenced nowhere else.
 - **Enforcement:** an ESLint or Stylelint rule fails the build on a literal hex, `rgb()`, `px`, `rem` or `em` value inside `*.module.css`, with `tokens.css` and `breakpoints.css` exempt.
 - **Also governed, and previously ungoverned:** `font-family`, `font-weight`, the `rounded` group and the `components` group. And the two value-SELECTION rules in `DESIGN.md`, which choose between tokens rather than declaring one: figure demotion by rendered character count, and focus-ring colour by the ground the ring lands on. Both are implemented once, in shared CSS, never re-derived per component.
-- **Drift check scope:** `scripts/check-tokens.mjs` asserts parity for the `colors`, `typography` and `spacing` token groups whose values are single CSS values. Composite entries such as `hero-plate-desktop: 480px x 372px` are documentation, not tokens, and are listed as exclusions in the script rather than silently skipped.
+- **Drift check scope:** `scripts/check-tokens.mts` asserts parity for the `colors`, `typography` and `spacing` token groups whose values are single CSS values. Composite entries such as `hero-plate-desktop: 480px x 372px` are documentation, not tokens, and are listed as exclusions in the script rather than silently skipped.
 
 
 ### AD-9: Content and link checks run against a running server
@@ -216,6 +216,14 @@ graph TD
 - **Prevents:** one root `not-found.tsx` emitting a single message where the contract requires two.
 - **Rule:** `app/experience/[slug]/not-found.tsx` and `app/projects/[slug]/not-found.tsx` each render the shared component with their own message. Both call `notFound()` from the route segment so the status is a real 404.
 
+### AD-24: TypeScript throughout, including tooling
+
+- **Binds:** NFR-5, AD-21
+- **Prevents:** repository scripts written in untyped JavaScript while the PRD requires TypeScript throughout, and a TypeScript runner added as a dependency only to execute them.
+- **Rule:** Every script under `scripts/` is a `.mts` file, and its tests are `.test.mts`, run with `node --test`. Node 24 runs them directly by stripping types, so no `tsx`, `ts-node` or build step is added. `tsconfig.json` sets `erasableSyntaxOnly` so only syntax Node can strip is allowed (no `enum`, `namespace` or parameter properties), and `allowImportingTsExtensions` so scripts import each other by their `.mts` name. `npm run typecheck` covers the scripts under `strict`, and `any` is not used.
+- **Exception:** a configuration file whose tool cannot load TypeScript without an extra dependency stays JavaScript. Today that is `eslint.config.mjs`, since ESLint needs `jiti` to read a TypeScript config. `next.config.ts` is already TypeScript.
+- **Added 2026-10-08** at Shahrouz's request, after Stories 1.1 and 1.2 shipped their scripts as `.mjs` following this spine's own file tree.
+
 ## Consistency Conventions
 
 | Concern | Convention |
@@ -283,8 +291,9 @@ styles/
   breakpoints.css       the one exception, AD-8
   reveal.css            global, exempt from CSS Modules, AD-14
 scripts/
-  check-content.mjs     crawl, FR-29 confidentiality and FR-27 link integrity
-  check-tokens.mjs      DESIGN.md to tokens.css drift check
+  check-repo.mts        publish allow-list and confidential terms, AD-24
+  check-content.mts     crawl, FR-29 confidentiality and FR-27 link integrity
+  check-tokens.mts      DESIGN.md to tokens.css drift check
 ```
 
 ## Capability to Architecture Map
