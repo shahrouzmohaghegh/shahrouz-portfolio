@@ -1,0 +1,22 @@
+/* Placeholder page: the name and one line saying the site is in progress. */
+.main {
+  padding: var(--space-section) var(--space-margin);
+}
+
+.name {
+  margin: 0;
+  font-family: var(--type-display-hero-family);
+  font-size: var(--type-display-hero-size);
+  font-weight: var(--type-display-hero-weight);
+  line-height: var(--type-display-hero-leading);
+  letter-spacing: var(--type-display-hero-tracking);
+}
+
+.status {
+  margin: var(--space-stack-md) 0 0;
+  font-family: var(--type-support-family);
+  font-size: var(--type-support-size);
+  font-weight: var(--type-support-weight);
+  line-height: var(--type-support-leading);
+  color: var(--color-muted);
+}

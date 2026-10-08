@@ -1,0 +1,7 @@
+/* The page ground: paper behind, ink text, no browser default margin. */
+.body {
+  margin: 0;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  color-scheme: light;
+}
