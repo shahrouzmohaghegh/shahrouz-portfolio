@@ -28,6 +28,17 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  // AD-21: abandoned-work markers in comments are lint errors, on every
+  // branch. The markers are listed only here, so documentation never trips
+  // the rule. scripts/lint-rules.test.mts keeps it from being weakened.
+  {
+    rules: {
+      "no-warning-comments": [
+        "error",
+        { terms: ["todo", "fixme", "xxx", "hack"], location: "anywhere" },
+      ],
+    },
+  },
   globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts"]),
 ]);
 
