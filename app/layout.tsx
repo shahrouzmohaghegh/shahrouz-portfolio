@@ -4,9 +4,12 @@ import type { ReactNode } from "react";
 // tokens.css must be imported before breakpoints.css: both set :root at equal specificity.
 import "@/styles/tokens.css";
 import "@/styles/breakpoints.css";
+import styles from "./layout.module.css";
 
 export const metadata: Metadata = {
   title: "Shahrouz Mohaghegh",
+  // Keeps the placeholder out of search results; removed when the real Home ships (decided by Shahrouz).
+  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({
@@ -14,7 +17,7 @@ export default function RootLayout({
 }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body className={styles.body}>{children}</body>
     </html>
   );
 }
