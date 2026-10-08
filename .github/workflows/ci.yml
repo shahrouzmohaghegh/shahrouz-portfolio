@@ -1,0 +1,87 @@
+# The gate. Every push and pull request runs the full current gate, in
+# order; any failing step fails the job. Branch protection on main requires
+# this job, so nothing merges (and Vercel deploys nothing) unless it passes.
+# The git hooks in .githooks/ run a subset locally, but hooks are skippable,
+# so this job is the guarantee.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # scripts/check-repo.mts reads the confidential terms from the untracked
+      # .forbidden-terms file. The list lives in a repository secret, never in
+      # the repo. Missing or empty fails closed. Runs triggered by Dependabot
+      # read Dependabot secrets, not Actions secrets, so FORBIDDEN_TERMS must
+      # exist in both the Actions and the Dependabot secret stores.
+      - name: Restore confidential term list
+        env:
+          FORBIDDEN_TERMS: ${{ secrets.FORBIDDEN_TERMS }}
+        run: |
+          if [ -z "$(printf '%s' "$FORBIDDEN_TERMS" | tr -d '[:space:]')" ]; then
+            echo "::error::Repository secret FORBIDDEN_TERMS is missing or empty, so the repository scan cannot run."
+            exit 1
+          fi
+          printf '%s\n' "$FORBIDDEN_TERMS" > .forbidden-terms
+
+      - name: Set up Node from .nvmrc
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Script tests
+        run: npm run test:scripts
+
+      - name: Build
+        run: npm run build
+
+      - name: Token drift check
+        run: npm run check:tokens
+
+      - name: Repository scan (tree, every blob and commit message in history)
+        run: node scripts/check-repo.mts --history
+
+      # gitleaks runs as a checksum-verified release binary rather than an
+      # action, so it scans full history on every event. Dependabot does not
+      # track this pin; bump the version and checksum by hand.
+      - name: Secret scan (gitleaks, full history)
+        env:
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          cd "$RUNNER_TEMP"
+          curl -sSfL --retry 3 --retry-connrefused -O "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
+          echo "${GITLEAKS_SHA256}  ${archive}" | sha256sum -c -
+          tar -xzf "$archive" gitleaks
+          cd "$GITHUB_WORKSPACE"
+          "$RUNNER_TEMP/gitleaks" git . --redact --no-banner --exit-code 1

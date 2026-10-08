@@ -1,11 +1,17 @@
 // Guards what can enter the public repository. Run by the git hooks in
-// .githooks/ and, later, by CI.
+// .githooks/ and by CI (.github/workflows/ci.yml).
 //
 //   node scripts/check-repo.mts                 checks the files staged for commit
 //   node scripts/check-repo.mts --message FILE  also checks a commit message
+//   node scripts/check-repo.mts --history       also checks every blob and every
+//                                               commit message reachable from HEAD
+//
+// CI runs --history, because pushing makes the whole history public: a term
+// added in one commit and removed in a later one is still published.
 //
 // The confidential terms are read from .forbidden-terms, which is untracked:
-// a public list would name the very terms it exists to keep out.
+// a public list would name the very terms it exists to keep out. CI writes
+// it at job start from the FORBIDDEN_TERMS repository secret.
 
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
@@ -28,11 +34,16 @@ function loadTerms(): RegExp[] {
     console.error(`check-repo: ${TERMS_FILE} is missing, so confidential terms cannot be checked.`);
     process.exit(1);
   }
-  return readFileSync(TERMS_FILE, "utf8")
+  const terms = readFileSync(TERMS_FILE, "utf8")
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => line && !line.startsWith("#"))
     .map((line) => new RegExp(line, "i"));
+  if (terms.length === 0) {
+    console.error(`check-repo: ${TERMS_FILE} holds no terms, so confidential terms cannot be checked.`);
+    process.exit(1);
+  }
+  return terms;
 }
 
 function scanText(label: string, text: string, terms: RegExp[], failures: string[]): void {
@@ -72,6 +83,39 @@ if (messageIndex !== -1) {
     .filter((line) => !line.startsWith("#"))
     .join("\n");
   scanText("commit message", message, terms, failures);
+}
+
+// History: every blob reachable from HEAD, each scanned once, and every
+// commit message in full. No '#' filter here: that exists only for the
+// commit-msg template, and a published message line starting with '#' is
+// still published.
+if (process.argv.includes("--history")) {
+  const objects = git("rev-list", "--objects", "HEAD").toString().split("\n").filter(Boolean);
+  const pathOf = new Map<string, string>();
+  for (const line of objects) {
+    const [sha, ...rest] = line.split(" ");
+    if (!pathOf.has(sha)) pathOf.set(sha, rest.join(" "));
+  }
+  const types = execFileSync("git", ["cat-file", "--batch-check=%(objecttype) %(objectname)"], {
+    input: [...pathOf.keys()].join("\n") + "\n",
+    maxBuffer: 64 * 1024 * 1024,
+  })
+    .toString()
+    .split("\n")
+    .filter((line) => line.startsWith("blob "));
+  for (const line of types) {
+    const sha = line.slice("blob ".length);
+    const blob = git("cat-file", "blob", sha);
+    if (blob.includes(0)) continue; // binary
+    scanText(`history ${pathOf.get(sha)} (${sha.slice(0, 7)})`, blob.toString("utf8"), terms, failures);
+  }
+
+  const log = git("log", "-z", "--format=%H%n%B", "HEAD").toString().split("\0").filter(Boolean);
+  for (const entry of log) {
+    const newline = entry.indexOf("\n");
+    const sha = entry.slice(0, newline);
+    scanText(`commit message ${sha.slice(0, 7)}`, entry.slice(newline + 1), terms, failures);
+  }
 }
 
 if (failures.length > 0) {
