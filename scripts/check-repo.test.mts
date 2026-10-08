@@ -128,4 +128,26 @@ describe("check-repo", () => {
   test("a term file holding only comments and blank lines fails", () => {
     assert.equal(run(cleanRepo("# nothing here\n\n   \n")), 1);
   });
+
+  test("an invalid pattern fails naming its line, never its text", () => {
+    const bad = `broken(${TERM}`;
+    const result = spawnSync(process.execPath, [SCRIPT], {
+      cwd: cleanRepo(`# invented terms\n${TERM}\n${bad}\n`),
+      env: ISOLATED_ENV,
+      encoding: "utf8",
+    });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /\.forbidden-terms line 3 is not a valid pattern/);
+    assert.ok(!(result.stdout + result.stderr).includes(TERM));
+  });
+
+  test("a term only on another branch fails under --history", () => {
+    const dir = cleanRepo();
+    git(dir, "switch", "-q", "-c", "side");
+    write(dir, "notes.md", `${TERM}\n`);
+    commit(dir, "Add notes on a side branch");
+    git(dir, "switch", "-q", "-");
+    assert.equal(run(dir), 0);
+    assert.equal(run(dir, "--history"), 1);
+  });
 });

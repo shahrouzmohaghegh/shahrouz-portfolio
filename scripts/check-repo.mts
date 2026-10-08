@@ -4,7 +4,8 @@
 //   node scripts/check-repo.mts                 checks the files staged for commit
 //   node scripts/check-repo.mts --message FILE  also checks a commit message
 //   node scripts/check-repo.mts --history       also checks every blob and every
-//                                               commit message reachable from HEAD
+//                                               commit message reachable from any
+//                                               ref, local or remote-tracking
 //
 // CI runs --history, because pushing makes the whole history public: a term
 // added in one commit and removed in a later one is still published.
@@ -34,11 +35,21 @@ function loadTerms(): RegExp[] {
     console.error(`check-repo: ${TERMS_FILE} is missing, so confidential terms cannot be checked.`);
     process.exit(1);
   }
-  const terms = readFileSync(TERMS_FILE, "utf8")
+  // An invalid pattern's SyntaxError quotes the pattern, which would print a
+  // confidential term into a public CI log. Report the line number only.
+  const terms: RegExp[] = [];
+  readFileSync(TERMS_FILE, "utf8")
     .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line && !line.startsWith("#"))
-    .map((line) => new RegExp(line, "i"));
+    .forEach((raw, i) => {
+      const line = raw.trim();
+      if (!line || line.startsWith("#")) return;
+      try {
+        terms.push(new RegExp(line, "i"));
+      } catch {
+        console.error(`check-repo: ${TERMS_FILE} line ${i + 1} is not a valid pattern`);
+        process.exit(1);
+      }
+    });
   if (terms.length === 0) {
     console.error(`check-repo: ${TERMS_FILE} holds no terms, so confidential terms cannot be checked.`);
     process.exit(1);
@@ -85,12 +96,13 @@ if (messageIndex !== -1) {
   scanText("commit message", message, terms, failures);
 }
 
-// History: every blob reachable from HEAD, each scanned once, and every
-// commit message in full. No '#' filter here: that exists only for the
+// History: every blob reachable from any ref (local branches, tags and
+// remote-tracking branches such as origin/main, which a full-depth CI
+// checkout provides), each scanned once, and every commit message in full. No '#' filter here: that exists only for the
 // commit-msg template, and a published message line starting with '#' is
 // still published.
 if (process.argv.includes("--history")) {
-  const objects = git("rev-list", "--objects", "HEAD").toString().split("\n").filter(Boolean);
+  const objects = git("rev-list", "--objects", "--all").toString().split("\n").filter(Boolean);
   const pathOf = new Map<string, string>();
   for (const line of objects) {
     const [sha, ...rest] = line.split(" ");
@@ -110,7 +122,7 @@ if (process.argv.includes("--history")) {
     scanText(`history ${pathOf.get(sha)} (${sha.slice(0, 7)})`, blob.toString("utf8"), terms, failures);
   }
 
-  const log = git("log", "-z", "--format=%H%n%B", "HEAD").toString().split("\0").filter(Boolean);
+  const log = git("log", "-z", "--format=%H%n%B", "--all").toString().split("\0").filter(Boolean);
   for (const entry of log) {
     const newline = entry.indexOf("\n");
     const sha = entry.slice(0, newline);
