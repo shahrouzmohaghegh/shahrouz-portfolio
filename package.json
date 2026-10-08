@@ -12,7 +12,8 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "check:tokens": "node scripts/check-tokens.mts",
-    "test:scripts": "node --test \"scripts/**/*.test.mts\""
+    "test:scripts": "node --test \"scripts/**/*.test.mts\"",
+    "terms:sync": "node scripts/terms-sync.mts"
   },
   "dependencies": {
     "next": "16.3.8",
