@@ -5,6 +5,24 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    # react-dom requires the identical react version, so they move together.
+    groups:
+      react:
+        patterns:
+          - react
+          - react-dom
+    # Each ignore holds a version the architecture or toolchain rules out.
+    # Security updates still arrive for the versions in range.
+    ignore:
+      # TypeScript 7 crashes next build; the stack pins ^5.
+      - dependency-name: typescript
+        versions: [">= 6"]
+      # Types must match the Node runtime, which is pinned to 24.
+      - dependency-name: "@types/node"
+        versions: [">= 25"]
+      # eslint-plugin-import, via eslint-config-next, supports ESLint 9 at most.
+      - dependency-name: eslint
+        versions: [">= 10"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
