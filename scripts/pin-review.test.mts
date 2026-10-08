@@ -13,18 +13,22 @@ import { fileURLToPath } from "node:url";
 import {
   CI_YML,
   DEPENDABOT_YML,
+  DOMAIN_RDAP,
   HANDLED_RULES,
   ISSUE_TITLE,
   admitsMajor,
   buildReport,
   collectFacts,
+  alertLine,
   decideIssue,
+  domainFacts,
   main,
   majorOf,
   markerOf,
   maxSatisfying,
   parseChecksum,
   parseGitleaksPin,
+  parseExpiry,
   parseIgnoreRules,
   syncIssue,
   type Deps,
@@ -71,7 +75,27 @@ const LOCAL: LocalFiles = {
     "          GITLEAKS_VERSION: 8.30.1",
     `          GITLEAKS_SHA256: ${SHA_PINNED}`,
   ].join("\n"),
+  repo: "o/r",
 };
+
+const BRANCH_URL = "https://api.github.com/repos/o/r/branches/main";
+const PROTECTED = JSON.stringify({
+  protected: true,
+  protection: {
+    enabled: true,
+    required_status_checks: { enforcement_level: "everyone", contexts: ["gate"], checks: [{ context: "gate" }] },
+  },
+});
+
+const NOW = new Date("2026-10-09T12:00:00Z");
+const EXPIRY = "2027-10-08T11:37:10Z";
+const rdap = (expiration: string): string =>
+  JSON.stringify({
+    events: [
+      { eventAction: "registration", eventDate: "2026-10-08T11:37:10Z" },
+      { eventAction: "expiration", eventDate: expiration },
+    ],
+  });
 
 const PINNED_CHECKSUMS = "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_checksums.txt";
 
@@ -103,6 +127,8 @@ function responses(over: Record<string, string | undefined> = {}): Record<string
       `${"c".repeat(64)}  gitleaks_8.31.0_darwin_arm64.tar.gz`,
       `${SHA_NEW}  gitleaks_8.31.0_linux_x64.tar.gz`,
     ].join("\n"),
+    [DOMAIN_RDAP]: rdap(EXPIRY),
+    [BRANCH_URL]: PROTECTED,
     ...over,
   };
   return Object.fromEntries(Object.entries(base).filter((entry): entry is [string, string] => entry[1] !== undefined));
@@ -115,8 +141,8 @@ const fakeFetch =
     return table[url];
   };
 
-const reportFor = async (table = responses(), local = LOCAL): Promise<string> =>
-  buildReport(await collectFacts(fakeFetch(table), local));
+const reportFor = async (table = responses(), local = LOCAL, now = NOW): Promise<string> =>
+  buildReport(await collectFacts(fakeFetch(table), local, now));
 
 describe("pin-review parsers", () => {
   test("parseIgnoreRules reads only the npm entry, with flow, block and quoted forms", () => {
@@ -139,6 +165,22 @@ describe("pin-review parsers", () => {
   test("parseChecksum picks the linux x64 archive only", () => {
     assert.equal(parseChecksum(responses()["https://example.test/checksums"], "8.31.0"), SHA_NEW);
     assert.throws(() => parseChecksum(responses()["https://example.test/checksums"], "8.30.1"));
+  });
+
+  test("parseExpiry reads the expiration event, and fails without a valid one", () => {
+    assert.equal(parseExpiry(rdap(EXPIRY)), EXPIRY);
+    assert.throws(() => parseExpiry(JSON.stringify({ events: [{ eventAction: "registration", eventDate: EXPIRY }] })), /no valid expiration/);
+    assert.throws(() => parseExpiry(rdap("soon")), /no valid expiration/);
+    assert.throws(() => parseExpiry("<html>"));
+  });
+
+  test("domainFacts counts whole days: ok beyond 21, near at 21 or fewer, expired once past", () => {
+    assert.deepEqual(domainFacts(EXPIRY, NOW), { state: "ok", expires: "2027-10-08", daysRemaining: 363 });
+    assert.deepEqual(domainFacts("2026-10-30T12:00:00Z", NOW), { state: "near", expires: "2026-10-30", daysRemaining: 21 });
+    assert.equal(domainFacts("2026-10-31T12:00:00Z", NOW).state, "ok");
+    assert.equal(domainFacts("2026-10-09T13:00:00Z", NOW).state, "near");
+    assert.equal(domainFacts("2026-10-09T12:00:00Z", NOW).state, "expired");
+    assert.deepEqual(domainFacts("2026-10-01T12:00:00Z", NOW), { state: "expired", expires: "2026-10-01", daysRemaining: -8 });
   });
 
   test("majorOf reads the first number", () => {
@@ -217,6 +259,69 @@ describe("collectFacts and buildReport", () => {
     assert.match(report, /pinned SHA-256 matches the published checksum for 8\.30\.1: yes/);
     assert.match(report, /- latest release: 8\.31\.0/);
     assert.match(report, /linux x64 SHA-256 of 8\.31\.0, from `gitleaks_8\.31\.0_checksums\.txt`: `b{64}`/);
+    assert.match(report, /## branch protection \(main\)[\s\S]*- state: intact, in o\/r/);
+    assert.match(report, /not visible without an admin token and are not checked/);
+    assert.match(report, /## domain \(shahrouzmohaghegh\.com\)/);
+    assert.match(report, /- state: ok\n- expires: 2027-10-08\n- days remaining: 363/);
+    assert.match(report, /within 21 days of expiry, late enough not to fire before the registrar's own auto-renew/);
+    assert.doesNotMatch(report, /Needs attention/);
+  });
+
+  test("the domain moves the key only when its state changes, not daily", async () => {
+    const before = markerOf(await reportFor());
+    const nextMonth = await reportFor(responses(), LOCAL, new Date("2026-11-09T12:00:00Z"));
+    const near = await reportFor(responses(), LOCAL, new Date("2027-09-20T12:00:00Z"));
+    const expired = await reportFor(responses(), LOCAL, new Date("2027-10-13T12:00:00Z"));
+    assert.equal(markerOf(nextMonth), before);
+    assert.match(nextMonth, /days remaining: 332/);
+    assert.notEqual(markerOf(near), before);
+    assert.match(near, /- state: near\n- expires: 2027-10-08\n- days remaining: 17/);
+    assert.notEqual(markerOf(expired), markerOf(near));
+    assert.match(expired, /- state: expired\n- expires: 2027-10-08\n- expired 5 days ago/);
+  });
+
+  test("an RDAP failure, such as a lapsed domain's 404, is reported as unreadable and the report still builds", async () => {
+    const report = await reportFor(responses({ [DOMAIN_RDAP]: undefined }));
+    assert.match(report, /- state: unreadable \(https:\/\/rdap\.verisign\.com.*HTTP 503\)/);
+    assert.match(report, /## gitleaks/);
+    assert.notEqual(markerOf(report), markerOf(await reportFor()));
+    const noEvent = await reportFor(responses({ [DOMAIN_RDAP]: JSON.stringify({ events: [] }) }));
+    assert.match(noEvent, /- state: unreadable \(RDAP for shahrouzmohaghegh\.com has no valid expiration event\)/);
+  });
+
+  test("drifted protection is listed, in the key, and the error text of an unreadable one is not", async () => {
+    const intact = markerOf(await reportFor());
+    const drifted = await reportFor(responses({ [BRANCH_URL]: JSON.stringify({ protected: false }) }));
+    assert.match(drifted, /- state: drifted, in o\/r\n {2}- main is not protected/);
+    assert.notEqual(markerOf(drifted), intact);
+    const down = await reportFor(responses({ [BRANCH_URL]: undefined }));
+    const otherwiseDown = await reportFor(responses({ [BRANCH_URL]: "null" }));
+    assert.match(down, /- state: unreadable \(.*HTTP 503\)/);
+    assert.match(otherwiseDown, /- state: unreadable \(unexpected branch response: not an object\)/);
+    assert.equal(markerOf(down), markerOf(otherwiseDown));
+    assert.notEqual(markerOf(down), intact);
+  });
+
+  test("an unknown repository reads protection as unreadable without fetching it", async () => {
+    const report = await reportFor(responses({ [BRANCH_URL]: undefined }), { ...LOCAL, repo: null });
+    assert.match(report, /- state: unreadable \(repository unknown/);
+  });
+
+  test("an alert line leads the body when protection or the domain needs action", async () => {
+    const lead = (report: string): string => report.split("\n")[3];
+    const drifted = await reportFor(responses({ [BRANCH_URL]: JSON.stringify({ protected: false }) }));
+    assert.equal(lead(drifted), "**Needs attention:** main protection has drifted. Details below.");
+    const near = await reportFor(responses(), LOCAL, new Date("2027-09-20T12:00:00Z"));
+    assert.equal(lead(near), "**Needs attention:** shahrouzmohaghegh.com expires in 17 days. Details below.");
+    const both = await reportFor(responses({ [BRANCH_URL]: undefined, [DOMAIN_RDAP]: undefined }));
+    assert.equal(
+      lead(both),
+      "**Needs attention:** main protection could not be read; shahrouzmohaghegh.com expiry could not be read. Details below.",
+    );
+    const expired = await collectFacts(fakeFetch(), LOCAL, new Date("2027-10-13T12:00:00Z"));
+    assert.match(alertLine(expired) ?? "", /shahrouzmohaghegh\.com expired 5 days ago/);
+    assert.equal(alertLine(await collectFacts(fakeFetch(), LOCAL, NOW)), null);
+    assert.ok(lead(await reportFor()).startsWith("Facts from"));
   });
 
   test("the marker key holds decision facts only, so a patch release keeps it", async () => {
@@ -373,6 +478,17 @@ describe("main", () => {
     assert.equal(await main(["--dry-run"], d), 1);
     assert.equal(calls.length, 0);
     assert.match(err.join(""), /unknown argument/);
+  });
+
+  test("a failed RDAP fetch still writes the issue, with the domain unreadable", async () => {
+    const { d, calls, out } = deps();
+    d.fetchText = fakeFetch(responses({ [DOMAIN_RDAP]: undefined }));
+    assert.equal(await main([], d), 0);
+    assert.match(out.join(""), /expiry could not be read/);
+    assert.deepEqual(
+      calls.map((c) => c.args[1]),
+      ["list", "create"],
+    );
   });
 
   test("a failed fetch rejects before any gh call", async () => {

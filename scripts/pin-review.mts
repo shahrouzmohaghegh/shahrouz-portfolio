@@ -11,12 +11,21 @@
 //
 // Every ignore rule in the npm entry of dependabot.yml needs a handler
 // below; a rule without one fails the run, so a new pin cannot go
-// unreported. The gitleaks binary pinned in ci.yml is reported too.
+// unreported. The gitleaks binary pinned in ci.yml is reported too, and
+// so are two facts the CI gate cannot watch on a quiet repository: main's
+// branch protection (the same reading as check-protection.mts) and the
+// domain's registry expiry date, read over RDAP. Renewal is automatic, but
+// a lapse from a failed payment would take the site down with no other
+// warning. Neither failing to read protection nor failing to read RDAP
+// (a lapsed domain returns 404) stops the report: each is reported as
+// unreadable, so the dependency facts still publish.
 //
 // The issue is found by a hidden marker carrying a key of the facts that
 // matter for a decision (majors, whether ESLint's next major is admitted,
-// whether gitleaks moved and whether its pinned checksum still matches).
-// Exact versions are display text only, so a patch release changes nothing.
+// whether gitleaks moved and whether its pinned checksum still matches,
+// whether protection holds, and the domain's state: ok, near, expired or
+// unreadable). Exact versions, the days remaining and error text are
+// display only, so a patch release or another day passing changes nothing.
 // An open issue is updated when its key differs. With none open, a new one
 // is created only when the key differs from the most recently closed one,
 // so closing the issue after review keeps it closed until something moves.
@@ -26,6 +35,8 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { BRANCH, defaultOriginUrl, readProtection, resolveRepo } from "./check-protection.mts";
+
 export const ISSUE_TITLE = "Dependency pins to review";
 export const PACKAGE_JSON = "package.json";
 export const NVMRC = ".nvmrc";
@@ -34,6 +45,14 @@ export const CI_YML = ".github/workflows/ci.yml";
 
 const REGISTRY = "https://registry.npmjs.org";
 const GITLEAKS_RELEASE = "https://api.github.com/repos/gitleaks/gitleaks/releases/latest";
+export const DOMAIN = "shahrouzmohaghegh.com";
+export const DOMAIN_RDAP = `https://rdap.verisign.com/com/v1/domain/${DOMAIN}`;
+// The domain counts as near expiry within this many days. Registrars
+// commonly run auto-renew during the final month, so a wider window (60
+// days) would flag every healthy year before renewal had its chance; 21
+// days still leaves three weeks to act once a renewal has failed.
+export const DOMAIN_WINDOW_DAYS = 21;
+const DAY_MS = 24 * 60 * 60 * 1000;
 const gitleaksChecksumsUrl = (version: string): string =>
   `https://github.com/gitleaks/gitleaks/releases/download/v${version}/gitleaks_${version}_checksums.txt`;
 
@@ -115,6 +134,14 @@ export function parseChecksum(checksums: string, version: string): string {
     if (file === archive && /^[0-9a-f]{64}$/.test(sha)) return sha;
   }
   throw new Error(`checksums file has no SHA-256 for ${archive}`);
+}
+
+// The expiration event of an RDAP domain response, as an ISO timestamp.
+export function parseExpiry(rdapJson: string): string {
+  const rdap = JSON.parse(rdapJson) as { events?: { eventAction?: string; eventDate?: string }[] };
+  const date = rdap.events?.find((event) => event.eventAction === "expiration")?.eventDate;
+  if (!date || Number.isNaN(Date.parse(date))) throw new Error(`RDAP for ${DOMAIN} has no valid expiration event`);
+  return date;
 }
 
 export function majorOf(version: string): number {
@@ -239,7 +266,8 @@ export function maxSatisfying(versions: string[], range: string): string | null 
 
 // ---------------------------------------------------------------- facts
 
-export type LocalFiles = { packageJson: string; nvmrc: string; dependabotYml: string; ciYml: string };
+// repo is owner/name for the protection reading, or null when unknown.
+export type LocalFiles = { packageJson: string; nvmrc: string; dependabotYml: string; ciYml: string; repo: string | null };
 export type FetchText = (url: string) => Promise<string>;
 
 export type PinFacts =
@@ -261,7 +289,16 @@ export type GitleaksFacts = {
   checksumsFile: string;
 };
 
-export type Facts = { pins: PinFacts[]; gitleaks: GitleaksFacts };
+export type DomainFacts =
+  | { state: "ok" | "near" | "expired"; expires: string; daysRemaining: number }
+  | { state: "unreadable"; reason: string };
+
+export type ProtectionFacts =
+  | { state: "intact"; repo: string }
+  | { state: "drifted"; repo: string; problems: string[] }
+  | { state: "unreadable"; reason: string };
+
+export type Facts = { pins: PinFacts[]; gitleaks: GitleaksFacts; protection: ProtectionFacts; domain: DomainFacts };
 
 type Manifest = {
   version: string;
@@ -307,7 +344,36 @@ const HANDLERS: Record<string, (rule: IgnoreRule, ctx: Context) => Promise<PinFa
 
 export const HANDLED_RULES = Object.keys(HANDLERS);
 
-export async function collectFacts(fetchText: FetchText, local: LocalFiles): Promise<Facts> {
+// The expiry as a UTC date, and whole days from now to it, rounded toward
+// zero (so a negative count is whole days since expiry): expired once the
+// expiry has passed, near at DOMAIN_WINDOW_DAYS or fewer.
+export function domainFacts(expiry: string, now: Date): DomainFacts {
+  const at = Date.parse(expiry);
+  const daysRemaining = Math.trunc((at - now.getTime()) / DAY_MS) || 0;
+  const state = at <= now.getTime() ? "expired" : daysRemaining <= DOMAIN_WINDOW_DAYS ? "near" : "ok";
+  return { state, expires: new Date(at).toISOString().slice(0, 10), daysRemaining };
+}
+
+const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+
+async function readDomain(fetchText: FetchText, now: Date): Promise<DomainFacts> {
+  try {
+    return domainFacts(parseExpiry(await fetchText(DOMAIN_RDAP)), now);
+  } catch (error) {
+    return { state: "unreadable", reason: errorText(error) };
+  }
+}
+
+async function protectionFacts(fetchText: FetchText, repo: string | null): Promise<ProtectionFacts> {
+  if (!repo) return { state: "unreadable", reason: "repository unknown: no GITHUB_REPOSITORY and no GitHub origin remote" };
+  const reading = await readProtection(fetchText, repo);
+  if (reading.state === "unreadable") return reading;
+  return reading.problems.length === 0
+    ? { state: "intact", repo }
+    : { state: "drifted", repo, problems: reading.problems };
+}
+
+export async function collectFacts(fetchText: FetchText, local: LocalFiles, now: Date = new Date()): Promise<Facts> {
   const pkg = JSON.parse(local.packageJson) as { devDependencies?: Record<string, string> };
   const ctx: Context = {
     local,
@@ -337,7 +403,15 @@ export async function collectFacts(fetchText: FetchText, local: LocalFiles): Pro
   if (!asset) throw new Error(`gitleaks ${release.tag_name} publishes no checksums.txt`);
   const latestSha256 = parseChecksum(await fetchText(asset.browser_download_url), latest);
 
-  return { pins, gitleaks: { pinned, pinnedPublishedSha256, latest, latestSha256, checksumsFile: asset.name } };
+  const protection = await protectionFacts(fetchText, local.repo);
+  const domain = await readDomain(fetchText, now);
+
+  return {
+    pins,
+    gitleaks: { pinned, pinnedPublishedSha256, latest, latestSha256, checksumsFile: asset.name },
+    protection,
+    domain,
+  };
 }
 
 // ---------------------------------------------------------------- report
@@ -346,7 +420,7 @@ const yesNo = (value: boolean | null): string => (value === null ? "range not un
 
 // The facts a decision depends on. Exact versions are left out on purpose.
 export function reportKey(facts: Facts): string {
-  const key: Record<string, Record<string, number | boolean | null>> = {};
+  const key: Record<string, Record<string, number | boolean | string | string[] | null>> = {};
   for (const pin of facts.pins) {
     const pinnedMajor = majorOf(pin.pinned);
     if (pin.name === "typescript") key[pin.name] = { pinnedMajor, latestMajor: majorOf(pin.latest) };
@@ -364,6 +438,11 @@ export function reportKey(facts: Facts): string {
     latestEqualsPinned: g.latest === g.pinned.version,
     pinnedChecksumMatches: g.pinnedPublishedSha256 === g.pinned.sha256,
   };
+  key.protection = {
+    state: facts.protection.state,
+    problems: facts.protection.state === "drifted" ? facts.protection.problems : [],
+  };
+  key.domain = { state: facts.domain.state };
   return JSON.stringify(key);
 }
 
@@ -406,16 +485,69 @@ function pinSection(pin: PinFacts): string[] {
   ];
 }
 
+const PROTECTION_CHECKED = "protected, required checks enforced for admins too, and `gate` required";
+
+function domainLine(domain: DomainFacts): string {
+  if (domain.state === "unreadable") return `${DOMAIN} expiry could not be read`;
+  if (domain.state === "expired") return `${DOMAIN} expired ${-domain.daysRemaining} days ago`;
+  return `${DOMAIN} expires in ${domain.daysRemaining} days`;
+}
+
+// One line naming whatever needs action now, or null when nothing does.
+export function alertLine(facts: Facts): string | null {
+  const parts: string[] = [];
+  if (facts.protection.state === "drifted") parts.push(`${BRANCH} protection has drifted`);
+  if (facts.protection.state === "unreadable") parts.push(`${BRANCH} protection could not be read`);
+  if (facts.domain.state !== "ok") parts.push(domainLine(facts.domain));
+  return parts.length > 0 ? `**Needs attention:** ${parts.join("; ")}. Details below.` : null;
+}
+
+function protectionSection(protection: ProtectionFacts): string[] {
+  const head = [
+    `## branch protection (${BRANCH})`,
+    "",
+    `The same reading as the CI gate's \`scripts/check-protection.mts\`: ${PROTECTION_CHECKED}. ` +
+      "Pull request, strict and force push settings are not visible without an admin token and are not checked.",
+    "",
+  ];
+  if (protection.state === "unreadable") return [...head, `- state: unreadable (${protection.reason})`];
+  if (protection.state === "intact") return [...head, `- state: intact, in ${protection.repo}`];
+  return [...head, `- state: drifted, in ${protection.repo}`, ...protection.problems.map((p) => `  - ${p}`)];
+}
+
+function domainSection(domain: DomainFacts): string[] {
+  const head = [
+    `## domain (${DOMAIN})`,
+    "",
+    `Set to renew automatically; this catches a renewal that failed. From the registry over RDAP, \`${DOMAIN_RDAP}\`. ` +
+      `Flagged as near within ${DOMAIN_WINDOW_DAYS} days of expiry, late enough not to fire before the registrar's own ` +
+      "auto-renew in a healthy year, early enough to act on a failed one.",
+    "",
+  ];
+  if (domain.state === "unreadable") return [...head, `- state: unreadable (${domain.reason})`];
+  return [
+    ...head,
+    `- state: ${domain.state}`,
+    `- expires: ${domain.expires}`,
+    domain.state === "expired"
+      ? `- expired ${-domain.daysRemaining} days ago`
+      : `- days remaining: ${domain.daysRemaining}`,
+  ];
+}
+
 export function buildReport(facts: Facts): string {
   const g = facts.gitleaks;
+  const alert = alertLine(facts);
   const lines = [
     `${MARKER_PREFIX}${reportKey(facts)} -->`,
     `<!-- Written by scripts/pin-review.mts (.github/workflows/pin-review.yml). Manual edits are overwritten. -->`,
     "",
-    "Facts from the npm registry and GitHub releases for each version this project holds back by hand. " +
+    ...(alert ? [alert, ""] : []),
+    "Facts from the npm registry and GitHub releases for each version this project holds back by hand, " +
+      "with main's branch protection and the domain's expiry date from the .com registry. " +
       "Whether a pin can be lifted is a judgement for review; nothing here changes a dependency. " +
-      "Close this issue after review: it returns only when a major, a peer range verdict or the gitleaks pin moves; " +
-      "patch releases alone do not reopen it.",
+      "Close this issue after review: it returns only when a major, a peer range verdict or the gitleaks pin moves, " +
+      "or when protection or the domain changes state; patch releases alone do not reopen it.",
     "",
   ];
   for (const pin of facts.pins) lines.push(...pinSection(pin), "");
@@ -429,6 +561,10 @@ export function buildReport(facts: Facts): string {
     `- latest release: ${g.latest}`,
     `- latest release equals pinned: ${yesNo(g.latest === g.pinned.version)}`,
     `- linux x64 SHA-256 of ${g.latest}, from \`${g.checksumsFile}\`: \`${g.latestSha256}\``,
+    "",
+    ...protectionSection(facts.protection),
+    "",
+    ...domainSection(facts.domain),
   );
   return lines.join("\n") + "\n";
 }
@@ -504,7 +640,13 @@ function defaultGh(args: string[], input?: string): string {
 function readLocal(): LocalFiles {
   const root = join(dirname(fileURLToPath(import.meta.url)), "..");
   const read = (path: string): string => readFileSync(join(root, path), "utf8");
-  return { packageJson: read(PACKAGE_JSON), nvmrc: read(NVMRC), dependabotYml: read(DEPENDABOT_YML), ciYml: read(CI_YML) };
+  return {
+    packageJson: read(PACKAGE_JSON),
+    nvmrc: read(NVMRC),
+    dependabotYml: read(DEPENDABOT_YML),
+    ciYml: read(CI_YML),
+    repo: resolveRepo({ GITHUB_REPOSITORY: process.env.GITHUB_REPOSITORY }, defaultOriginUrl),
+  };
 }
 
 export type Deps = {
