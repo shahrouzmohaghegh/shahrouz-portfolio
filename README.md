@@ -24,6 +24,8 @@ The hooks run `scripts/check-repo.mts` before every commit. It blocks planning f
 
 `main` is protected. Every change reaches it through a pull request, and the pull request merges only when the `gate` job in `.github/workflows/ci.yml` passes. Protection is strict (the branch must be up to date with `main` before merging) and applies to admins too, so there is no direct push to `main` for anyone.
 
+The `gate` job also checks part of this protection on every run: its last step, `scripts/check-protection.mts`, fails unless `main` is protected, its required checks apply to admins too, and `gate` is among them. Those three are all the public branch endpoint shows; the pull request, strict and force push settings need an admin token to read and are not checked. Run `node scripts/check-protection.mts` to check it locally.
+
 ```sh
 git switch -c <topic> main
 # commit, through the hooks
@@ -62,7 +64,7 @@ npm run terms:sync                # the guard, then both secrets
 
 ## Pinned versions
 
-`.github/dependabot.yml` holds back TypeScript, `@types/node` and ESLint, with a reason for each, and `ci.yml` pins the gitleaks binary by version and checksum, which Dependabot does not track. Once a month `.github/workflows/pin-review.yml` runs `scripts/pin-review.mts`, which keeps one issue, "Dependency pins to review", current with the latest versions next to those pins. Close it after review; it comes back only when a major version, a peer range verdict or the gitleaks pin moves, not for patch releases. `node scripts/pin-review.mts --print` shows the same report locally without touching the issue.
+`.github/dependabot.yml` holds back TypeScript, `@types/node` and ESLint, with a reason for each, and `ci.yml` pins the gitleaks binary by version and checksum, which Dependabot does not track. Once a month `.github/workflows/pin-review.yml` runs `scripts/pin-review.mts`, which keeps one issue, "Dependency pins to review", current with the latest versions next to those pins. Close it after review; it comes back only when a major version, a peer range verdict or the gitleaks pin moves, not for patch releases. The report also carries the same protection reading, so relaxed protection is noticed even when nothing runs CI, and the registry expiry date of `shahrouzmohaghegh.com`, read over RDAP. The issue returns, led by an alert line, when protection drifts or cannot be read, or the domain is within 21 days of expiry, expired or unreadable, in case auto-renew or billing fails. `node scripts/pin-review.mts --print` shows the same report locally without touching the issue.
 
 GitHub disables scheduled workflows in a public repository after 60 days without repository activity, and says so in the Actions tab. To turn the review back on, open Actions, select "Pin review" and choose "Enable workflow", or run `gh workflow enable pin-review.yml`. Running it once by hand (`gh workflow run pin-review.yml`) checks it still works.
 

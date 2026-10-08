@@ -85,3 +85,16 @@ jobs:
           tar -xzf "$archive" gitleaks
           cd "$GITHUB_WORKSPACE"
           "$RUNNER_TEMP/gitleaks" git . --redact --no-banner --exit-code 1
+
+      # Branch protection is what keeps a red gate out of production, so the
+      # gate checks the part of it the public branch endpoint shows: main
+      # protected, required checks enforced for admins too, and gate among
+      # them. Pull request, strict and force push settings are not visible
+      # there and are not checked. It uses this job's read-only token; no
+      # admin token. Drift fails with "has drifted:" and the list; an outage
+      # (network, timeout or HTTP error after one retry) fails with "could
+      # not read" instead, and a re-run once GitHub recovers clears it.
+      - name: Branch protection check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/check-protection.mts
