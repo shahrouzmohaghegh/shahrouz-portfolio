@@ -30,9 +30,19 @@ function write(dir: string, path: string, text: string): void {
   writeFileSync(join(dir, path), text);
 }
 
+// Run from a git hook, this suite inherits variables such as GIT_INDEX_FILE.
+// During `git commit -a` that is an absolute path to the real repository's
+// index, and a scratch repository would write into it. Children never see
+// any GIT_* variable.
+const ISOLATED_ENV: NodeJS.ProcessEnv = { ...process.env };
+for (const key of Object.keys(ISOLATED_ENV)) {
+  if (key.startsWith("GIT_")) delete ISOLATED_ENV[key];
+}
+
 function git(dir: string, ...args: string[]): void {
   execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "core.hooksPath=/dev/null", ...args], {
     cwd: dir,
+    env: ISOLATED_ENV,
     stdio: "ignore",
   });
 }
@@ -57,7 +67,7 @@ function cleanRepo(terms: string | null = `# invented terms\n${TERM}\n`): string
 }
 
 function run(dir: string, ...args: string[]): number | null {
-  return spawnSync(process.execPath, [SCRIPT, ...args], { cwd: dir, encoding: "utf8" }).status;
+  return spawnSync(process.execPath, [SCRIPT, ...args], { cwd: dir, env: ISOLATED_ENV, encoding: "utf8" }).status;
 }
 
 describe("check-repo", () => {
