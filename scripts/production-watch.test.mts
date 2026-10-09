@@ -35,6 +35,7 @@ import {
   keyOf,
   main,
   makeGh,
+  parseList,
   planIssues,
   recordedKey,
   recoveredComment,
@@ -135,7 +136,8 @@ function fakeGh(issues: FakeIssue[], labels: string[] = [LABEL]): { gh: Gh; call
       const issue = issues.find((i) => i.number === number);
       return (issue?.comments ?? []).map((c) => JSON.stringify(c)).join("\n") + "\n";
     }
-    if (args[0] === "label" && args[1] === "list") return JSON.stringify(labels.map((name) => ({ name })));
+    // Real gh prints nothing, not "[]", when `label list --search` matches no label.
+    if (args[0] === "label" && args[1] === "list") return labels.length === 0 ? "" : JSON.stringify(labels.map((name) => ({ name })));
     return "";
   };
   return { gh, calls };
@@ -643,5 +645,16 @@ describe("defaultHttp", () => {
   test("a non-OK status resolves rather than throwing", async () => {
     const fetchImpl = async (): Promise<Response> => new Response("", { status: 503 });
     assert.equal((await defaultHttp(APEX, { fetchImpl, token: "" })).status, 503);
+  });
+});
+
+describe("parseList", () => {
+  test("empty gh output is an empty list, as gh prints for some empty --json lists", () => {
+    assert.deepEqual(parseList(""), []);
+    assert.deepEqual(parseList("  \n"), []);
+  });
+
+  test("a JSON array parses", () => {
+    assert.deepEqual(parseList<{ name: string }>('[{"name":"production"}]'), [{ name: "production" }]);
   });
 });
