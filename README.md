@@ -26,7 +26,7 @@ content/         Typed content as data; imports nothing from components/ or app/
 lib/             Shared logic used by routes and components
 styles/          tokens.css (every design value) and breakpoints.css (the only media query)
 scripts/         Repository checks and tooling, in TypeScript, each with tests
-.github/         The CI gate, the monthly pin review and Dependabot settings
+.github/         The CI gate, the production watch, the monthly pin review and Dependabot settings
 .githooks/       Local pre-commit and commit-msg hooks
 _bmad-output/    The published subset of the planning documents
 ```
@@ -72,6 +72,7 @@ npm scripts:
 - `npm run check:readme`: every dependency justified here, every script and gate step listed in this section, every relative link resolving.
 - `npm run test:scripts`: the tests for every script, with `node --test`.
 - `npm run terms:sync`: changes the confidential term list safely (see below).
+- `npm run watch:production`: runs the production checks once against the live site and prints the result; touches no issue (see [Production watch](#production-watch)).
 
 The `gate` job in `.github/workflows/ci.yml` runs on every push and pull request, in this order:
 
@@ -124,6 +125,19 @@ Two repository settings keep this cheap:
 1. **Production is broken:** roll back in Vercel to the previous production deployment (instant rollback). No commit is needed, and the gate is not involved.
 2. **The fix:** goes through a pull request like any other change.
 3. **The gate fails for a reason outside the change** (an outage at GitHub, npm or the gitleaks download): wait for the outage to pass, then re-run the job with `gh run rerun <run-id> --failed`. There is no bypass; production stays safe on the rolled-back deployment meanwhile.
+
+## Production watch
+
+Two layers tell Shahrouz when production breaks, so a visitor never has to.
+
+- **In the repository:** four times an hour `.github/workflows/production-watch.yml` runs `scripts/production-watch.mts`. It checks that `https://shahrouzmohaghegh.com/` answers 200 with his name on the page; that `https://www.`, `http://` and `http://www.` each redirect (308) to it; and that the latest GitHub deployment in the `Production` environment, which Vercel records, has neither failed nor sat queued or in progress for over 30 minutes. A check must fail on three passes a minute apart to count, and an open issue closes only after three clean passes, so a blip changes nothing. While anything is wrong, one issue, "Production is down", stays open, assigned to Shahrouz and labelled `production`, listing the problems; it gets a comment only when the set of failing checks changes, and closes itself with a "Recovered" comment. Only issues and comments written by the GitHub Actions bot count, so nobody else can silence or close an alert. It needs no secret beyond the job's own token, and touches issues only inside GitHub Actions.
+- **Outside it:** an UptimeRobot keyword monitor in Shahrouz's own account requests the apex every five minutes and alerts him by email when the page stops answering or no longer contains his name. It never pauses and does not depend on GitHub, which can delay or skip scheduled runs. Its configuration lives in that account, not here.
+
+After a Vercel instant rollback the site recovers, but the deployment problem stays open until a new deploy succeeds, because the latest commit on `main` is not what is live.
+
+To prove the alert path end to end, run `gh workflow run production-watch.yml -f simulate_failure=true`. It fails the apex check on purpose and opens a real issue, which the next scheduled run closes once three passes are clean.
+
+GitHub disables scheduled workflows in a public repository after 60 days without repository activity, and says so in the Actions tab. To turn the watch back on, open Actions, select "Production watch" and choose "Enable workflow", or run `gh workflow enable production-watch.yml`; then `gh workflow run production-watch.yml` checks it still works. `npm run watch:production` runs the same checks locally and prints the result without touching any issue.
 
 ## Changing the confidential terms
 

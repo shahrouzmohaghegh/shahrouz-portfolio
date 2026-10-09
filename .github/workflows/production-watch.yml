@@ -1,0 +1,64 @@
+# Watches production four times an hour: the apex answers 200 with the
+# site's name, www and http redirect (308) to it, and the latest Production
+# deployment did not fail or stick. scripts/production-watch.mts keeps one
+# issue, "Production is down", open while a check fails on three passes a
+# minute apart, comments when the failing checks change, and closes it
+# after three clean passes. GitHub emails the issue. Dispatching with
+# simulate_failure opens a real issue to prove the alert path; the next
+# scheduled run closes it. It reads the site and the deployments
+# API only; it changes no deployment, setting or code.
+#
+# GitHub pauses scheduled workflows after 60 days without repository
+# activity and delays or skips scheduled runs under load, so the external
+# UptimeRobot monitor described in the README is the reliable uptime alert.
+
+name: Production watch
+
+on:
+  schedule:
+    # Off the quarter hours, when scheduled runs queue the most.
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+    inputs:
+      simulate_failure:
+        description: Fail the apex check on purpose for this run, opening a real issue
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  deployments: read
+  issues: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node from .nvmrc
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      # The script uses only Node built-ins, so there is no npm ci. Problems
+      # go to the issue, not the exit code; the job fails only when the issue
+      # cannot be read or written, and GitHub emails that failure instead.
+      - name: Check production and update the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SIMULATE_FAILURE: ${{ inputs.simulate_failure }}
+        run: |
+          if [ "$SIMULATE_FAILURE" = "true" ]; then
+            node scripts/production-watch.mts --simulate-failure
+          else
+            node scripts/production-watch.mts
+          fi
