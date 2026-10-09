@@ -31,7 +31,18 @@ scripts/         Repository checks and tooling, in TypeScript, each with tests
 _bmad-output/    The published subset of the planning documents
 ```
 
-`content/ad-10-probe.ts` is a deliberate probe that keeps the lint rule on import direction firing; it is not dead code.
+`content/ad-10-probe.ts` and `components/ad-6-probe.ts` are deliberate probes that keep the lint rules on import direction firing; they are not dead code. The second rule keeps `app/` and `components/` reading evidence only through `lib/evidence.ts`.
+
+## Adding an Evidence Item
+
+Every Case Study and Project is defined once and read from there by every page, through the `EvidenceItem` type in `lib/evidence.ts`. Adding one takes two file edits:
+
+1. An entry in `content/case-studies/index.ts` or `content/projects/index.ts`: slug, title, one-line summary, one or more Capabilities, one Headline Metric and the `href` (`/experience/<slug>` or `/projects/<slug>`).
+2. A new `<slug>.mdx` beside it, holding the prose.
+
+A slug is lowercase kebab-case and unique across both collections. The order of entries in `index.ts` is the order they are shown in.
+
+It is two files, not one, because metadata lives in TypeScript and prose in MDX (AD-5 in the spine). MDX exports and frontmatter are not type-checked, so keeping the metadata in TypeScript is what makes an unknown Capability, an empty Capability list or a metric without its qualifier fail `npm run typecheck`; the cases are pinned in `lib/evidence.type-test.ts`. `npm run test` then fails, naming the item, on an entry with no `.mdx`, an `.mdx` with no entry, a slug used twice across both collections, or an `href` that does not match the kind and slug. The split is revisited past about twenty items.
 
 ## Architecture and planning
 
@@ -56,6 +67,7 @@ These five are the only planning files published. The product requirements, the 
 | `eslint` | Runs the lint step of the gate. |
 | `eslint-config-next` | The Next.js lint rules, and the import plugin that enforces dependency direction. |
 | `typescript` | Strict type checking of the site and the scripts. |
+| `vitest` | Runs the application logic tests, starting with the content integrity suite; the scripts keep `node:test`. |
 
 There is no component library, CSS framework or animation library. A dependency without a row here fails `scripts/check-readme.mts`.
 
@@ -71,6 +83,7 @@ npm scripts:
 - `npm run check:tokens`: keeps `styles/tokens.css` in step with the design document and every stylesheet on the tokens.
 - `npm run check:readme`: every dependency justified here, every script and gate step listed in this section, every relative link resolving.
 - `npm run test:scripts`: the tests for every script, with `node --test`.
+- `npm run test`: the application logic tests, with Vitest; today the content integrity suite in `lib/evidence.test.ts`.
 - `npm run terms:sync`: changes the confidential term list safely (see below).
 - `npm run watch:production`: runs the production checks once against the live site and prints the result; touches no issue (see [Production watch](#production-watch)).
 
@@ -83,12 +96,13 @@ The `gate` job in `.github/workflows/ci.yml` runs on every push and pull request
 5. **Lint**: `npm run lint`.
 6. **Type check**: `npm run typecheck`.
 7. **Script tests**: `npm run test:scripts`.
-8. **Build**: `npm run build`.
-9. **Token drift check**: `npm run check:tokens`.
-10. **Repository scan (tree, every blob and commit message in history)**: `check-repo.mts --history`.
-11. **Secret scan (gitleaks, full history)**: a checksum-pinned gitleaks binary.
-12. **README check**: `npm run check:readme`.
-13. **Branch protection check**: `main` still protected with `gate` required for everyone.
+8. **Unit tests**: `npm run test`.
+9. **Build**: `npm run build`.
+10. **Token drift check**: `npm run check:tokens`.
+11. **Repository scan (tree, every blob and commit message in history)**: `check-repo.mts --history`.
+12. **Secret scan (gitleaks, full history)**: a checksum-pinned gitleaks binary.
+13. **README check**: `npm run check:readme`.
+14. **Branch protection check**: `main` still protected with `gate` required for everyone.
 
 ## One-time setup after cloning
 
