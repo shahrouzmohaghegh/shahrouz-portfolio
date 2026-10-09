@@ -29,6 +29,7 @@ permissions:
   contents: read
   deployments: read
   issues: write
+  actions: write # only to keep the scheduled workflows enabled, see the last step
 
 concurrency:
   group: ${{ github.workflow }}
@@ -36,7 +37,7 @@ concurrency:
 
 jobs:
   watch:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # pinned; move to a newer image deliberately, in a pull request
     timeout-minutes: 10
     steps:
       - name: Check out
@@ -62,3 +63,15 @@ jobs:
           else
             node scripts/production-watch.mts
           fi
+
+      # GitHub disables scheduled workflows in a public repository after 60
+      # days without commits, which would stop this watch silently. Enabling
+      # an already enabled workflow through the API resets that clock, so a
+      # quiet repository keeps both scheduled workflows running.
+      - name: Keep the scheduled workflows enabled
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api -X PUT "repos/$GITHUB_REPOSITORY/actions/workflows/production-watch.yml/enable"
+          gh api -X PUT "repos/$GITHUB_REPOSITORY/actions/workflows/pin-review.yml/enable"
