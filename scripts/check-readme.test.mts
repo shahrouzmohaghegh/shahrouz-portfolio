@@ -198,15 +198,15 @@ describe("checksProblems", () => {
 
   test("a script or step missing from the README is named", () => {
     assert.deepEqual(checksProblems(CHECKS, ["lint", "build", "dev"], ["Lint", "Build", "Deploy"]), [
-      'npm script "dev": in package.json but not listed under Checks',
-      'gate step "Deploy": in .github/workflows/ci.yml but not listed under Checks',
+      `npm script "dev": in package.json but not listed under Checks; add it to the README's Checks section in the same change`,
+      `gate step "Deploy": in .github/workflows/ci.yml but not listed under Checks; add it to the README's Checks section in the same change`,
     ]);
   });
 
   test("a listed script or step that does not exist is named", () => {
     assert.deepEqual(checksProblems(CHECKS, ["lint"], ["Lint"]), [
-      'npm script "build": listed under Checks but not in package.json',
-      'gate step "Build": listed under Checks but not in .github/workflows/ci.yml',
+      `npm script "build": listed under Checks but not in package.json; if it was renamed or removed there, rename or remove it in the README's Checks section too`,
+      `gate step "Build": listed under Checks but not in .github/workflows/ci.yml; if it was renamed or removed there, rename or remove it in the README's Checks section too`,
     ]);
   });
 
@@ -262,6 +262,11 @@ describe("headingSlugs", () => {
   test("slugs as GitHub does, repeats suffixed", () => {
     const md = "# Title\n## One-time setup after cloning\n## `npm` and [links](x.md)!\n## Notes\n## Notes\n```\n## Not a heading\n```";
     assert.deepEqual([...headingSlugs(md)], ["title", "one-time-setup-after-cloning", "npm-and-links", "notes", "notes-1"]);
+  });
+
+  test("punctuation and emoji are dropped exactly as GitHub drops them", () => {
+    const md = "## Ready? Go! \u{1F680}\n## A & B\n## snake_case and kebab-case\n## Caf\u00e9 r\u00e9sum\u00e9";
+    assert.deepEqual([...headingSlugs(md)], ["ready-go-", "a--b", "snake_case-and-kebab-case", "caf\u00e9-r\u00e9sum\u00e9"]);
   });
 });
 

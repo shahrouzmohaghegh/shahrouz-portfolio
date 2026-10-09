@@ -20,9 +20,9 @@
 // Zero dependencies: the frontmatter is read with a minimal indentation
 // parser that understands only the four groups it checks.
 
-import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
-import { fileURLToPath } from "node:url";
+import { isEntryPoint } from "./entry-point.mts";
 
 export const DESIGN_PATH =
   "_bmad-output/planning-artifacts/ux-designs/ux-ShahrouzPortfolio-2026-09-23/DESIGN.md";
@@ -578,15 +578,7 @@ export function run(root: string = process.cwd()): RunResult {
   };
 }
 
-// realpath, so a symlinked invocation still runs the check rather than
-// exiting 0 having checked nothing.
-const invokedDirectly = ((): boolean => {
-  try {
-    return process.argv[1] !== undefined && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
-  } catch {
-    return false;
-  }
-})();
+const invokedDirectly = isEntryPoint(import.meta.url);
 if (invokedDirectly) {
   const { failures, summary } = run();
   if (failures.length > 0) {
