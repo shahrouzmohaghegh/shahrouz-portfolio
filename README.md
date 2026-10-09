@@ -41,7 +41,7 @@ _bmad-output/    The published subset of the planning documents
 - [Design](_bmad-output/planning-artifacts/ux-designs/ux-ShahrouzPortfolio-2026-09-23/DESIGN.md): how the site looks, and the source of the design tokens.
 - [Experience](_bmad-output/planning-artifacts/ux-designs/ux-ShahrouzPortfolio-2026-09-23/EXPERIENCE.md): how the site behaves.
 
-These five are the only planning files published. The PRD, its addendum, the epics, the reviews, the mockups and the source notes are private by design and are kept out of the repository, so some links inside these documents do not resolve.
+These five are the only planning files published. The product requirements, the epics, the reviews, the mockups and the working notes are private by design and are kept out of the repository, so some links inside these documents do not resolve.
 
 ## Dependencies
 

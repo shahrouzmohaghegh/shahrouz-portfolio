@@ -29,10 +29,9 @@
 // protection is noticed on a quiet repository too.
 
 import { spawnSync } from "node:child_process";
-import { realpathSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 
 import { repoSlug } from "./terms-sync.mts";
+import { isEntryPoint } from "./entry-point.mts";
 
 export const BRANCH = "main";
 export const REQUIRED_CHECK = "gate";
@@ -200,15 +199,7 @@ export function defaultOriginUrl(): string | null {
   return result.status === 0 ? result.stdout.trim() : null;
 }
 
-// realpath, so a symlinked invocation still runs the check rather than
-// exiting 0 having checked nothing.
-const invokedDirectly = ((): boolean => {
-  try {
-    return process.argv[1] !== undefined && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
-  } catch {
-    return false;
-  }
-})();
+const invokedDirectly = isEntryPoint(import.meta.url);
 if (invokedDirectly) {
   main({
     fetchText: (url) => defaultFetch(url),

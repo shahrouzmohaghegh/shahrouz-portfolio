@@ -23,9 +23,9 @@
 // small parsers that understand only the shapes these files use.
 
 import { spawnSync } from "node:child_process";
-import { readFileSync, realpathSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join, posix } from "node:path";
-import { fileURLToPath } from "node:url";
+import { isEntryPoint } from "./entry-point.mts";
 
 export const README_PATH = "README.md";
 export const PACKAGE_PATH = "package.json";
@@ -138,8 +138,10 @@ export function section(markdown: string, title: string): string[] | null {
   return lines.slice(all[at].line + 1, next ? next.line : lines.length);
 }
 
-// GitHub's heading anchors: rendered text lowercased, punctuation dropped,
-// spaces to hyphens, repeats suffixed -1, -2 and so on.
+// GitHub's heading anchors, as github-slugger makes them: rendered text
+// lowercased, everything but letters, marks, numbers, connector punctuation,
+// hyphens and spaces dropped (emoji included), each space to a hyphen,
+// repeats suffixed -1, -2 and so on.
 export function headingSlugs(markdown: string): Set<string> {
   const seen = new Map<string, number>();
   const slugs = new Set<string>();
@@ -150,7 +152,7 @@ export function headingSlugs(markdown: string): Set<string> {
       .replace(/[`*]/g, "");
     const base = rendered
       .toLowerCase()
-      .replace(/[^\p{L}\p{M}\p{N}\s_-]/gu, "")
+      .replace(/[^\p{L}\p{M}\p{N}\p{Pc}\- ]/gu, "")
       .replace(/ /g, "-");
     const count = seen.get(base) ?? 0;
     seen.set(base, count + 1);
@@ -228,8 +230,8 @@ export function listedChecks(readme: string): Listed {
 }
 
 const drift = (kind: string, source: string, actual: string[], listed: string[]): string[] => [
-  ...actual.filter((name) => !listed.includes(name)).map((name) => `${kind} "${name}": in ${source} but not listed under Checks`),
-  ...listed.filter((name) => !actual.includes(name)).map((name) => `${kind} "${name}": listed under Checks but not in ${source}`),
+  ...actual.filter((name) => !listed.includes(name)).map((name) => `${kind} "${name}": in ${source} but not listed under Checks; add it to the README's Checks section in the same change`),
+  ...listed.filter((name) => !actual.includes(name)).map((name) => `${kind} "${name}": listed under Checks but not in ${source}; if it was renamed or removed there, rename or remove it in the README's Checks section too`),
 ];
 
 export function checksProblems(readme: string, scripts: string[], steps: string[]): string[] {
@@ -355,15 +357,7 @@ export function cliDeps(args: string[]): Deps {
   };
 }
 
-// realpath, so a symlinked invocation still runs the check rather than
-// exiting 0 having checked nothing.
-const invokedDirectly = ((): boolean => {
-  try {
-    return process.argv[1] !== undefined && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
-  } catch {
-    return false;
-  }
-})();
+const invokedDirectly = isEntryPoint(import.meta.url);
 if (invokedDirectly) {
   try {
     process.exit(main(cliDeps(process.argv.slice(2))));
