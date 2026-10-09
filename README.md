@@ -137,7 +137,9 @@ After a Vercel instant rollback the site recovers, but the deployment problem st
 
 To prove the alert path end to end, run `gh workflow run production-watch.yml -f simulate_failure=true`. It fails the apex check on purpose and opens a real issue, which the next scheduled run closes once three passes are clean.
 
-GitHub disables scheduled workflows in a public repository after 60 days without repository activity, and says so in the Actions tab. To turn the watch back on, open Actions, select "Production watch" and choose "Enable workflow", or run `gh workflow enable production-watch.yml`; then `gh workflow run production-watch.yml` checks it still works. `npm run watch:production` runs the same checks locally and prints the result without touching any issue.
+GitHub disables scheduled workflows in a public repository after 60 days without commits. The watch's last step re-enables itself and the pin review through the API on every run, which resets that clock, so a quiet repository keeps both running. If one is ever disabled anyway, the Actions tab says so: open it, select the workflow and choose "Enable workflow", or run `gh workflow enable production-watch.yml`; then `gh workflow run production-watch.yml` checks it still works.
+
+Both layers look for the exact text `Shahrouz Mohaghegh` on the page (`NAME` in `scripts/production-watch.mts` and the UptimeRobot keyword). A change to how the name appears in the HTML must update both in the same change, or both raise a false alarm. `npm run watch:production` runs the same checks locally and prints the result without touching any issue.
 
 ## Changing the confidential terms
 

@@ -297,8 +297,8 @@ export function issueBody(problems: Problem[], now: Date, repo: string): string 
       `"Recovered" comment after ${PASSES} clean passes.`,
     "",
     `To restore the site quickly, see the [emergency path](${emergencyUrl(repo)}). ` +
-      "After a Vercel instant rollback the site recovers, but the deployment problem stays until a new deploy " +
-      "succeeds, because the latest commit on main is not what is live.",
+      "If you rolled back in Vercel, the site itself is fine: the deployment problem stays listed until the next " +
+      "successful deploy, because the latest commit on main is not what is live.",
     "",
   ].join("\n");
 }
