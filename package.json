@@ -12,6 +12,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "check:tokens": "node scripts/check-tokens.mts",
+    "check:readme": "node scripts/check-readme.mts",
     "test:scripts": "node --test \"scripts/**/*.test.mts\"",
     "terms:sync": "node scripts/terms-sync.mts"
   },
