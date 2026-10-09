@@ -29,7 +29,8 @@
 // protection is noticed on a quiet repository too.
 
 import { spawnSync } from "node:child_process";
-import { pathToFileURL } from "node:url";
+import { realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 import { repoSlug } from "./terms-sync.mts";
 
@@ -199,7 +200,15 @@ export function defaultOriginUrl(): string | null {
   return result.status === 0 ? result.stdout.trim() : null;
 }
 
-const invokedDirectly = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+// realpath, so a symlinked invocation still runs the check rather than
+// exiting 0 having checked nothing.
+const invokedDirectly = ((): boolean => {
+  try {
+    return process.argv[1] !== undefined && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
+  } catch {
+    return false;
+  }
+})();
 if (invokedDirectly) {
   main({
     fetchText: (url) => defaultFetch(url),

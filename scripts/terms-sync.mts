@@ -17,9 +17,9 @@
 // arguments, output or logs.
 
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 export const TERMS_FILE = ".forbidden-terms";
 export const SECRET_NAME = "FORBIDDEN_TERMS";
@@ -97,5 +97,13 @@ export function main(argv: string[], cwd: string = process.cwd()): number {
   return 0;
 }
 
-const invokedDirectly = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+// realpath, so a symlinked invocation still runs the check rather than
+// exiting 0 having checked nothing.
+const invokedDirectly = ((): boolean => {
+  try {
+    return process.argv[1] !== undefined && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
+  } catch {
+    return false;
+  }
+})();
 if (invokedDirectly) process.exit(main(process.argv.slice(2)));

@@ -3,3 +3,4 @@ set -e
 node --test "scripts/**/*.test.mts"
 node scripts/check-repo.mts
 node scripts/check-tokens.mts
+node scripts/check-readme.mts --staged

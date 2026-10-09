@@ -86,6 +86,11 @@ jobs:
           cd "$GITHUB_WORKSPACE"
           "$RUNNER_TEMP/gitleaks" git . --redact --no-banner --exit-code 1
 
+      # Every package in package.json has a one-line reason in the README's
+      # Dependencies table, and every relative README link is a tracked file.
+      - name: README check
+        run: npm run check:readme
+
       # Branch protection is what keeps a red gate out of production, so the
       # gate checks the part of it the public branch endpoint shows: main
       # protected, required checks enforced for admins too, and gate among
