@@ -14,6 +14,7 @@
     "check:tokens": "node scripts/check-tokens.mts",
     "check:readme": "node scripts/check-readme.mts",
     "test:scripts": "node --test \"scripts/**/*.test.mts\"",
+    "test": "vitest run",
     "terms:sync": "node scripts/terms-sync.mts",
     "watch:production": "node scripts/production-watch.mts --print"
   },
@@ -28,6 +29,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.0.3"
   }
 }
