@@ -439,7 +439,7 @@ describe("issueBody", () => {
     const body = issueBody([apexProblem], NOW, REPO);
     assert.ok(body.includes(`(${emergencyUrl(REPO)})`));
     assert.equal(emergencyUrl(REPO), "https://github.com/owner/site/blob/main/README.md#emergency-path");
-    assert.match(body, /instant rollback .* deployment problem stays until a new deploy succeeds/);
+    assert.match(body, /rolled back in Vercel, the site itself is fine: the deployment problem stays listed until the next successful deploy/);
   });
 });
 

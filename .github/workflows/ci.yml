@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   gate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # pinned; move to a newer image deliberately, in a pull request
     timeout-minutes: 20
     steps:
       - name: Check out full history
