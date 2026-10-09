@@ -31,9 +31,9 @@
 // so closing the issue after review keeps it closed until something moves.
 
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 import { BRANCH, defaultOriginUrl, readProtection, resolveRepo } from "./check-protection.mts";
 
@@ -679,7 +679,15 @@ export async function main(argv: string[], deps: Deps = DEFAULT_DEPS): Promise<n
   return 0;
 }
 
-const invokedDirectly = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+// realpath, so a symlinked invocation still runs the check rather than
+// exiting 0 having checked nothing.
+const invokedDirectly = ((): boolean => {
+  try {
+    return process.argv[1] !== undefined && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
+  } catch {
+    return false;
+  }
+})();
 if (invokedDirectly) {
   main(process.argv.slice(2)).then(
     (code) => process.exit(code),
