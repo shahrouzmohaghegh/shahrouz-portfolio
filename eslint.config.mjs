@@ -28,6 +28,27 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  // AD-6: routes and components read evidence only through lib/evidence.ts,
+  // never from content/ or the type leaf directly, so they never see
+  // CaseStudy or Project.
+  {
+    files: ["app/**", "components/**"],
+    rules: {
+      "import/no-restricted-paths": [
+        "error",
+        {
+          zones: [
+            {
+              target: ["./app", "./components"],
+              from: ["./content", "./lib/evidence-types.ts"],
+              message:
+                "app/ and components/ read evidence through lib/evidence.ts, never from content/ or lib/evidence-types.ts (AD-6).",
+            },
+          ],
+        },
+      ],
+    },
+  },
   // AD-21: abandoned-work markers in comments are lint errors, on every
   // branch. The markers are listed only here, so documentation never trips
   // the rule. scripts/lint-rules.test.mts keeps it from being weakened.
