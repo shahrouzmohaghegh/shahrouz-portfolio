@@ -368,6 +368,12 @@ export function planIssues(verdict: Verdict, ours: OwnedIssue[]): Action[] {
 
 export type Gh = (args: string[], input?: string) => string;
 
+// gh prints nothing at all, not "[]", for some empty --json lists (seen with
+// `gh label list --search` matching no label), so empty output is an empty list.
+export function parseList<T>(json: string): T[] {
+  return json.trim() === "" ? [] : (JSON.parse(json) as T[]);
+}
+
 // Open issues the bot owns, each with every comment.
 export function findOwnIssues(gh: Gh, repo: string): OwnedIssue[] {
   const listed = new Map<number, ListedIssue>();
@@ -376,7 +382,7 @@ export function findOwnIssues(gh: Gh, repo: string): OwnedIssue[] {
       "issue", "list", "--repo", repo, "--state", "open", "--search", search,
       "--limit", "100", "--json", "number,title,body,author",
     ]);
-    for (const issue of JSON.parse(json) as ListedIssue[]) listed.set(issue.number, issue);
+    for (const issue of parseList<ListedIssue>(json)) listed.set(issue.number, issue);
   }
   return [...listed.values()].filter(isOurs).map((issue) => ({
     number: issue.number,
@@ -392,9 +398,9 @@ export function findOwnIssues(gh: Gh, repo: string): OwnedIssue[] {
 }
 
 function ensureLabel(gh: Gh, repo: string): void {
-  const labels = JSON.parse(
+  const labels = parseList<{ name: string }>(
     gh(["label", "list", "--repo", repo, "--search", LABEL, "--limit", "100", "--json", "name"]),
-  ) as { name: string }[];
+  );
   if (labels.some((label) => label.name.toLowerCase() === LABEL)) return;
   gh(["label", "create", LABEL, "--repo", repo, "--color", "B60205", "--description", "Production health, from the production watch"]);
 }
