@@ -66,7 +66,7 @@ Microcopy only. Brand voice and aesthetic posture live in `DESIGN.md.Brand and S
 | "2 Projects also match Hands-On" | "See also" |
 | "Cycle time down 30 to 40% across pilot projects" | "Cycle time down 30 to 40%" |
 | "DORA-informed, adapted for AI-assisted delivery" | "We used DORA" |
-| "Bug reopen rate on the 26-person team I hired and ran" | Any attribution of that figure to the 38-person function |
+| "Bad fixes on the 26-person team I hired and ran" | Any attribution of that figure to the 38-person function |
 | "There is no CV on this site, and that is deliberate." | Leaving the absence unexplained |
 | "Read the case study" | "Learn more", "Click here", "Discover" |
 | Numbers, mechanisms and trade-offs | Adjectives, achievement statements, breathlessness about AI |
@@ -78,7 +78,7 @@ Hard rules, binding on every word rendered: **no em dashes anywhere**. First per
 Product-specific section. These rules are behavioural, enforced in content and in CI, and they outrank layout convenience.
 
 1. **Open, goes to John: One qualifier, one sentence.** The content model carries an optional qualifier on every headline metric so a figure cannot render bare. Any surface that displays a metric displays its qualifier with it.
-2. **The 26 and the 38 are distinct.** The bug reopen turnaround belongs to the 26-person team he hired and ran, which was part of the 38-person function and not additional to it. The case study states this three times in identical words: in the dek, in `{components.outcome-band}`, and in `{components.source-note}`.
+2. **The 26 and the 38 are distinct.** The Fault Feedback Ratio turnaround, shown above the fold as bad fixes, belongs to the 26-person team he hired and ran, which was part of the 38-person function and not additional to it. The case study states this three times in identical words: in the dek, in `{components.outcome-band}`, and in `{components.source-note}`.
 3. **Sources are stated before they are asked for.** Telemetry-derived figures and self-reported figures are labelled as such. A deliberately favourable sample is named as one.
 4. **Illustrative values are labelled.** The worked similarity values in the decision table (0.91, 0.87, 0.93) are internally consistent but not measured. The production page must say so.
 5. **Open, low risk: Leadership leads, AI never leads.** Home leads with leadership and delivery outcomes. The chip order is fixed and AI-Native is never first.
@@ -93,7 +93,7 @@ Behavioural. Visual specification lives in `DESIGN.md.Components`.
 | Hero plate `{components.hero-plate}` | Home, Contact, hands-on passage | Decorative framing, informative `alt`. Never a link, never a lightbox, never a carousel. Desktop and mobile are two `object-position` crops of one file via `object-fit: cover`, never two pre-cropped assets. Explicit `width`/`height` so no layout shift |
 | Call to action `{components.cta-link}` | Home hero, cross-links, next-case link | A link, not a button. One per surface at most |
 | Evidence band `{components.evidence-band}` | Home | Static content, one figure and one caption. **Two bands on Home, not three:** Quality and Security posture. The former Scale band is retired because it restated the 38-person figure already in the positioning paragraph, which amended FR-5 now forbids. Reveals on scroll within the motion ceiling. Present in the DOM and readable with JavaScript off |
-| Figure pair `{components.figure-pair}` | Home, above the fold | Two stacked full-width rows, each one caps scope label on a single line above one `{typography.figure-inline}` serif figure. **Never a reveal target**, because it sits above the fold and above-fold content is never hidden. Static, present in the DOM, and depends on no late-loading asset. Carries FR-5's two required figures and no others |
+| Figure pair `{components.figure-pair}` | Home, above the fold | Two stacked full-width rows, each one caps scope label above one `{typography.figure-inline}` serif figure, the label on one line from 768px and allowed to wrap below. **Never a reveal target**, because it sits above the fold and above-fold content is never hidden. Static, present in the DOM, and depends on no late-loading asset. Carries FR-5's two required figures, quality then speed, and no others |
 | Capability chip `{components.capability-chip}` | `/experience`, `/projects` | Fixed order: Leadership, AI-Native, Executive Influence, Hands-On. Multi-select, OR logic, toggle on activation. **Every chip is an `<a href>`, never a `<button>`, and `aria-pressed` appears nowhere.** Selected state is exposed by `aria-current="true"` plus visually hidden text. Full markup and URL contract in Capability Filter Contract below. Chips are the short labels; the full capability name is used in headings, on cards and in the state line |
 | State line `{components.state-line}` | Directly under the chips | Always rendered, including unfiltered. States the count, the filter applied, and the cross-route count. **It is a focus target, not a live region.** Announcement mechanism and exact strings in Capability Filter Contract below |
 | Cross-listing link | Under the state line, and first inside the empty state | States the other route's matching count and carries the selection across on the shared parameter |
@@ -384,7 +384,7 @@ Fold discipline at 375px, in render order above that fold: his name as the `h1`,
 
 Below the fold, in order: the portrait plate, the Explore affordance, then the two evidence bands, with the Secure Score band captioned "Microsoft Defender for Cloud Secure Score across the full production Azure subscription, reported to the Digital Governance Board." The estate size is not published (FR-29, amended 2026-10-07).
 
-**The two evidence bands deliberately repeat the figure pair's numbers, and that is not repetition for its own sake.** The compact label above the fold compresses the scope into one line, while the band's caption carries FR-34's scope in full prose. The pair is Dana's guarantee that she sees two numbers without scrolling; the band is Marcus's qualified read once he does. Anyone tempted to remove the repetition as duplication should change FR-5 or FR-34 first, not the composition.
+**The Quality band deliberately repeats the figure pair's first number, and that is not repetition for its own sake.** The compact label above the fold compresses the scope into one line, while the band's caption names the Fault Feedback Ratio and carries FR-34's scope in full prose. The pair is Dana's guarantee that she sees two numbers without scrolling; the band is Marcus's qualified read once he does. The Security posture band carries the Secure Score, which is not above the fold. Anyone tempted to remove the repetition as duplication should change FR-5 or FR-34 first, not the composition.
 
 **One positioning statement, at both widths, 40 to 45 words.** `mockups/screen-home.html` previously carried two different support paragraphs, 53 words on desktop and 42 at 375px. That cannot ship: FR-4 is one statement. Both frames now carry the 42-word version, because at 53 words the 375px stack measures about 573px and overruns the fold. The composition is verified at 375px and still needs a 320px check, since a headline wrapping to a fourth line costs 36px and the headroom is 25px.
 
@@ -441,7 +441,7 @@ Binding notes for whoever builds the decision table, from the agent that prototy
 ### Flow 1, Dana screens a candidate on a phone between meetings (UJ-1)
 
 1. Dana opens the link from a LinkedIn message, on a phone, on mobile data.
-2. Home renders above the fold: his name, a positioning statement naming the 38-person function through six people-managers and the standing Digital Governance Board seat, "Open to conversations about the next role.", and the two hard numbers UJ-1 requires her to see: bug reopen rate above 100% to below 20%, and cloud Secure Score 20% to 76%. Then the portrait plate.
+2. Home renders above the fold: his name, a positioning statement naming the 38-person function through six people-managers and the standing Digital Governance Board seat, "Open to conversations about the next role.", and the two hard numbers UJ-1 requires her to see: bad fixes on the Vietnam team, over 1 per fix to under 1 in 5, and cycle time on AI-assisted pilot projects, 30 to 40% faster. Then the portrait plate.
 3. Nothing above the fold depends on a late-loading asset. LCP is under 2.0 seconds on simulated mobile 4G.
 4. **Climax:** Dana does not scroll. She can already describe his level and scale to a client without opening a CV, so she copies the URL into a note and adds him to the shortlist.
 5. Failure: if the portrait has not loaded, the plate ground and the `alt` text hold the composition and the judgement is still available from type alone.
@@ -453,7 +453,7 @@ Binding notes for whoever builds the decision table, from the agent that prototy
 3. Three cards. He opens the delivery and quality one because that is his actual pain.
 4. The facts strip tells him the team was 26 people hired and run directly, within a 38-person function, in regulated healthcare. The section rail tells him the page has five parts.
 5. He skims Decisions. Every decision carries its trade-off set apart, including the one where two people left.
-6. **Climax:** the outcome band states the bug reopen rate taken from above 100 percent to below 20 percent, attributed in the same sentence to the 26-person team he hired and ran, with the source note underneath naming the defect tracker and the release windows. Marcus can now name two measurable outcomes and has a question to ask, so he accepts the call.
+6. **Climax:** the outcome band states the Fault Feedback Ratio taken from over 1 per fix to under 1 in 5, attributed in the same sentence to the 26-person team he hired and ran, with the source note underneath naming the defect tracker and the release windows. Marcus can now name two measurable outcomes and has a question to ask, so he accepts the call.
 7. Failure: he skipped the prose. The key and value list repeats every number, so nothing is lost.
 
 ### Flow 3, Priya checks whether the technical claims are real (UJ-3)
