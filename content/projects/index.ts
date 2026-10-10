@@ -12,7 +12,7 @@ export const projects: readonly Project[] = [
       "A governed multi-agent system with C4 architecture, agent design and toolchain documentation, public on GitHub.",
     capabilities: ["ai-native", "hands-on"],
     headlineMetric: {
-      value: "Public repository, audited clean on 2026-09-22",
+      value: "Guardrails are scripts, not intentions",
       qualifierNotRequired: true,
     },
     href: "/projects/career-application-system",
@@ -25,7 +25,7 @@ export const projects: readonly Project[] = [
       "Next.js, React and TypeScript, built with BMAD agents while he held the requirements, architecture, decisions and acceptance criteria.",
     capabilities: ["hands-on"],
     headlineMetric: {
-      value: "Public repository",
+      value: "Eleven automated checks block every merge to main",
       qualifierNotRequired: true,
     },
     href: "/projects/this-website",

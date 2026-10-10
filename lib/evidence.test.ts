@@ -6,9 +6,11 @@
 // qualifier, that no dated claim is older than a year, and the display order.
 // Each problem names the item, so a failing gate says what to fix.
 
-import { readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
+
+import { CI_PATH, gateStepNames } from "@/scripts/check-readme.mts";
 
 import {
   CAPABILITIES,
@@ -20,6 +22,19 @@ import {
   type Capabilities,
   type EvidenceItem,
 } from "@/lib/evidence";
+
+// The this-website Headline Metric states how many checks block a merge, so
+// the count is read from the gate rather than trusted: every step after
+// "Install dependencies" is a check, and the steps before it are setup.
+const COUNT_WORDS = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
+  "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen", "Twenty"];
+
+function gateCheckNames(ciText: string): string[] {
+  const steps = gateStepNames(ciText);
+  const setupEnd = steps.indexOf("Install dependencies");
+  if (setupEnd === -1) throw new Error(`${CI_PATH}: no "Install dependencies" step to count the checks after`);
+  return steps.slice(setupEnd + 1);
+}
 
 function mdxProblems(collection: string, items: readonly EvidenceItem[], files: readonly string[]): string[] {
   const slugs = new Set(items.map((item) => item.slug));
@@ -176,6 +191,15 @@ describe("the content collections", () => {
 
   test("no dated claim is more than a year old", () => {
     expect(staleClaimProblems(evidenceItems, new Date())).toEqual([]);
+  });
+
+  test("this website's check count matches the gate in ci.yml", () => {
+    const value = projectItems.find((item) => item.slug === "this-website")?.headlineMetric.value ?? "";
+    const checks = gateCheckNames(readFileSync(CI_PATH, "utf8"));
+    expect(
+      value.startsWith(`${COUNT_WORDS[checks.length]} automated checks`),
+      `The this-website Headline Metric must open with "${COUNT_WORDS[checks.length]} automated checks": the gate runs ${checks.length} (${checks.join(", ")}).`,
+    ).toBe(true);
   });
 
   test("the display order is the reviewed one", () => {
