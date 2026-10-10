@@ -31,6 +31,12 @@ describe("figureRole", () => {
     expect(figureRole(`${phrase(13)}\u{1D7D7}`)).toBe("figure");
   });
 
+  test("a letter and its combining mark count as one rendered character", () => {
+    // 14 graphemes, 15 code points: e followed by U+0301 renders as one é.
+    expect(figureRole(`${phrase(13)}e\u0301`)).toBe("figure");
+    expect(figureRole(`${phrase(14)}e\u0301`)).toBe("figure-small");
+  });
+
   test("a URL is a pull-quote figure whatever its length", () => {
     expect(figureRole("https://x.io")).toBe("pull-quote");
   });

@@ -16,11 +16,15 @@
 //   4. Every other stylesheet uses tokens only: no literal colour or length,
 //      type properties set from tokens, no scaled type, no undefined var(),
 //      no @media, @container, @custom-media or media-conditioned @import.
-//   5. The reveal guard (AD-14). No stylesheet declares opacity: 0 or a
-//      translateY in a rule unless every selector of that rule is scoped
-//      under .js-reveal, the root class only RevealOnScroll adds, so nothing
-//      is hidden without script. @media print is allowed in styles/reveal.css
-//      and nowhere else, and app/layout.tsx imports reveal.css last.
+//   5. The reveal guard (AD-14). No stylesheet declares opacity: 0,
+//      visibility: hidden, a translate property or a translate(),
+//      translateY() or translate3d() in a rule unless every selector of that
+//      rule is scoped under .js-reveal (outside any :not()), the root class
+//      only RevealOnScroll adds, so nothing is hidden without script.
+//      styles/reveal.css must restore .js-reveal .reveal.in to opacity 1 and
+//      transform none, with both class names read from the island's
+//      constants. @media print is allowed only in styles/reveal.css and
+//      styles/print.css, and app/layout.tsx imports reveal.css last.
 //
 // Zero dependencies: the frontmatter is read with a minimal indentation
 // parser that understands only the four groups it checks.
@@ -35,6 +39,10 @@ export const TOKENS_PATH = "styles/tokens.css";
 export const BREAKPOINTS_PATH = "styles/breakpoints.css";
 export const LAYOUT_PATH = "app/layout.tsx";
 export const REVEAL_PATH = "styles/reveal.css";
+// Epic 3's detail-page print contract (UX-DR37) will live here.
+export const PRINT_PATH = "styles/print.css";
+export const PRINT_PATHS = [REVEAL_PATH, PRINT_PATH];
+export const ISLAND_PATH = "components/islands/reveal-on-scroll.tsx";
 
 export const TYPE_FLOOR_PX = 13.5;
 export const FLOOR_EXCEPTIONS = ["meta-label", "nameline", "kicker", "stage-number"];
@@ -468,17 +476,19 @@ export function breakpointAtRule(statement: string): string | null {
 const REVEAL_SCOPE = /\.js-reveal(?![\w-])/;
 const PRINT_PRELUDE = /^@media\s+print$/i;
 const ZERO_OPACITY = /^(?:0+(?:\.0*)?|\.0+)%?$/;
-const TRANSLATE_Y = /\btranslateY\(/i;
+const TRANSLATE_FUNCTION = /\btranslate(?:Y|3d)?\(/i;
+const HIDDEN_VISIBILITY = /^(?:hidden|collapse)$/i;
 
-// Splits on `separator` outside parentheses and brackets, so :is(a, b) stays whole.
-function splitTopLevel(text: string, separator: string): string[] {
+// Splits where `isSeparator` holds outside parentheses and brackets, so
+// :is(a, b) and [title="a b"] stay whole.
+function splitTopLevel(text: string, isSeparator: (ch: string) => boolean): string[] {
   const parts: string[] = [];
   let depth = 0;
   let current = "";
   for (const ch of text) {
     if (ch === "(" || ch === "[") depth++;
     else if (ch === ")" || ch === "]") depth = Math.max(0, depth - 1);
-    if (ch === separator && depth === 0) {
+    if (depth === 0 && isSeparator(ch)) {
       parts.push(current);
       current = "";
     } else {
@@ -489,22 +499,97 @@ function splitTopLevel(text: string, separator: string): string[] {
   return parts.map((p) => p.trim()).filter(Boolean);
 }
 
+// A compound without its :not(...) arguments, which exclude rather than scope.
+function withoutNegations(compound: string): string {
+  let out = "";
+  for (let i = 0; i < compound.length; i++) {
+    if (compound.slice(i, i + 5).toLowerCase() !== ":not(") {
+      out += compound[i];
+      continue;
+    }
+    let depth = 0;
+    for (let j = i + 4; j < compound.length; j++) {
+      if (compound[j] === "(") depth++;
+      else if (compound[j] === ")" && --depth === 0) {
+        i = j;
+        break;
+      }
+      i = j;
+    }
+  }
+  return out;
+}
+
 // True when every selector in the list matches only descendants of an
-// element carrying .js-reveal: the class sits in a compound before the last.
+// element carrying .js-reveal: the class sits, outside any :not(), in a
+// compound before the last.
 export function scopedUnderReveal(selectorList: string): boolean {
-  const selectors = splitTopLevel(selectorList, ",");
+  const selectors = splitTopLevel(selectorList, (ch) => ch === ",");
   return selectors.length > 0 && selectors.every((selector) => {
-    const compounds = selector.split(/\s*[>+~]\s*|\s+/).filter(Boolean);
-    return compounds.slice(0, -1).some((compound) => REVEAL_SCOPE.test(compound));
+    const compounds = splitTopLevel(selector, (ch) => /[\s>+~]/.test(ch));
+    return compounds.slice(0, -1).some((compound) => REVEAL_SCOPE.test(withoutNegations(compound)));
   });
 }
 
 // The hide a declaration makes, if any, for the reveal guard.
 function revealHide(property: string, value: string): string | null {
+  const p = property.toLowerCase();
   const v = value.replace(/\s*!important\s*$/i, "").trim();
-  if (property.toLowerCase() === "opacity" && ZERO_OPACITY.test(v)) return "opacity: 0 outside .js-reveal (hidden without script)";
-  if (TRANSLATE_Y.test(v)) return "translateY outside .js-reveal";
+  if (p === "opacity" && ZERO_OPACITY.test(v)) return "opacity: 0 outside .js-reveal (hidden without script)";
+  if (p === "visibility" && HIDDEN_VISIBILITY.test(v)) return "visibility: hidden outside .js-reveal (hidden without script)";
+  if (p === "translate" && !/^(?:none|initial|unset|revert|revert-layer)$/i.test(v)) return "translate outside .js-reveal";
+  if (TRANSLATE_FUNCTION.test(v)) return "translate outside .js-reveal";
   return null;
+}
+
+// The island's class names, read from its exported constants.
+export function revealClassNames(islandSource: string): { root: string; revealed: string } | null {
+  const read = (name: string): string | undefined =>
+    islandSource.match(new RegExp(`export const ${name}\\s*=\\s*["']([\\w-]+)["']`))?.[1];
+  const root = read("REVEAL_ROOT_CLASS");
+  const revealed = read("REVEALED_CLASS");
+  return root && revealed ? { root, revealed } : null;
+}
+
+// Top-level style rules of a stylesheet (not inside an at-rule), each as its
+// selector list and its declarations.
+function topLevelRules(css: string): Array<{ selectors: string[]; declarations: TokenMap }> {
+  const text = stripCssComments(css);
+  const rules: Array<{ selectors: string[]; declarations: TokenMap }> = [];
+  let from = 0;
+  while (from < text.length) {
+    const open = text.indexOf("{", from);
+    if (open === -1) break;
+    const close = matchBrace(text, open);
+    if (close === -1) break;
+    const prelude = text.slice(from, open).replace(/^[\s;]+/, "").trim();
+    if (!prelude.startsWith("@")) {
+      const declarations: TokenMap = {};
+      for (const decl of text.slice(open + 1, close).split(";")) {
+        const m = decl.match(/^\s*([\w-]+)\s*:\s*([\s\S]+?)\s*$/);
+        if (m) declarations[m[1].toLowerCase()] = m[2].replace(/\s+/g, " ");
+      }
+      rules.push({ selectors: splitTopLevel(prelude, (ch) => ch === ",").map((sel) => sel.replace(/\s+/g, " ")), declarations });
+    }
+    from = close + 1;
+  }
+  return rules;
+}
+
+// reveal.css must bring a band back to rest under the class the island adds
+// once it is in view; otherwise a rename on either side leaves every band
+// invisible with JavaScript on.
+export function checkRevealRestore(revealCss: string | null, islandSource: string | null): string[] {
+  if (revealCss === null) return [`${REVEAL_PATH}: missing`];
+  if (islandSource === null) return [`${ISLAND_PATH}: missing`];
+  const names = revealClassNames(islandSource);
+  if (names === null) return [`${ISLAND_PATH}: exports no REVEAL_ROOT_CLASS and REVEALED_CLASS string constants`];
+  const selector = `.${names.root} .reveal.${names.revealed}`;
+  const restores = topLevelRules(revealCss).some(
+    ({ selectors, declarations }) =>
+      selectors.includes(selector) && declarations.opacity === "1" && declarations.transform === "none",
+  );
+  return restores ? [] : [`${REVEAL_PATH}: no top-level rule ${selector} { opacity: 1; transform: none }`];
 }
 
 function scanValue(value: string, defined: ReadonlySet<string>): string[] {
@@ -556,7 +641,9 @@ export function scanStylesheet(label: string, css: string, defined: ReadonlySet<
     }
     const atRule = breakpointAtRule(s);
     if (atRule === "@media" && PRINT_PRELUDE.test(s)) {
-      if (label !== REVEAL_PATH) failures.push(`${label}:${segmentLine}: @media print belongs only in ${REVEAL_PATH}`);
+      if (!PRINT_PATHS.includes(label)) {
+        failures.push(`${label}:${segmentLine}: @media print belongs only in ${PRINT_PATHS.join(" or ")}`);
+      }
     } else if (atRule) {
       failures.push(`${label}:${segmentLine}: ${atRule} belongs only in ${BREAKPOINTS_PATH}`);
     }
@@ -642,6 +729,9 @@ export function run(root: string = process.cwd()): RunResult {
   failures.push(...checkLayoutImports(existsSync(join(root, LAYOUT_PATH)) ? read(LAYOUT_PATH) : null));
   if (!existsSync(join(root, BREAKPOINTS_PATH))) failures.push(`${BREAKPOINTS_PATH}: missing`);
   else failures.push(...checkBreakpoints(read(BREAKPOINTS_PATH), remaps, tokens));
+
+  const optional = (path: string): string | null => (existsSync(join(root, path)) ? read(path) : null);
+  failures.push(...checkRevealRestore(optional(REVEAL_PATH), optional(ISLAND_PATH)));
 
   const defined = new Set(Object.keys(tokens));
   const sheets = findStylesheets(root).filter((p) => p !== TOKENS_PATH && p !== BREAKPOINTS_PATH);
