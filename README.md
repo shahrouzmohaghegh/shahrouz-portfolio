@@ -23,6 +23,7 @@ app/             Routes and layouts (Next.js App Router); composes components
 components/      Server components; read content, never import upward
   islands/       The only client components, each named in the architecture
 content/         Typed content as data; imports nothing from components/ or app/
+public/          Static files served as they are: the hero portrait
 lib/             Shared logic used by routes and components
 styles/          tokens.css (every design value) and breakpoints.css (the only media query)
 scripts/         Repository checks and tooling, in TypeScript, each with tests
@@ -33,7 +34,7 @@ _bmad-output/    The published subset of the planning documents
 
 `content/ad-10-probe.ts` and `components/ad-6-probe.ts` are deliberate probes that keep the lint rules on import direction firing; they are not dead code. The second rule (AD-6) keeps `app/` and `components/` reading evidence only through `lib/evidence.ts`: it forbids importing `content/case-studies`, `content/projects` and `lib/evidence-types.ts` directly. AD-6 is about evidence, so the rest of `content/` is outside it.
 
-`content/site.ts` holds the site-wide copy: the wordmark name, the footer (positioning line, location, availability, contact links and the note about the CV) and the lines Home reuses. Components import it directly. It sits under `content/`, so the content review box gates every change to it like any other content.
+`content/site.ts` holds the site-wide copy: the wordmark name, the footer (positioning line, location, availability, contact links and the note about the CV) and the lines Home reuses. Components import it directly. It sits under `content/`, so the content review box gates every change to it like any other content. `content/home.ts` holds Home's own copy the same way: the positioning statement, the kicker, the two figure-pair labels and figures, the portrait `alt` and the Explore link. `app/home.test.tsx` fails if the statement leaves 40 to 45 words, the hero order changes, a banned word reaches Home or `/` asks for `noindex` again while the empty route shells stop asking for it.
 
 Every route renders `components/site-frame.tsx` itself, passing its own nav item as `current`: one header with the primary nav, one main, one footer. `components/site-frame.test.tsx` renders every `app/**/page.tsx` and `app/not-found.tsx` and fails, by route, any that skips the frame or marks the wrong nav item.
 
@@ -93,7 +94,7 @@ npm scripts:
 - `npm run check:readme`: every dependency justified here, every script and gate step listed in this section, every relative link resolving.
 - `npm run check:content-review`: on a pull request that changes anything under `content/` or `lib/evidence.test.ts`, fails unless the body has the `Shahrouz reviewed the content wording at COMMIT` box ticked with the latest commit that changed them; passes on any other event.
 - `npm run test:scripts`: the tests for every script, with `node --test`.
-- `npm run test`: the application logic tests, with Vitest; today the content integrity suite in `lib/evidence.test.ts`.
+- `npm run test`: the application logic tests, with Vitest: the content integrity suite in `lib/evidence.test.ts`, the route frame suite in `components/site-frame.test.tsx` and the Home hero suite in `app/home.test.tsx`.
 - `npm run terms:sync`: changes the confidential term list safely (see below).
 - `npm run watch:production`: runs the production checks once against the live site and prints the result; touches no issue (see [Production watch](#production-watch)).
 

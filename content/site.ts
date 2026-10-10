@@ -1,5 +1,6 @@
-// Site-wide copy: the wordmark, the footer and the lines Home reuses
-// (Story 2.3 takes the positioning line and availability from here). It
+// Site-wide copy: the wordmark, the footer and the lines Home reuses (Home
+// takes the name and availability from here; the positioning line renders
+// in the footer only). It
 // lives under content/ so the content review box gates every word of it.
 // Not evidence: AD-6 governs Case Studies and Projects only, so components
 // may import this file directly.
