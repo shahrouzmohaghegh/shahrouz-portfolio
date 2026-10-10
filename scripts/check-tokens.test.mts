@@ -10,17 +10,22 @@ import { fileURLToPath } from "node:url";
 import {
   BREAKPOINTS_PATH,
   DESIGN_PATH,
+  ISLAND_PATH,
   LAYOUT_PATH,
+  PRINT_PATH,
+  REVEAL_PATH,
   TOKENS_PATH,
   checkBreakpoints,
   checkFloor,
   checkLayoutImports,
   checkParity,
+  checkRevealRestore,
   expectedNeutrals,
   expectedRemaps,
   expectedTokens,
   parseDeclarations,
   parseFrontmatter,
+  revealClassNames,
   run,
   scanStylesheet,
 } from "./check-tokens.mts";
@@ -48,7 +53,7 @@ after(() => fixtures.forEach((dir) => rmSync(dir, { recursive: true, force: true
 function fixture(files: Record<string, string> = {}): string {
   const dir = mkdtempSync(join(tmpdir(), "check-tokens-"));
   fixtures.push(dir);
-  for (const path of [DESIGN_PATH, TOKENS_PATH, BREAKPOINTS_PATH, LAYOUT_PATH]) {
+  for (const path of [DESIGN_PATH, TOKENS_PATH, BREAKPOINTS_PATH, LAYOUT_PATH, REVEAL_PATH, ISLAND_PATH]) {
     mkdirSync(dirname(join(dir, path)), { recursive: true });
     cpSync(join(ROOT, path), join(dir, path));
   }
@@ -88,9 +93,10 @@ describe("the real repository", () => {
     // margin, section, band, hero-plate x2, contact-plate x2; then the
     // COMPONENT_REMAPS: nav padding block; the five Home hero pairs (padding,
     // stack gap, kicker display, plate position, Explore alignment); chip
-    // padding, nav item gap, size and leading, footer columns
-    const expected = typeRemaps + 7 + 11;
-    assert.equal(expected, 91);
+    // padding, nav item gap, size and leading, footer columns; the two
+    // evidence band gaps (tag, figure)
+    const expected = typeRemaps + 7 + 13;
+    assert.equal(expected, 93);
     assert.equal(Object.keys(expectedRemaps(groups)).length, expected);
   });
 
@@ -324,6 +330,154 @@ describe("stylesheet scan", () => {
   });
 });
 
+describe("the reveal guard (AD-14)", () => {
+  for (const value of ["0", "0%", "0.0", ".0", "00", "0 !important"]) {
+    test(`an unscoped opacity: ${value} fails with file:line`, () => {
+      assert.deepEqual(scan(`.a {\n  opacity: ${value};\n}`),
+        ["x.module.css:2: opacity: 0 outside .js-reveal (hidden without script)"]);
+    });
+  }
+
+  test("an unscoped translateY fails with file:line", () => {
+    assert.deepEqual(scan(".a {\n  transform: translateY(var(--space-stack-xs));\n}"),
+      ["x.module.css:2: translate outside .js-reveal"]);
+    assert.deepEqual(scan(".a { transform: scale(1) translatey(var(--space-stack-xs)); }"),
+      ["x.module.css:1: translate outside .js-reveal"]);
+  });
+
+  test("both pass when every selector is scoped under .js-reveal", () => {
+    const css = ".js-reveal .reveal,\n:root.js-reveal > .b {\n  opacity: 0;\n  transform: translateY(var(--space-stack-xs));\n}";
+    assert.deepEqual(scan(css), []);
+  });
+
+  test("one unscoped selector in the list fails the rule", () => {
+    assert.deepEqual(scan(".js-reveal .reveal, .b { opacity: 0; }"),
+      ["x.module.css:1: opacity: 0 outside .js-reveal (hidden without script)"]);
+  });
+
+  test(".js-reveal itself is not scoped under it, and a lookalike class is not either", () => {
+    for (const selector of [".js-reveal", ":root.js-reveal", ".js-revealed .a", ".no-js-reveal .a"]) {
+      assert.equal(scan(`${selector} { opacity: 0; }`).length, 1, selector);
+    }
+  });
+
+  test("other opacities pass anywhere", () => {
+    assert.deepEqual(scan(".a { opacity: 1; }\n.b { opacity: 0.5; }\n.c { opacity: 0.05; }"), []);
+  });
+
+  test("an unscoped hide nested in an at-rule still fails", () => {
+    const failures = scanStylesheet(REVEAL_PATH, "@media print {\n  .a { opacity: 0; }\n}", defined);
+    assert.deepEqual(failures, [`${REVEAL_PATH}:2: opacity: 0 outside .js-reveal (hidden without script)`]);
+  });
+
+  test("@media print passes in styles/reveal.css", () => {
+    const css = "@media print {\n  .js-reveal .reveal { opacity: 1; transform: none; transition: none; }\n}";
+    assert.deepEqual(scanStylesheet(REVEAL_PATH, css, defined), []);
+  });
+
+  test("@media print fails anywhere else", () => {
+    assert.deepEqual(scan("@media print {\n  .a { color: var(--color-ink); }\n}"),
+      [`x.module.css:1: @media print belongs only in ${REVEAL_PATH} or ${PRINT_PATH}`]);
+  });
+
+  test("any other @media fails in styles/reveal.css too", () => {
+    for (const prelude of ["@media screen", "@media print and (max-width: 767px)", "@media (prefers-reduced-motion: reduce)"]) {
+      const failures = scanStylesheet(REVEAL_PATH, `${prelude} {\n  .a { color: var(--color-ink); }\n}`, defined);
+      assert.deepEqual(failures, [`${REVEAL_PATH}:1: @media belongs only in ${BREAKPOINTS_PATH}`], prelude);
+    }
+  });
+
+  test("translate(), translate3d() and the translate property are hides too", () => {
+    for (const decl of ["transform: translate(0, var(--space-stack-xs))", "transform: translate3d(0, var(--space-stack-xs), 0)", "translate: 0 var(--space-stack-xs)"]) {
+      assert.deepEqual(scan(`.a { ${decl}; }`), ["x.module.css:1: translate outside .js-reveal"], decl);
+      assert.deepEqual(scan(`.js-reveal .a { ${decl}; }`), [], decl);
+    }
+    assert.deepEqual(scan(".a { translate: none; }"), []);
+  });
+
+  test("visibility: hidden and collapse are hides; visible is not", () => {
+    for (const value of ["hidden", "collapse", "hidden !important"]) {
+      assert.deepEqual(scan(`.a { visibility: ${value}; }`),
+        ["x.module.css:1: visibility: hidden outside .js-reveal (hidden without script)"], value);
+    }
+    assert.deepEqual(scan(".js-reveal .a { visibility: hidden; }"), []);
+    assert.deepEqual(scan(".a { visibility: visible; }"), []);
+  });
+
+  test(".js-reveal inside :not() does not scope", () => {
+    for (const selector of [":not(.js-reveal) .a", "html:not(.js-reveal) .a", ":not(:is(.js-reveal)) .a"]) {
+      assert.equal(scan(`${selector} { opacity: 0; }`).length, 1, selector);
+    }
+    assert.deepEqual(scan(".js-reveal:not(.x) .a { opacity: 0; }"), []);
+  });
+
+  test("whitespace inside parentheses and brackets does not split a compound", () => {
+    // Split on raw whitespace, ":is(.x .js-reveal)" would leave ".js-reveal)" as a scoping compound.
+    assert.equal(scan(":is(.x .js-reveal) { opacity: 0; }").length, 1);
+    assert.equal(scan('[data-a="x .js-reveal"] { opacity: 0; }').length, 1);
+    assert.deepEqual(scan(':is(.js-reveal, .js-reveal) [data-a="b c"] { opacity: 0; }'), []);
+  });
+
+  test("@media print passes in styles/print.css", () => {
+    assert.deepEqual(scanStylesheet(PRINT_PATH, "@media print {\n  .a { color: var(--color-ink); }\n}", defined), []);
+  });
+
+  test("the real styles/reveal.css passes", () => {
+    assert.deepEqual(scanStylesheet(REVEAL_PATH, read(REVEAL_PATH), defined), []);
+  });
+});
+
+describe("the reveal restore rule", () => {
+  const ISLAND = read(ISLAND_PATH);
+  const REVEAL_CSS = read(REVEAL_PATH);
+
+  test("the class names are read from the island's exported constants", () => {
+    assert.deepEqual(revealClassNames(ISLAND), { root: "js-reveal", revealed: "in" });
+  });
+
+  test("the real reveal.css restores under the island's class names", () => {
+    assert.deepEqual(checkRevealRestore(REVEAL_CSS, ISLAND), []);
+  });
+
+  test("renaming the revealed class in the island alone fails", () => {
+    const renamed = ISLAND.replace('REVEALED_CLASS = "in"', 'REVEALED_CLASS = "shown"');
+    assert.notEqual(renamed, ISLAND);
+    assert.deepEqual(checkRevealRestore(REVEAL_CSS, renamed),
+      [`${REVEAL_PATH}: no top-level rule .js-reveal .reveal.shown { opacity: 1; transform: none }`]);
+  });
+
+  test("renaming the root class in the island alone fails", () => {
+    const renamed = ISLAND.replace('REVEAL_ROOT_CLASS = "js-reveal"', 'REVEAL_ROOT_CLASS = "js-motion"');
+    assert.notEqual(renamed, ISLAND);
+    assert.equal(checkRevealRestore(REVEAL_CSS, renamed).length, 1);
+  });
+
+  test("a restore rule that is missing, incomplete or only inside @media print fails", () => {
+    const rule = /\.js-reveal \.reveal\.in \{[^}]*\}/;
+    assert.match(REVEAL_CSS, rule);
+    for (const css of [
+      REVEAL_CSS.replace(rule, ""),
+      REVEAL_CSS.replace(rule, ".js-reveal .reveal.in { opacity: 1; }"),
+      REVEAL_CSS.replace(rule, ".js-reveal .reveal.in { opacity: 0.9; transform: none; }"),
+      REVEAL_CSS.replace(rule, "").replace("@media print {", "@media print {\n  .js-reveal .reveal.in { opacity: 1; transform: none; }"),
+    ]) {
+      assert.equal(checkRevealRestore(css, ISLAND).length, 1, css);
+    }
+  });
+
+  test("a missing island, constants or reveal.css fails", () => {
+    assert.deepEqual(checkRevealRestore(null, ISLAND), [`${REVEAL_PATH}: missing`]);
+    assert.deepEqual(checkRevealRestore(REVEAL_CSS, null), [`${ISLAND_PATH}: missing`]);
+    assert.equal(checkRevealRestore(REVEAL_CSS, "export const X = 1;").length, 1);
+  });
+
+  test("run() fails when the island and reveal.css drift apart", () => {
+    const dir = fixture({ [ISLAND_PATH]: ISLAND.replace('REVEALED_CLASS = "in"', 'REVEALED_CLASS = "shown"') });
+    assert.deepEqual(run(dir).failures,
+      [`${REVEAL_PATH}: no top-level rule .js-reveal .reveal.shown { opacity: 1; transform: none }`]);
+  });
+});
+
 describe("breakpoints.css", () => {
   const remaps = expectedRemaps(groups);
   const check = (css: string): string[] => checkBreakpoints(css, remaps, tokens);
@@ -380,7 +534,8 @@ describe("run() over a fixture repository", () => {
     const dir = fixture({ "components/card.module.css": ".card { padding: var(--space-stack-md); }\n" });
     const { failures, summary } = run(dir);
     assert.deepEqual(failures, []);
-    assert.match(summary ?? "", /1 other stylesheet/);
+    // The module plus the fixture's copy of styles/reveal.css.
+    assert.match(summary ?? "", /2 other stylesheet/);
   });
 
   test("a stylesheet under a nested docs/ directory is scanned", () => {
@@ -398,11 +553,34 @@ describe("run() over a fixture repository", () => {
   });
 
   test("a missing stylesheet import in app/layout.tsx fails", () => {
-    for (const path of ["tokens", "breakpoints"]) {
+    for (const path of ["tokens", "breakpoints", "reveal"]) {
       const dir = fixture({ [LAYOUT_PATH]: LAYOUT.replace(`import "@/styles/${path}.css";\n`, "") });
       assert.deepEqual(run(dir).failures, [`${LAYOUT_PATH}: must import @/styles/${path}.css`]);
     }
     assert.deepEqual(checkLayoutImports(null), [`${LAYOUT_PATH}: missing`]);
+  });
+
+  test("@media print in a stylesheet other than styles/reveal.css fails", () => {
+    const dir = fixture({ "app/globals.css": "@media print {\n  body { color: var(--color-ink); }\n}\n" });
+    assert.deepEqual(run(dir).failures, [`app/globals.css:1: @media print belongs only in ${REVEAL_PATH} or ${PRINT_PATH}`]);
+  });
+
+  test("an unscoped opacity: 0 in any stylesheet fails", () => {
+    const dir = fixture({ "components/x.module.css": ".x {\n  opacity: 0;\n}\n" });
+    assert.deepEqual(run(dir).failures,
+      ["components/x.module.css:2: opacity: 0 outside .js-reveal (hidden without script)"]);
+  });
+
+  test("app/layout.tsx must import styles/reveal.css after breakpoints.css", () => {
+    const swapped = LAYOUT.replace('import "@/styles/breakpoints.css";\nimport "@/styles/reveal.css";',
+      'import "@/styles/reveal.css";\nimport "@/styles/breakpoints.css";');
+    assert.notEqual(swapped, LAYOUT);
+    assert.deepEqual(run(fixture({ [LAYOUT_PATH]: swapped })).failures,
+      [`${LAYOUT_PATH}: must import @/styles/breakpoints.css before @/styles/reveal.css`]);
+    const missing = LAYOUT.replace('import "@/styles/reveal.css";\n', "");
+    assert.notEqual(missing, LAYOUT);
+    assert.deepEqual(run(fixture({ [LAYOUT_PATH]: missing })).failures,
+      [`${LAYOUT_PATH}: must import @/styles/reveal.css`]);
   });
 
   test("@container in tokens.css fails", () => {
