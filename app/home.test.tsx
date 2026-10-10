@@ -20,6 +20,7 @@ import { describe, expect, test } from "vitest";
 
 import { home } from "@/content/home";
 import { site } from "@/content/site";
+import { caseStudyItems } from "@/lib/evidence";
 import { metadata as contactMetadata } from "./contact/page";
 import { metadata as experienceMetadata } from "./experience/page";
 import { metadata } from "./layout";
@@ -31,11 +32,11 @@ const Home = homeModule.default;
 const STATEMENT =
   "Engineering leader in regulated industries, most recently running a 38-person function through six people-managers, with a standing seat on the Digital Governance Board, reporting to the CEO. Twenty years across banking, payments and healthcare, hands-on throughout, with AI-native delivery measured rather than assumed.";
 
-const LABELS = ["Bug reopen rate, Vietnam team, 26 of the 38", "Cloud Secure Score, full production subscription"];
+const LABELS = ["Bad fixes, Vietnam team, 26 of the 38", "Cycle time, AI-assisted pilot projects"];
 const KICKER = "Leadership · Governance · Hands-on";
 const DESCRIPTION =
   "Engineering leader in regulated industries: a 38-person function, a Digital Governance Board seat reporting to the CEO, and twenty years across banking, payments and healthcare.";
-const FIGURES = ["above 100% to below 20%", "20% to 76%"];
+const FIGURES = ["Over 1 per fix to under 1 in 5", "30 to 40% faster"];
 
 const TERMS_FILE = ".forbidden-terms";
 
@@ -152,6 +153,21 @@ describe("the Home hero", () => {
 
   test("the Explore link is a real href to /experience", () => {
     expect(main).toMatch(new RegExp(`<a[^>]*href="/experience"[^>]*>${escapeRegExp(home.explore.label)}`));
+  });
+
+  test("the hero never names the Fault Feedback Ratio or DORA", () => {
+    // FR-5 as amended 2026-10-11: the metric's name lives in the Quality band
+    // and CS-1, and cycle time is never called a DORA metric anywhere.
+    const hero = text(main);
+    expect(hero).not.toMatch(/fault feedback ratio/i);
+    expect(hero).not.toMatch(/\bDORA\b/i);
+  });
+
+  test("CS-1's Headline Metric uses the pair's plain words, never the Fault Feedback Ratio name", () => {
+    const cs1 = caseStudyItems.find((item) => item.slug === "offshore-delivery-turnaround");
+    expect(cs1?.headlineMetric.value).toBe("Bad fixes from over 1 per fix to under 1 in 5");
+    expect(cs1?.headlineMetric.value).not.toMatch(/fault feedback ratio/i);
+    expect(cs1?.headlineMetric.value.toLowerCase()).toContain(FIGURES[0].toLowerCase());
   });
 
   test("no banned or confidential term appears anywhere on Home", () => {
