@@ -1,0 +1,85 @@
+/* {components.footer}: panel ground, hairline top rule, three columns from 768px, one below. */
+.footer {
+  padding: var(--space-stack-xl) var(--space-margin);
+  border-top: var(--space-rule-hairline) solid var(--color-rule);
+  background: var(--color-panel);
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: var(--component-footer-columns);
+  gap: var(--space-stack-lg);
+}
+
+.wordmark {
+  margin: 0 0 var(--space-stack-xs);
+  font-family: var(--type-wordmark-footer-family);
+  font-size: var(--type-wordmark-footer-size);
+  font-weight: var(--type-wordmark-footer-weight);
+  line-height: var(--type-wordmark-footer-leading);
+  letter-spacing: var(--type-wordmark-footer-tracking);
+  color: var(--color-ink);
+}
+
+.line {
+  margin: 0;
+  font-family: var(--type-ui-family);
+  font-size: var(--type-ui-size);
+  font-weight: var(--type-ui-weight);
+  line-height: var(--type-ui-leading);
+  color: var(--color-muted);
+}
+
+.label {
+  margin: 0 0 var(--space-stack-sm);
+  font-family: var(--type-meta-label-family);
+  font-size: var(--type-meta-label-size);
+  font-weight: var(--type-meta-label-weight);
+  line-height: var(--type-meta-label-leading);
+  letter-spacing: var(--type-meta-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.links {
+  display: grid;
+  gap: var(--space-stack-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Ink with a 1px muted underline: {colors.rule} measured 1.06:1 on panel and was not perceivable. */
+.link {
+  font-family: var(--type-ui-family);
+  font-size: var(--type-ui-size);
+  font-weight: var(--type-ui-weight);
+  line-height: var(--type-ui-leading);
+  color: var(--color-ink);
+  text-decoration-line: underline;
+  text-decoration-thickness: var(--component-footer-link-underline-width);
+  text-decoration-color: var(--color-muted);
+  overflow-wrap: anywhere;
+}
+
+.note {
+  margin: var(--space-stack-xl) 0 0;
+  font-family: var(--type-small-family);
+  font-size: var(--type-small-size);
+  font-weight: var(--type-small-weight);
+  line-height: var(--type-small-leading);
+  color: var(--color-muted);
+}
+
+/* Read by assistive technology, never drawn or copied: a hairline box,
+   clipped to nothing, out of flow and unselectable, so copying the visible
+   address gives one "@". */
+.visuallyHidden {
+  position: absolute;
+  width: var(--space-rule-hairline);
+  height: var(--space-rule-hairline);
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  user-select: none;
+}

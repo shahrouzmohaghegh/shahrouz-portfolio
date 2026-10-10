@@ -35,9 +35,13 @@ export const FLOOR_EXCEPTIONS = ["meta-label", "nameline", "kicker", "stage-numb
 export const MEDIA_PRELUDE = /^@media\s*\(\s*max-width\s*:\s*767px\s*\)$/;
 
 // Component values are free-form prose in DESIGN.md and are not parsed, so
-// the one component pair that switches at the breakpoint is named here.
+// the component pairs that switch at the breakpoint are named here.
 export const COMPONENT_REMAPS: TokenMap = {
   "--component-capability-chip-padding": "var(--component-capability-chip-padding-mobile)",
+  "--component-nav-item-gap": "var(--component-nav-item-gap-mobile)",
+  "--component-nav-item-size": "var(--component-nav-item-size-mobile)",
+  "--component-nav-item-leading": "var(--component-nav-item-leading-mobile)",
+  "--component-footer-columns": "var(--component-footer-columns-mobile)",
 };
 
 const KNOWN_TOP_LEVEL = new Set([

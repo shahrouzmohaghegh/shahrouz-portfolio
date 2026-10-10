@@ -85,9 +85,10 @@ describe("the real repository", () => {
   test("the remap count is exact and derived from DESIGN.md", () => {
     let typeRemaps = 0;
     for (const role of MOBILE_ROLES) typeRemaps += Object.keys(groups.typography[`${role}-mobile`]).length;
-    // margin, section, band, hero-plate x2, contact-plate x2, chip padding
-    const expected = typeRemaps + 7 + 1;
-    assert.equal(expected, 81);
+    // margin, section, band, hero-plate x2, contact-plate x2; then the
+    // COMPONENT_REMAPS: chip padding, nav item gap, size and leading, footer columns
+    const expected = typeRemaps + 7 + 5;
+    assert.equal(expected, 85);
     assert.equal(Object.keys(expectedRemaps(groups)).length, expected);
   });
 
@@ -345,7 +346,8 @@ describe("breakpoints.css", () => {
   });
 
   test("a final declaration without ';' is accepted", () => {
-    const css = BREAKPOINTS_CSS.replace("var(--component-capability-chip-padding-mobile);", "var(--component-capability-chip-padding-mobile)");
+    const css = BREAKPOINTS_CSS.replace(/;(\s*}\s*}\s*)$/, "$1");
+    assert.notEqual(css, BREAKPOINTS_CSS);
     assert.deepEqual(check(css), []);
   });
 
