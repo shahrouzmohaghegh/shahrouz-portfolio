@@ -71,10 +71,15 @@
   color: var(--color-muted);
 }
 
-/* Read by assistive technology, never drawn: clipped to nothing and out of flow. */
+/* Read by assistive technology, never drawn or copied: a hairline box,
+   clipped to nothing, out of flow and unselectable, so copying the visible
+   address gives one "@". */
 .visuallyHidden {
   position: absolute;
+  width: var(--space-rule-hairline);
+  height: var(--space-rule-hairline);
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+  user-select: none;
 }
