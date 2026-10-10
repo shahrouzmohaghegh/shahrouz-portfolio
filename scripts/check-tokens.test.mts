@@ -86,9 +86,11 @@ describe("the real repository", () => {
     let typeRemaps = 0;
     for (const role of MOBILE_ROLES) typeRemaps += Object.keys(groups.typography[`${role}-mobile`]).length;
     // margin, section, band, hero-plate x2, contact-plate x2; then the
-    // COMPONENT_REMAPS: chip padding, nav item gap, size and leading, footer columns
-    const expected = typeRemaps + 7 + 5;
-    assert.equal(expected, 85);
+    // COMPONENT_REMAPS: nav padding block; the five Home hero pairs (padding,
+    // stack gap, kicker display, plate position, Explore alignment); chip
+    // padding, nav item gap, size and leading, footer columns
+    const expected = typeRemaps + 7 + 11;
+    assert.equal(expected, 91);
     assert.equal(Object.keys(expectedRemaps(groups)).length, expected);
   });
 

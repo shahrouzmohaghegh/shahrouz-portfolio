@@ -37,6 +37,12 @@ export const MEDIA_PRELUDE = /^@media\s*\(\s*max-width\s*:\s*767px\s*\)$/;
 // Component values are free-form prose in DESIGN.md and are not parsed, so
 // the component pairs that switch at the breakpoint are named here.
 export const COMPONENT_REMAPS: TokenMap = {
+  "--component-nav-padding-block": "var(--component-nav-padding-block-mobile)",
+  "--component-hero-padding": "var(--component-hero-padding-mobile)",
+  "--component-hero-stack-gap": "var(--component-hero-stack-gap-mobile)",
+  "--component-hero-kicker-display": "var(--component-hero-kicker-display-mobile)",
+  "--component-hero-plate-position": "var(--component-hero-plate-position-mobile)",
+  "--component-hero-explore-align": "var(--component-hero-explore-align-mobile)",
   "--component-capability-chip-padding": "var(--component-capability-chip-padding-mobile)",
   "--component-nav-item-gap": "var(--component-nav-item-gap-mobile)",
   "--component-nav-item-size": "var(--component-nav-item-size-mobile)",

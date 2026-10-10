@@ -326,6 +326,7 @@
   --space-contact-plate-height: var(--space-contact-plate-desktop-height);
 
   /* components: literal lengths from DESIGN.md components */
+  --component-nav-padding-block-mobile: 16px;
   --component-nav-padding-block: 30px;
   --component-nav-padding: var(--component-nav-padding-block) var(--space-margin);
   --component-nav-current-underline-width: 1px;
@@ -339,9 +340,26 @@
   --component-nav-item-leading: var(--type-ui-leading);
   --component-nav-item-gap: var(--space-stack-lg);
   --component-hero-plate-background: linear-gradient(168deg, var(--color-tone) 0%, var(--color-tone-2) 100%);
+  /* Home hero, from screen-home.html. The text sits beside the fixed plate
+     only when its column can be at least --component-hero-text-min-width
+     ("Mohaghegh" at 76px is about 409px); otherwise text, plate and Explore
+     stack. The 28px top padding below 768px is part of the 375 x 550 fold. */
+  --component-hero-padding-mobile: 28px var(--space-margin) var(--space-stack-xl);
+  --component-hero-padding: 72px var(--space-margin) 104px;
+  --component-hero-text-min-width: 440px;
+  --component-hero-stack-gap-mobile: var(--space-stack-sm);
+  --component-hero-stack-gap: var(--space-stack-md);
+  --component-hero-kicker-display-mobile: none;
+  --component-hero-kicker-display: block;
+  --component-hero-plate-position-mobile: 24% 50%;
+  --component-hero-plate-position: 50% 2%;
+  --component-hero-explore-align-mobile: center;
+  --component-hero-explore-align: start;
+  --component-availability-dot-size: 8px;
   --component-figure-pair-label-gap: 4px;
   --component-figure-pair-row-gap: 12px;
   --component-cta-link-underline-width: 1.5px;
+  --component-cta-link-weight: 600;
   --component-capability-chip-padding-mobile: 9px 15px;
   --component-capability-chip-padding: 11px 20px;
   --component-cross-listing-link-underline-width: 1px;

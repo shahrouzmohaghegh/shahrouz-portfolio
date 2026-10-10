@@ -307,6 +307,7 @@ components:
   nav:
     background: '{colors.paper}'
     padding: 30px {spacing.margin-desktop}
+    padding-mobile: 16px {spacing.margin-mobile}
     link: '{colors.muted}'
     link-current: '{colors.accent}'
     current-underline: 1px solid {colors.accent}
