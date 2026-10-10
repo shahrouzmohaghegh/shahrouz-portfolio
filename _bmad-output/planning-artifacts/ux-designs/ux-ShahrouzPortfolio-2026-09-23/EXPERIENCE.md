@@ -382,7 +382,7 @@ Fold discipline at 375px, in render order above that fold: his name as the `h1`,
 
 **This supersedes a claim that was already false.** The previous version of this line put identity, the positioning statement, availability and the portrait all above the fold at 375px. Measured, that stack came to about 876px against 553px of visible viewport, an overrun of roughly 323px before any figure was added. FR-5's amendment did not create that problem, it exposed it.
 
-Below the fold, in order: the portrait plate, the Explore affordance, then the two evidence bands, with the Secure Score band captioned "Microsoft Defender for Cloud Secure Score across the full production Azure subscription, reported to the Digital Governance Board." The estate size is not published (FR-29, amended 2026-10-07).
+Below the fold, in order: the portrait plate, the Explore affordance, then the two evidence bands. The Quality band is captioned "Fault Feedback Ratio: every reopened bug and every new issue linked back to it, per bug fixed, on the 26-person Vietnam team, part of the 38-person function." The Secure Score band is captioned "Microsoft Defender for Cloud Secure Score across the full production Azure subscription, reported to the Digital Governance Board." The estate size is not published (FR-29, amended 2026-10-07).
 
 **The Quality band deliberately repeats the figure pair's first number, and that is not repetition for its own sake.** The compact label above the fold compresses the scope into one line, while the band's caption names the Fault Feedback Ratio and carries FR-34's scope in full prose. The pair is Dana's guarantee that she sees two numbers without scrolling; the band is Marcus's qualified read once he does. The Security posture band carries the Secure Score, which is not above the fold. Anyone tempted to remove the repetition as duplication should change FR-5 or FR-34 first, not the composition.
 
@@ -452,8 +452,8 @@ Binding notes for whoever builds the decision table, from the agent that prototy
 2. Home gives him the shape. He follows "Explore selected work" to `/experience`.
 3. Three cards. He opens the delivery and quality one because that is his actual pain.
 4. The facts strip tells him the team was 26 people hired and run directly, within a 38-person function, in regulated healthcare. The section rail tells him the page has five parts.
-5. He skims Decisions. Every decision carries its trade-off set apart, including the one where two people left.
-6. **Climax:** the outcome band states the Fault Feedback Ratio taken from over 1 per fix to under 1 in 5, attributed in the same sentence to the 26-person team he hired and ran, with the source note underneath naming the defect tracker and the release windows. Marcus can now name two measurable outcomes and has a question to ask, so he accepts the call.
+5. He skims Decisions. Every decision carries its trade-off set apart.
+6. **Climax:** the outcome band states the Fault Feedback Ratio taken from over 1 per fix to under 1 in 5, attributed in the same sentence to the 26-person team he hired and ran, with the source note underneath stating exactly what the ratio counted. Marcus can now name two measurable outcomes and has a question to ask, so he accepts the call.
 7. Failure: he skipped the prose. The key and value list repeats every number, so nothing is lost.
 
 ### Flow 3, Priya checks whether the technical claims are real (UJ-3)

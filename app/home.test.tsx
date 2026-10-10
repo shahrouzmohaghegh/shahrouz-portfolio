@@ -163,9 +163,10 @@ describe("the Home hero", () => {
     expect(hero).not.toMatch(/\bDORA\b/i);
   });
 
-  test("CS-1's Headline Metric names the Fault Feedback Ratio with the pair's first figure", () => {
+  test("CS-1's Headline Metric uses the pair's plain words, never the Fault Feedback Ratio name", () => {
     const cs1 = caseStudyItems.find((item) => item.slug === "offshore-delivery-turnaround");
-    expect(cs1?.headlineMetric.value).toBe("Fault Feedback Ratio from over 1 per fix to under 1 in 5");
+    expect(cs1?.headlineMetric.value).toBe("Bad fixes from over 1 per fix to under 1 in 5");
+    expect(cs1?.headlineMetric.value).not.toMatch(/fault feedback ratio/i);
     expect(cs1?.headlineMetric.value.toLowerCase()).toContain(FIGURES[0].toLowerCase());
   });
 
