@@ -27,8 +27,8 @@
 // matter for a decision (majors, whether ESLint's next major is admitted,
 // whether gitleaks moved and whether its pinned checksum still matches,
 // whether protection holds, the domain's state: ok, near, expired or
-// unreadable, and each cited repository's state: public, private, missing
-// or unreadable). Exact versions, the days remaining and error text are
+// unreadable, and the state of any cited repository that is not public:
+// private, missing or unreadable). Exact versions, the days remaining and error text are
 // display only, so a patch release or another day passing changes nothing.
 // An open issue is updated when its key differs. With none open, a new one
 // is created only when the key differs from the most recently closed one,
@@ -485,7 +485,11 @@ export function reportKey(facts: Facts): string {
     problems: facts.protection.state === "drifted" ? facts.protection.problems : [],
   };
   key.domain = { state: facts.domain.state };
-  key.citedRepos = Object.fromEntries(facts.citedRepos.map((repo) => [repo.repo, repo.state]));
+  // Only a repository that is not public enters the key. With every one
+  // public the key is the one written before cited repositories were
+  // watched, so adding the watch reopens no issue and recreates none.
+  const notPublic = facts.citedRepos.filter((repo) => repo.state !== "public");
+  if (notPublic.length > 0) key.citedRepos = Object.fromEntries(notPublic.map((repo) => [repo.repo, repo.state]));
   return JSON.stringify(key);
 }
 

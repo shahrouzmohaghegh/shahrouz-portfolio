@@ -13,7 +13,9 @@
 // The box is tied to a commit: the accepted line is
 //   - [x] Shahrouz reviewed the content wording at <sha>
 // where <sha> (7 to 40 hex characters) is a prefix of the latest commit in
-// the pull request that touched a gated path. A later content push makes an
+// the pull request that touched a gated path. A merge of main into the
+// branch is not that commit unless it resolved a conflict in a gated path
+// with wording of its own. A later content push makes an
 // old tick stale, and the failure names the commit to review and name. A
 // tick inside an HTML comment or a fenced code block does not count.
 //
@@ -116,7 +118,8 @@ export type Deps = {
   readFile: (path: string) => string;
   // The files changed on head since it left base.
   changedFiles: (base: string, head: string) => string[];
-  // The latest commit on head, not on base, that touched a gated path.
+  // The latest commit on head, not on base, that touched a gated path,
+  // skipping a merge that only brought in content already on base.
   latestGatedCommit: (base: string, head: string) => string | null;
 };
 
@@ -150,8 +153,21 @@ function git(args: string[]): string {
 const gitChangedFiles = (base: string, head: string): string[] =>
   git(["diff", "--name-only", "--no-renames", "-z", `${base}...${head}`]).split("\0").filter(Boolean);
 
-const gitLatestGatedCommit = (base: string, head: string): string | null =>
-  git(["log", "-1", "--no-renames", "--format=%H", `${base}..${head}`, "--", CONTENT_DIR, REVIEWED_LISTS]).trim() || null;
+// Newest first, following every parent of a merge. A merge counts only for
+// gated wording it wrote itself, a conflict resolved differently from every
+// parent, which is what the combined diff lists. A merge that only brings in
+// content already on main, such as main merged into the branch, is skipped:
+// that content was reviewed on its way to main.
+const gitLatestGatedCommit = (base: string, head: string): string | null => {
+  const log = git(["log", "--full-history", "--no-renames", "--format=%H %P", `${base}..${head}`, "--", CONTENT_DIR, REVIEWED_LISTS]);
+  for (const line of log.split("\n").filter(Boolean)) {
+    const [sha, ...parents] = line.split(" ");
+    if (parents.length < 2) return sha;
+    const resolved = git(["diff-tree", "--cc", "--no-commit-id", "--name-only", sha, "--", CONTENT_DIR, REVIEWED_LISTS]);
+    if (resolved.trim()) return sha;
+  }
+  return null;
+};
 
 if (isEntryPoint(import.meta.url)) {
   try {

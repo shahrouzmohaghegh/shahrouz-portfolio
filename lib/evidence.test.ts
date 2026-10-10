@@ -96,11 +96,17 @@ function unqualifiedSlugs(items: readonly EvidenceItem[]): string[] {
   return items.filter((item) => "qualifierNotRequired" in item.headlineMetric).map((item) => item.slug);
 }
 
+// Claim dates are written in Sydney time, so today is the Sydney date. The
+// UTC date runs a day behind until 10 or 11am in Sydney, and would read a
+// claim dated today as a claim from the future.
+const CLAIM_TIME_ZONE = "Australia/Sydney";
+const sydneyDate = (at: Date): string => new Intl.DateTimeFormat("en-CA", { timeZone: CLAIM_TIME_ZONE }).format(at);
+
 // Every ISO date (YYYY-MM-DD) in a headline metric's value or qualifier that
-// is more than DATED_CLAIM_MAX_DAYS before today, counted in whole UTC days,
-// or that is not a real calendar date, or that is after today.
+// is more than DATED_CLAIM_MAX_DAYS before today's Sydney date, counted in
+// whole days, or that is not a real calendar date, or that is after today.
 function staleClaimProblems(items: readonly EvidenceItem[], today: Date): string[] {
-  const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+  const todayUtc = Date.parse(`${sydneyDate(today)}T00:00:00Z`);
   const problems: string[] = [];
   for (const item of items) {
     const metric = item.headlineMetric;
@@ -263,6 +269,18 @@ describe("the integrity checks", () => {
     expect(staleClaimProblems([dated("On 2026-10-10")], today)).toEqual([]);
     expect(staleClaimProblems([dated("On 2024-02-29")], today)).toHaveLength(1);
     expect(staleClaimProblems([dated("On 2024-02-29")], today)[0]).toContain("needs refreshing");
+  });
+
+  test("today is the Sydney date, so a claim dated this morning in Sydney is not in the future", () => {
+    // 7am on 10 October in Sydney (AEDT, UTC+11) is still 9 October in UTC.
+    const sydneyMorning = new Date("2026-10-09T20:00:00Z");
+    const dated = (value: string) => item({ headlineMetric: { value, qualifier: "in one place" } });
+    expect(staleClaimProblems([dated("On 2026-10-10")], sydneyMorning)).toEqual([]);
+    expect(staleClaimProblems([dated("On 2026-10-11")], sydneyMorning)).toEqual(['"x": headline metric date 2026-10-11 is in the future']);
+    expect(staleClaimProblems([dated("Audited clean on 2025-10-10")], sydneyMorning)).toEqual([]);
+    expect(staleClaimProblems([dated("Audited clean on 2025-10-09")], sydneyMorning)).toHaveLength(1);
+    // 9am on 1 July in Sydney (AEST, UTC+10) is still 30 June in UTC.
+    expect(staleClaimProblems([dated("On 2026-07-01")], new Date("2026-06-30T23:00:00Z"))).toEqual([]);
   });
 
   test.each([
