@@ -1,7 +1,7 @@
 // Home's hero (Stories 2.3 and 2.4). Renders app/page.tsx to static markup
 // and checks what a visitor reads above the fold, in order: his name as the
 // one h1, the kicker, the positioning statement word for word, the availability line from
-// site.availability, then the figure pair's two labels and two figures. Also
+// site.availability, then each figure-pair row: number, words, scope. Also
 // checks the statement stays inside FR-4's 40 to 45 words, that no banned
 // word reaches the rendered Home, and that the root layout no longer asks for
 // noindex while the empty route shells still do.
@@ -39,11 +39,15 @@ const Home = homeModule.default;
 const STATEMENT =
   "Engineering leader in regulated industries, most recently running a 38-person function through six people-managers, with a standing seat on the Digital Governance Board, reporting to the CEO. Twenty years across banking, payments and healthcare, hands-on throughout, with AI-native delivery measured rather than assumed.";
 
-const LABELS = ["Bad fixes, Vietnam team, 26 of the 38", "Cycle time, AI-assisted pilot projects"];
+// FR-5 as amended 2026-10-11 (C): people first, then speed. Each row is a
+// phrase (the number in bold, then what it measures) with its scope beneath.
+const ROWS = [
+  { figure: "About 35%", words: "of engineers grown into senior or leadership roles", scope: "across the 38-person function" },
+  { figure: "30 to 40%", words: "faster cycle time", scope: "across AI-assisted pilot projects" },
+];
 const KICKER = "Leadership · Governance · Hands-on";
 const DESCRIPTION =
   "Engineering leader in regulated industries: a 38-person function, a Digital Governance Board seat reporting to the CEO, and twenty years across banking, payments and healthcare.";
-const FIGURES = ["Over 1 per fix to under 1 in 5", "30 to 40% faster"];
 
 const TERMS_FILE = ".forbidden-terms";
 
@@ -121,23 +125,31 @@ describe("the Home hero", () => {
     expect(main).toMatch(new RegExp(`<p[^>]*>${escapeRegExp(site.availability)}</p>`));
   });
 
-  test("name, kicker, statement, availability, labels and figures render in that order", () => {
+  test("name, kicker, statement, availability, then each row's figure, words and scope, in that order", () => {
     const order = [
       positionOf("<h1", "the h1"),
       positionOf(home.kicker, "the kicker"),
       positionOf(STATEMENT, "the positioning statement"),
       positionOf(site.availability, "the availability line"),
-      positionOf(LABELS[0], "the first figure-pair label"),
-      positionOf(FIGURES[0], "the first figure"),
-      positionOf(LABELS[1], "the second figure-pair label"),
-      positionOf(FIGURES[1], "the second figure"),
+      ...ROWS.flatMap((row, i) => [
+        positionOf(row.figure, `row ${i + 1}'s figure`),
+        positionOf(row.words, `row ${i + 1}'s words`),
+        positionOf(row.scope, `row ${i + 1}'s scope`),
+      ]),
     ];
     expect(order).toEqual([...order].sort((a, b) => a - b));
   });
 
-  test("the figure pair is two rows, each a label above a figure", () => {
-    expect(home.figurePair.map((r) => r.label)).toEqual(LABELS);
-    expect(home.figurePair.map((r) => r.figure)).toEqual(FIGURES);
+  test("each figure-pair row is a phrase with the number in bold, and the scope beneath it", () => {
+    expect(home.figurePair).toEqual(ROWS);
+    for (const row of ROWS) {
+      const phrase = new RegExp(`<strong[^>]*>${escapeRegExp(row.figure)}</strong>\\s*${escapeRegExp(row.words)}</p>\\s*<p[^>]*>${escapeRegExp(row.scope)}</p>`);
+      expect(main, `row "${row.figure}" reads number, words, then scope`).toMatch(phrase);
+    }
+  });
+
+  test("the figure pair has no caps label", () => {
+    expect(readFileSync(join(process.cwd(), "components/figure-pair.module.css"), "utf8")).not.toMatch(/text-transform:\s*uppercase/);
   });
 
   test("the hero has no nameline and no headline", () => {
@@ -165,19 +177,19 @@ describe("the Home hero", () => {
     expect(main).toMatch(new RegExp(`<a[^>]*href="/experience"[^>]*>${escapeRegExp(home.explore.label)}`));
   });
 
-  test("the hero never names the Fault Feedback Ratio, and Home never says DORA", () => {
+  test("the hero never names the Fault Feedback Ratio or bad fixes, and Home never says DORA", () => {
     // FR-5 as amended 2026-10-11: the metric's name lives in the Quality band
     // and CS-1, and cycle time is never called a DORA metric anywhere.
     expect(hero).toContain('id="home-name"');
     expect(text(hero)).not.toMatch(/fault feedback ratio/i);
+    expect(text(hero)).not.toMatch(/bad fixes/i);
     expect(text(main)).not.toMatch(/\bDORA\b/i);
   });
 
-  test("CS-1's Headline Metric uses the pair's plain words, never the Fault Feedback Ratio name", () => {
+  test("CS-1's Headline Metric is the plain-words reduction, never the Fault Feedback Ratio name", () => {
     const cs1 = caseStudyItems.find((item) => item.slug === "offshore-delivery-turnaround");
-    expect(cs1?.headlineMetric.value).toBe("Bad fixes from over 1 per fix to under 1 in 5");
+    expect(cs1?.headlineMetric.value).toBe("Bad fixes cut by more than 80%");
     expect(cs1?.headlineMetric.value).not.toMatch(/fault feedback ratio/i);
-    expect(cs1?.headlineMetric.value.toLowerCase()).toContain(FIGURES[0].toLowerCase());
   });
 
   test("no banned or confidential term appears anywhere on Home", () => {
@@ -253,7 +265,7 @@ describe("the evidence bands below the hero", () => {
 
   test("both bands come after the figure pair and the Explore link", () => {
     const explore = positionOf(home.explore.label, "the Explore link");
-    expect(explore).toBeGreaterThan(positionOf(FIGURES[1], "the second figure"));
+    expect(explore).toBeGreaterThan(positionOf(ROWS[1].scope, "the second row's scope"));
     const quality = main.indexOf(`>${BANDS[0].tag}</h2>`);
     const security = main.indexOf(`>${BANDS[1].tag}</h2>`);
     expect(quality, "Quality band").toBeGreaterThan(explore);

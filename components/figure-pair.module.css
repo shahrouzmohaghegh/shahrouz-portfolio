@@ -1,4 +1,5 @@
-/* {components.figure-pair}: no tag, no divider, no background, two rows. */
+/* {components.figure-pair}: no tag, no divider, no background, two rows,
+   each a serif phrase with its scope beneath. No caps label. */
 .pair {
   display: flex;
   flex-direction: column;
@@ -12,23 +13,29 @@
   gap: var(--component-figure-pair-label-gap);
 }
 
-.label {
-  font-family: var(--type-meta-label-family);
-  font-size: var(--type-meta-label-size);
-  font-weight: var(--type-meta-label-weight);
-  line-height: var(--type-meta-label-leading);
-  letter-spacing: var(--type-meta-label-tracking);
-  text-transform: uppercase;
-  color: var(--color-muted);
-}
-
-.figure {
+/* The phrase: {typography.figure-inline}, words at regular weight. */
+.phrase {
   margin: 0;
   font-family: var(--type-figure-inline-family);
   font-size: var(--type-figure-inline-size);
-  font-weight: var(--type-figure-inline-weight);
+  font-weight: var(--type-body-weight);
   line-height: var(--type-figure-inline-leading);
   letter-spacing: var(--type-figure-inline-tracking);
-  font-variant-numeric: tabular-nums;
   color: var(--color-ink);
+}
+
+/* The number, at the figure-inline weight. */
+.figure {
+  font-weight: var(--type-figure-inline-weight);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The scope: {typography.small} in muted, sentence case. */
+.scope {
+  margin: 0;
+  font-family: var(--type-small-family);
+  font-size: var(--type-small-size);
+  font-weight: var(--type-small-weight);
+  line-height: var(--type-small-leading);
+  color: var(--color-muted);
 }

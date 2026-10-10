@@ -13,13 +13,13 @@ export const home = {
     "Engineering leader in regulated industries, most recently running a 38-person function through six people-managers, with a standing seat on the Digital Governance Board, reporting to the CEO. Twenty years across banking, payments and healthcare, hands-on throughout, with AI-native delivery measured rather than assumed.",
   // Rendered from 768px only; it does not render at 375px.
   kicker: "Leadership · Governance · Hands-on",
-  // FR-5 as amended 2026-10-11: quality first, then speed. Each label carries
-  // its figure's scope (one caps line from 768px, may wrap below). The metric's
-  // name, Fault Feedback Ratio, appears only where it is defined: the Quality
-  // band caption and the CS-1 case study page, never on a card or above the fold.
+  // FR-5 as amended 2026-10-11 (C): people first, then speed. Each row reads
+  // as a phrase, the number in bold then what it measures, with its scope on
+  // the line beneath (FR-34). No caps label. The Fault Feedback Ratio and bad
+  // fixes stay below the fold: in the Quality band and on CS-1.
   figurePair: [
-    { label: "Bad fixes, Vietnam team, 26 of the 38", figure: "Over 1 per fix to under 1 in 5" },
-    { label: "Cycle time, AI-assisted pilot projects", figure: "30 to 40% faster" },
+    { figure: "About 35%", words: "of engineers grown into senior or leadership roles", scope: "across the 38-person function" },
+    { figure: "30 to 40%", words: "faster cycle time", scope: "across AI-assisted pilot projects" },
   ],
   portrait: {
     src: "/portrait-hero.png",
