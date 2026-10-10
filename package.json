@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "check:tokens": "node scripts/check-tokens.mts",
     "check:readme": "node scripts/check-readme.mts",
+    "check:content-review": "node scripts/check-content-review.mts",
     "test:scripts": "node --test \"scripts/**/*.test.mts\"",
     "test": "vitest run",
     "terms:sync": "node scripts/terms-sync.mts",
