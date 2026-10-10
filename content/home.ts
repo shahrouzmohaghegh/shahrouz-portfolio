@@ -13,10 +13,13 @@ export const home = {
     "Engineering leader in regulated industries, most recently running a 38-person function through six people-managers, with a standing seat on the Digital Governance Board, reporting to the CEO. Twenty years across banking, payments and healthcare, hands-on throughout, with AI-native delivery measured rather than assumed.",
   // Rendered from 768px only; it does not render at 375px.
   kicker: "Leadership · Governance · Hands-on",
-  // UX-DR27: each label carries the figure's scope (one caps line from 768px, may wrap below).
+  // FR-5 as amended 2026-10-11: quality first, then speed. Each label carries
+  // its figure's scope (one caps line from 768px, may wrap below). The metric's
+  // name, Fault Feedback Ratio, appears only where it is defined: the Quality
+  // band caption and the CS-1 case study page, never on a card or above the fold.
   figurePair: [
-    { label: "Bug rework measure, Vietnam team, part of the 38", figure: "cut by more than 80%" },
-    { label: "Cloud Secure Score, production environment", figure: "steady improvement" },
+    { label: "Bad fixes, Vietnam team, part of the 38", figure: "cut by more than 80%" },
+    { label: "Cycle time, AI-assisted pilot projects", figure: "30 to 40% faster" },
   ],
   portrait: {
     src: "/portrait-hero.png",

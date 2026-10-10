@@ -327,7 +327,7 @@ components:
   figure-pair:
     background: transparent
     figure: '{typography.figure-inline}'
-    label: '{typography.meta-label} in {colors.muted}, uppercase, one line only'
+    label: '{typography.meta-label} in {colors.muted}, uppercase, one line from 768px; may wrap to two below'
     label-gap: 4px
     row-gap: 12px
     divider: none
@@ -614,7 +614,7 @@ Full visual specs live in the `components` frontmatter block. The notes below ca
 - **Navigation `{components.nav}`.** A wordmark in sans and a flat list of routes. The current route is the only oxide mark in the header, carrying both colour and a 1px underline. No logo, no disclosure menu at any width, no sticky header on scroll.
 - **Hero plate `{components.hero-plate}`.** The portrait is an editorial object, never full-bleed. Gradient tone ground, hairline border, `object-fit: cover` with a tuned `object-position`. Desktop and mobile are two crops of one file. A caption label sits bottom-left over a translucent ink scrim only where the render calls for it.
 - **Evidence band `{components.evidence-band}`.** One caps tag, one figure, one caption. Nothing else may enter this band. The dark variant inverts to `{colors.deep}` and drops its top rule.
-- **Figure pair `{components.figure-pair}`.** Above the fold on Home, and nowhere else. Two stacked full-width rows, each one `{typography.meta-label}` caps scope label on a single line above one `{typography.figure-inline}` serif figure. No tag, no divider, no background, never more than two rows. It exists because `{components.evidence-band}` cannot serve above the fold: that band permits one figure and reveals on scroll, and an above-fold element must never be a reveal target. The scope label is the figure's own sentence, which is how FR-34 is satisfied without a separate caption.
+- **Figure pair `{components.figure-pair}`.** Above the fold on Home, and nowhere else. Two stacked full-width rows, each one `{typography.meta-label}` caps scope label above one `{typography.figure-inline}` serif figure, one line from 768px and two at most below it. Its two labels are named in UX-DR27 and are the only caps runs allowed past five words. No tag, no divider, no background, never more than two rows. It exists because `{components.evidence-band}` cannot serve above the fold: that band permits one figure and reveals on scroll, and an above-fold element must never be a reveal target. The scope label is the figure's own sentence, which is how FR-34 is satisfied without a separate caption.
 - **Capability chip `{components.capability-chip}`.** Fixed order at all widths: Leadership, AI-Native, Executive Influence, Hands-On. Selected state carries an oxide fill, a check glyph and a visually hidden ", selected", three signals for one state. Chips wrap to a second line at 375px. They never enter a horizontal scroller.
 - **Evidence card `{components.evidence-card}`.** A 2px ink rule on top, a capability eyebrow in full-name form, a sans title, the headline metric in oxide, a one-line summary, and a text link. No image, no shadow, no border box.
 - **State line `{components.state-line}`.** A written sentence directly under the chips. It is a first-class component, not helper text.
