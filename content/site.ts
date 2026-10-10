@@ -8,7 +8,7 @@ export const site = {
   name: "Shahrouz Mohaghegh",
   positioning: "Engineering leadership in regulated industries, measured by what ships and stays shipped.",
   location: "Sydney, Australia.",
-  availability: "Open to senior engineering leadership roles in Sydney.",
+  availability: "Open to conversations about the next role.",
   evidenceLabel: "Evidence",
   evidenceLinks: [
     { label: "Experience", href: "/experience" },
