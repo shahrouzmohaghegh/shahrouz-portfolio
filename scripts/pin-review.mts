@@ -12,19 +12,23 @@
 // Every ignore rule in the npm entry of dependabot.yml needs a handler
 // below; a rule without one fails the run, so a new pin cannot go
 // unreported. The gitleaks binary pinned in ci.yml is reported too, and
-// so are two facts the CI gate cannot watch on a quiet repository: main's
-// branch protection (the same reading as check-protection.mts) and the
-// domain's registry expiry date, read over RDAP. Renewal is automatic, but
-// a lapse from a failed payment would take the site down with no other
-// warning. Neither failing to read protection nor failing to read RDAP
-// (a lapsed domain returns 404) stops the report: each is reported as
-// unreadable, so the dependency facts still publish.
+// so are three facts the CI gate cannot watch on a quiet repository: main's
+// branch protection (the same reading as check-protection.mts), the
+// domain's registry expiry date, read over RDAP, and that the repositories
+// the site claims are public (the Career Application System and this one)
+// still are. Renewal is automatic, but a lapse from a failed payment would
+// take the site down with no other warning; a cited repository made private
+// or deleted would leave a claim on the site that a reader cannot check.
+// Failing to read protection, RDAP (a lapsed domain returns 404) or a cited
+// repository never stops the report: each is reported as unreadable, so the
+// dependency facts still publish.
 //
 // The issue is found by a hidden marker carrying a key of the facts that
 // matter for a decision (majors, whether ESLint's next major is admitted,
 // whether gitleaks moved and whether its pinned checksum still matches,
-// whether protection holds, and the domain's state: ok, near, expired or
-// unreadable). Exact versions, the days remaining and error text are
+// whether protection holds, the domain's state: ok, near, expired or
+// unreadable, and the state of any cited repository that is not public:
+// private, missing or unreadable). Exact versions, the days remaining and error text are
 // display only, so a patch release or another day passing changes nothing.
 // An open issue is updated when its key differs. With none open, a new one
 // is created only when the key differs from the most recently closed one,
@@ -54,6 +58,10 @@ export const DOMAIN_RDAP = `https://rdap.verisign.com/com/v1/domain/${DOMAIN}`;
 // days still leaves three weeks to act once a renewal has failed.
 export const DOMAIN_WINDOW_DAYS = 21;
 const DAY_MS = 24 * 60 * 60 * 1000;
+// The repositories the site claims are public: the Career Application
+// System project and this website.
+export const CITED_REPOS = ["shahrouzmohaghegh/career-application-system", "shahrouzmohaghegh/shahrouz-portfolio"] as const;
+export const citedRepoApi = (repo: string): string => `https://api.github.com/repos/${repo}`;
 const gitleaksChecksumsUrl = (version: string): string =>
   `https://github.com/gitleaks/gitleaks/releases/download/v${version}/gitleaks_${version}_checksums.txt`;
 
@@ -299,7 +307,19 @@ export type ProtectionFacts =
   | { state: "drifted"; repo: string; problems: string[] }
   | { state: "unreadable"; reason: string };
 
-export type Facts = { pins: PinFacts[]; gitleaks: GitleaksFacts; protection: ProtectionFacts; domain: DomainFacts };
+// public: found and not private. missing: a 404, which GitHub also returns
+// for a private repository the token cannot see.
+export type CitedRepoFacts =
+  | { repo: string; state: "public" | "private" | "missing" }
+  | { repo: string; state: "unreadable"; reason: string };
+
+export type Facts = {
+  pins: PinFacts[];
+  gitleaks: GitleaksFacts;
+  protection: ProtectionFacts;
+  domain: DomainFacts;
+  citedRepos: CitedRepoFacts[];
+};
 
 type Manifest = {
   version: string;
@@ -365,6 +385,24 @@ async function readDomain(fetchText: FetchText, now: Date): Promise<DomainFacts>
   }
 }
 
+// The repository response's private flag; anything else is unreadable, so a
+// malformed body is never read as public.
+export function parseRepoVisibility(text: string): "public" | "private" {
+  const body: unknown = JSON.parse(text);
+  const flag = typeof body === "object" && body !== null ? (body as { private?: unknown }).private : undefined;
+  if (typeof flag !== "boolean") throw new Error("unexpected repository response: private is not a boolean");
+  return flag ? "private" : "public";
+}
+
+async function readCitedRepo(fetchText: FetchText, repo: string): Promise<CitedRepoFacts> {
+  try {
+    return { repo, state: parseRepoVisibility(await fetchText(citedRepoApi(repo))) };
+  } catch (error) {
+    const reason = errorText(error);
+    return /: HTTP 404$/.test(reason) ? { repo, state: "missing" } : { repo, state: "unreadable", reason };
+  }
+}
+
 async function protectionFacts(fetchText: FetchText, repo: string | null): Promise<ProtectionFacts> {
   if (!repo) return { state: "unreadable", reason: "repository unknown: no GITHUB_REPOSITORY and no GitHub origin remote" };
   const reading = await readProtection(fetchText, repo);
@@ -406,12 +444,15 @@ export async function collectFacts(fetchText: FetchText, local: LocalFiles, now:
 
   const protection = await protectionFacts(fetchText, local.repo);
   const domain = await readDomain(fetchText, now);
+  const citedRepos: CitedRepoFacts[] = [];
+  for (const repo of CITED_REPOS) citedRepos.push(await readCitedRepo(fetchText, repo));
 
   return {
     pins,
     gitleaks: { pinned, pinnedPublishedSha256, latest, latestSha256, checksumsFile: asset.name },
     protection,
     domain,
+    citedRepos,
   };
 }
 
@@ -444,6 +485,11 @@ export function reportKey(facts: Facts): string {
     problems: facts.protection.state === "drifted" ? facts.protection.problems : [],
   };
   key.domain = { state: facts.domain.state };
+  // Only a repository that is not public enters the key. With every one
+  // public the key is the one written before cited repositories were
+  // watched, so adding the watch reopens no issue and recreates none.
+  const notPublic = facts.citedRepos.filter((repo) => repo.state !== "public");
+  if (notPublic.length > 0) key.citedRepos = Object.fromEntries(notPublic.map((repo) => [repo.repo, repo.state]));
   return JSON.stringify(key);
 }
 
@@ -494,12 +540,19 @@ function domainLine(domain: DomainFacts): string {
   return `${DOMAIN} expires in ${domain.daysRemaining} days`;
 }
 
+function citedRepoLine(repo: CitedRepoFacts): string {
+  if (repo.state === "private") return `${repo.repo} is private`;
+  if (repo.state === "missing") return `${repo.repo} was not found`;
+  return `${repo.repo} could not be read`;
+}
+
 // One line naming whatever needs action now, or null when nothing does.
 export function alertLine(facts: Facts): string | null {
   const parts: string[] = [];
   if (facts.protection.state === "drifted") parts.push(`${BRANCH} protection has drifted`);
   if (facts.protection.state === "unreadable") parts.push(`${BRANCH} protection could not be read`);
   if (facts.domain.state !== "ok") parts.push(domainLine(facts.domain));
+  for (const repo of facts.citedRepos) if (repo.state !== "public") parts.push(citedRepoLine(repo));
   return parts.length > 0 ? `**Needs attention:** ${parts.join("; ")}. Details below.` : null;
 }
 
@@ -536,6 +589,18 @@ function domainSection(domain: DomainFacts): string[] {
   ];
 }
 
+function citedRepoSection(repo: CitedRepoFacts): string[] {
+  const head = [
+    `## cited repository (${repo.repo})`,
+    "",
+    `The site cites https://github.com/${repo.repo} as a public repository. From \`${citedRepoApi(repo.repo)}\`; ` +
+      "a 404 means deleted, renamed or made private.",
+    "",
+  ];
+  if (repo.state === "unreadable") return [...head, `- state: unreadable (${repo.reason})`];
+  return [...head, `- state: ${repo.state}`];
+}
+
 export function buildReport(facts: Facts): string {
   const g = facts.gitleaks;
   const alert = alertLine(facts);
@@ -545,10 +610,10 @@ export function buildReport(facts: Facts): string {
     "",
     ...(alert ? [alert, ""] : []),
     "Facts from the npm registry and GitHub releases for each version this project holds back by hand, " +
-      "with main's branch protection and the domain's expiry date from the .com registry. " +
+      "with main's branch protection, the domain's expiry date from the .com registry and the cited repositories' visibility. " +
       "Whether a pin can be lifted is a judgement for review; nothing here changes a dependency. " +
       "Close this issue after review: it returns only when a major, a peer range verdict or the gitleaks pin moves, " +
-      "or when protection or the domain changes state; patch releases alone do not reopen it.",
+      "or when protection, the domain or a cited repository changes state; patch releases alone do not reopen it.",
     "",
   ];
   for (const pin of facts.pins) lines.push(...pinSection(pin), "");
@@ -566,6 +631,8 @@ export function buildReport(facts: Facts): string {
     ...protectionSection(facts.protection),
     "",
     ...domainSection(facts.domain),
+    "",
+    ...facts.citedRepos.flatMap((repo) => ["", ...citedRepoSection(repo)]).slice(1),
   );
   return lines.join("\n") + "\n";
 }

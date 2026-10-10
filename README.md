@@ -35,14 +35,19 @@ _bmad-output/    The published subset of the planning documents
 
 ## Adding an Evidence Item
 
-Every Case Study and Project is defined once and read from there by every page, through the `EvidenceItem` type in `lib/evidence.ts`. Adding one takes two file edits:
+Every Case Study and Project is defined once and read from there by every page, through the `EvidenceItem` type in `lib/evidence.ts`. Adding one takes three edits:
 
 1. An entry in `content/case-studies/index.ts` or `content/projects/index.ts`: slug, title, one-line summary, one or more Capabilities, one Headline Metric and the `href` (`/experience/<slug>` or `/projects/<slug>`).
 2. A new `<slug>.mdx` beside it, holding the prose.
+3. The slug, in its place, in `DISPLAY_ORDER` in `lib/evidence.test.ts`.
 
-A slug is lowercase kebab-case and unique across both collections. The order of entries in `index.ts` is the order they are shown in.
+A slug is lowercase kebab-case and unique across both collections. The order of entries in `index.ts` is the order they are shown in, and `DISPLAY_ORDER` pins that order, so adding, removing or reordering an item also means updating that list. The third edit is the reason this is three edits rather than the two-file record made earlier for NFR-8, which it supersedes: display order is a content decision, and the list is where it is confirmed on purpose rather than changed by a stray move in `index.ts`.
 
-It is two files, not one, because metadata lives in TypeScript and prose in MDX (AD-5 in the spine). MDX exports and frontmatter are not type-checked, so keeping the metadata in TypeScript is what makes an unknown Capability, an empty Capability list or a metric without its qualifier fail `npm run typecheck`; the cases are pinned in `lib/evidence.type-test.ts`. `npm run test` then fails, naming the item, on an entry with no `.mdx`, an `.mdx` with no entry, a slug used twice across both collections, or an `href` that does not match the kind and slug. The split is revisited past about twenty items.
+A Headline Metric without a qualifier (`qualifierNotRequired: true`) fails `npm run test` unless its slug is on the reviewed list `REVIEWED_UNQUALIFIED` in `lib/evidence.test.ts`; a slug goes there only after Shahrouz confirms the figure needs no scope. A dated claim is checked only when its date is written `YYYY-MM-DD` in a Headline Metric's value or qualifier; it then fails `npm run test` once it is more than 365 days old, until the claim is checked again and its date refreshed, and a date that is impossible or in the future fails too.
+
+A pull request that changes anything under `content/` or `lib/evidence.test.ts` (which holds his reviewed lists) fails the gate until its description has the line `- [x] Shahrouz reviewed the content wording at COMMIT`, from `.github/pull_request_template.md`, where `COMMIT` is at least 7 characters of the latest commit in the pull request that changed those paths. A later content push makes the tick stale, and the failure names the commit to review. This is a procedural check, not proof of who reviewed: agents act through Shahrouz's login, so GitHub cannot tell who ticked the box. The agent never ticks it; only Shahrouz does, after reading the wording.
+
+The first two edits are two files, not one, because metadata lives in TypeScript and prose in MDX (AD-5 in the spine). MDX exports and frontmatter are not type-checked, so keeping the metadata in TypeScript is what makes an unknown Capability, an empty Capability list or a metric without its qualifier fail `npm run typecheck`; the cases are pinned in `lib/evidence.type-test.ts`. `npm run test` then fails, naming the item, on an entry with no `.mdx`, an `.mdx` with no entry, a slug used twice across both collections, or an `href` that does not match the kind and slug. The split is revisited past about twenty items.
 
 ## Architecture and planning
 
@@ -82,12 +87,13 @@ npm scripts:
 - `npm run typecheck`: `tsc --noEmit` over the site and the scripts.
 - `npm run check:tokens`: keeps `styles/tokens.css` in step with the design document and every stylesheet on the tokens.
 - `npm run check:readme`: every dependency justified here, every script and gate step listed in this section, every relative link resolving.
+- `npm run check:content-review`: on a pull request that changes anything under `content/` or `lib/evidence.test.ts`, fails unless the body has the `Shahrouz reviewed the content wording at COMMIT` box ticked with the latest commit that changed them; passes on any other event.
 - `npm run test:scripts`: the tests for every script, with `node --test`.
 - `npm run test`: the application logic tests, with Vitest; today the content integrity suite in `lib/evidence.test.ts`.
 - `npm run terms:sync`: changes the confidential term list safely (see below).
 - `npm run watch:production`: runs the production checks once against the live site and prints the result; touches no issue (see [Production watch](#production-watch)).
 
-The `gate` job in `.github/workflows/ci.yml` runs on every push and pull request, in this order:
+The `gate` job in `.github/workflows/ci.yml` runs on every pull request (including an edit to its description, so ticking the content review box re-runs it) and on every push to `main`; pushes to other branches do not run it, so a pull request's commit carries one `gate` result, from the pull request run, in this order:
 
 1. **Check out full history**: every ref, so the scans see all of history.
 2. **Restore confidential term list**: from a repository secret; fails closed if it is missing.
@@ -102,7 +108,8 @@ The `gate` job in `.github/workflows/ci.yml` runs on every push and pull request
 11. **Repository scan (tree, every blob and commit message in history)**: `check-repo.mts --history`.
 12. **Secret scan (gitleaks, full history)**: a checksum-pinned gitleaks binary.
 13. **README check**: `npm run check:readme`.
-14. **Branch protection check**: `main` still protected with `gate` required for everyone.
+14. **Content review check**: `npm run check:content-review`.
+15. **Branch protection check**: `main` still protected with `gate` required for everyone; runs even when an earlier step fails.
 
 ## One-time setup after cloning
 
@@ -126,6 +133,8 @@ gh pr create --fill
 gh pr checks --watch
 gh pr merge --squash --delete-branch
 ```
+
+CI runs on pull requests and on pushes to `main` only, so a topic branch gets no gate run until a pull request is open for it. Open a draft pull request early (`gh pr create --draft --fill`) to see the gate on every push.
 
 When `main` moves while a pull request is open, strict protection blocks the merge until the branch is updated: `gh pr update-branch`, then wait for `gate` again.
 
@@ -171,6 +180,6 @@ npm run terms:sync                # the guard, then both secrets
 
 ## Pinned versions
 
-`.github/dependabot.yml` holds back TypeScript, `@types/node` and ESLint, with a reason for each, and `ci.yml` pins the gitleaks binary by version and checksum, which Dependabot does not track. Once a month `.github/workflows/pin-review.yml` runs `scripts/pin-review.mts`, which keeps one issue, "Dependency pins to review", current with the latest versions next to those pins. Close it after review; it comes back only when a major version, a peer range verdict or the gitleaks pin moves, not for patch releases. The report also carries the same protection reading, so relaxed protection is noticed even when nothing runs CI, and the registry expiry date of `shahrouzmohaghegh.com`, read over RDAP. The issue returns, led by an alert line, when protection drifts or cannot be read, or the domain is within 21 days of expiry, expired or unreadable, in case auto-renew or billing fails. `node scripts/pin-review.mts --print` shows the same report locally without touching the issue.
+`.github/dependabot.yml` holds back TypeScript, `@types/node` and ESLint, with a reason for each, and `ci.yml` pins the gitleaks binary by version and checksum, which Dependabot does not track. Once a month `.github/workflows/pin-review.yml` runs `scripts/pin-review.mts`, which keeps one issue, "Dependency pins to review", current with the latest versions next to those pins. Close it after review; it comes back only when a major version, a peer range verdict or the gitleaks pin moves, not for patch releases. The report also carries the same protection reading, so relaxed protection is noticed even when nothing runs CI, the registry expiry date of `shahrouzmohaghegh.com`, read over RDAP, and whether `shahrouzmohaghegh/career-application-system` and `shahrouzmohaghegh/shahrouz-portfolio`, which the site claims are public repositories, still are. The issue returns, led by an alert line, when protection drifts or cannot be read, the domain is within 21 days of expiry, expired or unreadable, in case auto-renew or billing fails, or either cited repository is private, not found or unreadable. `node scripts/pin-review.mts --print` shows the same report locally without touching the issue.
 
 GitHub disables scheduled workflows in a public repository after 60 days without repository activity, and says so in the Actions tab. To turn the review back on, open Actions, select "Pin review" and choose "Enable workflow", or run `gh workflow enable pin-review.yml`. Running it once by hand (`gh workflow run pin-review.yml`) checks it still works.
