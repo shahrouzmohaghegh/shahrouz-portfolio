@@ -9,8 +9,6 @@ import styles from "./layout.module.css";
 export const metadata: Metadata = {
   // Each route's own title renders as "<Name> | Shahrouz Mohaghegh"; Home keeps the default.
   title: { default: "Shahrouz Mohaghegh", template: "%s | Shahrouz Mohaghegh" },
-  // Keeps the placeholder out of search results; removed when the real Home ships (decided by Shahrouz).
-  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({
