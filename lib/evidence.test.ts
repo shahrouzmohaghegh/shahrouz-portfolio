@@ -2,6 +2,8 @@
 // every index.ts slug has its .mdx file and every .mdx file has its entry,
 // slugs are unique across both collections, each href matches its kind and
 // slug, and the capabilities and Headline Metric hold up at runtime too.
+// Three reviewed facts are pinned here as well: which items may skip a
+// qualifier, that no dated claim is older than a year, and the display order.
 // Each problem names the item, so a failing gate says what to fix.
 
 import { readdirSync } from "node:fs";
@@ -69,6 +71,60 @@ function itemProblems(item: EvidenceItem): string[] {
   return problems;
 }
 
+// The items whose Headline Metric may stand without a qualifier. Each one is
+// a figure Shahrouz confirmed needs no scope; the escape hatch is not a way
+// round FR-34.
+const REVIEWED_UNQUALIFIED = ["career-application-system", "this-website"];
+
+// The display order, reviewed. index.ts order is display order, so a
+// reorder there is a content decision and is confirmed by updating this list.
+const DISPLAY_ORDER = [
+  "offshore-delivery-turnaround",
+  "ai-native-engineering",
+  "digital-governance-board",
+  "career-application-system",
+  "this-website",
+  "platform-modernisation",
+];
+
+// A dated claim ("audited clean on <date>") goes stale; past this many days
+// it fails until the claim is checked again and its date refreshed.
+const DATED_CLAIM_MAX_DAYS = 365;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function unqualifiedSlugs(items: readonly EvidenceItem[]): string[] {
+  return items.filter((item) => "qualifierNotRequired" in item.headlineMetric).map((item) => item.slug);
+}
+
+// Every ISO date (YYYY-MM-DD) in a headline metric's value or qualifier that
+// is more than DATED_CLAIM_MAX_DAYS before today, counted in whole UTC days,
+// or that is not a real calendar date, or that is after today.
+function staleClaimProblems(items: readonly EvidenceItem[], today: Date): string[] {
+  const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+  const problems: string[] = [];
+  for (const item of items) {
+    const metric = item.headlineMetric;
+    const text = [metric.value, "qualifier" in metric ? metric.qualifier : ""].join(" ");
+    for (const [date] of text.matchAll(/\b\d{4}-\d{2}-\d{2}\b/g)) {
+      const at = Date.parse(`${date}T00:00:00Z`);
+      // A round trip catches what Date.parse rolls over or rejects (2025-02-30, month 13).
+      if (Number.isNaN(at) || new Date(at).toISOString().slice(0, 10) !== date) {
+        problems.push(`"${item.slug}": headline metric date ${date} is not a real calendar date`);
+        continue;
+      }
+      const age = Math.floor((todayUtc - at) / DAY_MS);
+      if (age < 0) {
+        problems.push(`"${item.slug}": headline metric date ${date} is in the future`);
+      } else if (age > DATED_CLAIM_MAX_DAYS) {
+        problems.push(
+          `"${item.slug}": headline metric is dated ${date}, ${age} days ago; the claim needs refreshing (check it again and update the date)`,
+        );
+      }
+    }
+  }
+  return problems;
+}
+
 function mdxFiles(collection: string): string[] {
   return readdirSync(fileURLToPath(new URL(`../content/${collection}/`, import.meta.url)));
 }
@@ -103,6 +159,24 @@ describe("the content collections", () => {
 
   test("evidenceItems is both collections, case studies first", () => {
     expect(evidenceItems).toEqual([...caseStudyItems, ...projectItems]);
+  });
+
+  test("only reviewed items skip the qualifier", () => {
+    expect(
+      unqualifiedSlugs(evidenceItems).toSorted(),
+      "An item uses qualifierNotRequired without review. Add its slug to REVIEWED_UNQUALIFIED only after Shahrouz confirms the figure needs no scope; otherwise give it a qualifier.",
+    ).toEqual(REVIEWED_UNQUALIFIED.toSorted());
+  });
+
+  test("no dated claim is more than a year old", () => {
+    expect(staleClaimProblems(evidenceItems, new Date())).toEqual([]);
+  });
+
+  test("the display order is the reviewed one", () => {
+    expect(
+      evidenceItems.map((item) => item.slug),
+      "Order in content/*/index.ts is display order. Confirm a reorder, an addition or a removal by updating DISPLAY_ORDER in lib/evidence.test.ts.",
+    ).toEqual(DISPLAY_ORDER);
   });
 });
 
@@ -156,6 +230,39 @@ describe("the integrity checks", () => {
     expect(duplicateSlugs([item({ kind: "case-study", href: "/experience/x" }), item()])).toEqual([
       'slug "x" is used more than once',
     ]);
+  });
+
+  test("unqualified items are listed, qualified ones are not", () => {
+    expect(
+      unqualifiedSlugs([item(), item({ slug: "y", headlineMetric: { value: "1", qualifierNotRequired: true } })]),
+    ).toEqual(["y"]);
+  });
+
+  test("a dated claim fails once it is more than 365 days old, in the value or the qualifier", () => {
+    const today = new Date("2026-10-10T09:00:00Z");
+    const dated = (value: string, qualifier = "in one place") => item({ headlineMetric: { value, qualifier } });
+    expect(staleClaimProblems([dated("Audited clean on 2025-10-10")], today)).toEqual([]);
+    expect(staleClaimProblems([dated("Audited clean on 2025-10-09")], today)).toEqual([
+      '"x": headline metric is dated 2025-10-09, 366 days ago; the claim needs refreshing (check it again and update the date)',
+    ]);
+    expect(staleClaimProblems([dated("1", "as of 2024-01-01")], today)).toHaveLength(1);
+    expect(staleClaimProblems([item({ headlineMetric: { value: "On 2020-01-01", qualifierNotRequired: true } })], today)).toHaveLength(1);
+    expect(staleClaimProblems([dated("Released in 2019")], today)).toEqual([]);
+  });
+
+  test("an impossible or future date in a headline metric is named, not skipped", () => {
+    const today = new Date("2026-10-10T09:00:00Z");
+    const dated = (value: string) => item({ headlineMetric: { value, qualifier: "in one place" } });
+    expect(staleClaimProblems([dated("On 2025-02-30")], today)).toEqual([
+      '"x": headline metric date 2025-02-30 is not a real calendar date',
+    ]);
+    expect(staleClaimProblems([dated("On 2025-13-01")], today)).toEqual([
+      '"x": headline metric date 2025-13-01 is not a real calendar date',
+    ]);
+    expect(staleClaimProblems([dated("On 2026-10-11")], today)).toEqual(['"x": headline metric date 2026-10-11 is in the future']);
+    expect(staleClaimProblems([dated("On 2026-10-10")], today)).toEqual([]);
+    expect(staleClaimProblems([dated("On 2024-02-29")], today)).toHaveLength(1);
+    expect(staleClaimProblems([dated("On 2024-02-29")], today)[0]).toContain("needs refreshing");
   });
 
   test.each([

@@ -11,6 +11,8 @@ import { describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
+  CITED_REPOS,
+  citedRepoApi,
   CI_YML,
   DEPENDABOT_YML,
   DOMAIN_RDAP,
@@ -30,6 +32,7 @@ import {
   parseGitleaksPin,
   parseExpiry,
   parseIgnoreRules,
+  parseRepoVisibility,
   syncIssue,
   type Deps,
   type FetchText,
@@ -97,6 +100,9 @@ const rdap = (expiration: string): string =>
     ],
   });
 
+const CAS_API = "https://api.github.com/repos/shahrouzmohaghegh/career-application-system";
+const SITE_API = "https://api.github.com/repos/shahrouzmohaghegh/shahrouz-portfolio";
+
 const PINNED_CHECKSUMS = "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_checksums.txt";
 
 function responses(over: Record<string, string | undefined> = {}): Record<string, string> {
@@ -129,15 +135,20 @@ function responses(over: Record<string, string | undefined> = {}): Record<string
     ].join("\n"),
     [DOMAIN_RDAP]: rdap(EXPIRY),
     [BRANCH_URL]: PROTECTED,
+    [CAS_API]: JSON.stringify({ full_name: "shahrouzmohaghegh/career-application-system", private: false }),
+    [SITE_API]: JSON.stringify({ full_name: "shahrouzmohaghegh/shahrouz-portfolio", private: false }),
     ...over,
   };
   return Object.fromEntries(Object.entries(base).filter((entry): entry is [string, string] => entry[1] !== undefined));
 }
 
+// A URL missing from the table answers 503; one mapped to NOT_FOUND answers 404.
+const NOT_FOUND = "\u0000404";
 const fakeFetch =
   (table: Record<string, string> = responses()): FetchText =>
   async (url) => {
     if (!(url in table)) throw new Error(`${url}: HTTP 503`);
+    if (table[url] === NOT_FOUND) throw new Error(`${url}: HTTP 404`);
     return table[url];
   };
 
@@ -181,6 +192,14 @@ describe("pin-review parsers", () => {
     assert.equal(domainFacts("2026-10-09T13:00:00Z", NOW).state, "near");
     assert.equal(domainFacts("2026-10-09T12:00:00Z", NOW).state, "expired");
     assert.deepEqual(domainFacts("2026-10-01T12:00:00Z", NOW), { state: "expired", expires: "2026-10-01", daysRemaining: -8 });
+  });
+
+  test("parseRepoVisibility reads the private flag, and fails on any other shape", () => {
+    assert.equal(parseRepoVisibility(JSON.stringify({ private: false })), "public");
+    assert.equal(parseRepoVisibility(JSON.stringify({ private: true })), "private");
+    assert.throws(() => parseRepoVisibility(JSON.stringify({ private: "no" })), /private is not a boolean/);
+    assert.throws(() => parseRepoVisibility("null"), /private is not a boolean/);
+    assert.throws(() => parseRepoVisibility("<html>"));
   });
 
   test("majorOf reads the first number", () => {
@@ -264,7 +283,48 @@ describe("collectFacts and buildReport", () => {
     assert.match(report, /## domain \(shahrouzmohaghegh\.com\)/);
     assert.match(report, /- state: ok\n- expires: 2027-10-08\n- days remaining: 363/);
     assert.match(report, /within 21 days of expiry, late enough not to fire before the registrar's own auto-renew/);
+    assert.match(
+      report,
+      /## cited repository \(shahrouzmohaghegh\/career-application-system\)\n\nThe site cites https:\/\/github\.com\/shahrouzmohaghegh\/career-application-system [^\n]*\n\n- state: public\n\n## cited repository \(shahrouzmohaghegh\/shahrouz-portfolio\)\n\nThe site cites https:\/\/github\.com\/shahrouzmohaghegh\/shahrouz-portfolio [^\n]*\n\n- state: public\n$/,
+    );
     assert.doesNotMatch(report, /Needs attention/);
+  });
+
+  test("a cited repository that is private, missing or unreadable is reported, alerted and in the key", async () => {
+    const lead = (report: string): string => report.split("\n")[3];
+    const before = markerOf(await reportFor());
+    const isPrivate = await reportFor(responses({ [CAS_API]: JSON.stringify({ private: true }) }));
+    const missing = await reportFor(responses({ [CAS_API]: NOT_FOUND }));
+    const down = await reportFor(responses({ [CAS_API]: undefined }));
+    const malformed = await reportFor(responses({ [CAS_API]: "{}" }));
+    assert.match(isPrivate, /career-application-system[^#]*- state: private\n/);
+    assert.match(missing, /career-application-system[^#]*- state: missing\n/);
+    assert.match(down, /- state: unreadable \(https:\/\/api\.github\.com\/repos\/shahrouzmohaghegh\/career-application-system: HTTP 503\)\n/);
+    assert.match(malformed, /- state: unreadable \(unexpected repository response: private is not a boolean\)/);
+    assert.equal(lead(isPrivate), "**Needs attention:** shahrouzmohaghegh/career-application-system is private. Details below.");
+    assert.equal(lead(missing), "**Needs attention:** shahrouzmohaghegh/career-application-system was not found. Details below.");
+    assert.equal(lead(down), "**Needs attention:** shahrouzmohaghegh/career-application-system could not be read. Details below.");
+    const keys = [before, markerOf(isPrivate), markerOf(missing), markerOf(down)];
+    assert.equal(new Set(keys).size, 4);
+    assert.equal(markerOf(malformed), markerOf(down));
+    assert.match(down, /## gitleaks/);
+  });
+
+  test("both claimed public repositories are watched, each with its own state and alert", async () => {
+    assert.deepEqual([...CITED_REPOS], ["shahrouzmohaghegh/career-application-system", "shahrouzmohaghegh/shahrouz-portfolio"]);
+    assert.equal(citedRepoApi(CITED_REPOS[1]), SITE_API);
+    const lead = (report: string): string => report.split("\n")[3];
+    const before = markerOf(await reportFor());
+    const sitePrivate = await reportFor(responses({ [SITE_API]: JSON.stringify({ private: true }) }));
+    const casPrivate = await reportFor(responses({ [CAS_API]: JSON.stringify({ private: true }) }));
+    assert.match(sitePrivate, /## cited repository \(shahrouzmohaghegh\/shahrouz-portfolio\)[^#]*- state: private\n$/);
+    assert.equal(lead(sitePrivate), "**Needs attention:** shahrouzmohaghegh/shahrouz-portfolio is private. Details below.");
+    assert.equal(new Set([before, markerOf(sitePrivate), markerOf(casPrivate)]).size, 3);
+    const both = await reportFor(responses({ [CAS_API]: NOT_FOUND, [SITE_API]: undefined }));
+    assert.equal(
+      lead(both),
+      "**Needs attention:** shahrouzmohaghegh/career-application-system was not found; shahrouzmohaghegh/shahrouz-portfolio could not be read. Details below.",
+    );
   });
 
   test("the domain moves the key only when its state changes, not daily", async () => {

@@ -1,5 +1,6 @@
 // Vitest runs the application logic tests (AD-18); the repository scripts
 // keep node:test (`npm run test:scripts`), so scripts/ is not collected here.
+// .mts makes Vitest load this file as ESM in this CommonJS package (AD-24).
 
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
