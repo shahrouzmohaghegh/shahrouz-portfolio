@@ -31,7 +31,11 @@ scripts/         Repository checks and tooling, in TypeScript, each with tests
 _bmad-output/    The published subset of the planning documents
 ```
 
-`content/ad-10-probe.ts` and `components/ad-6-probe.ts` are deliberate probes that keep the lint rules on import direction firing; they are not dead code. The second rule keeps `app/` and `components/` reading evidence only through `lib/evidence.ts`.
+`content/ad-10-probe.ts` and `components/ad-6-probe.ts` are deliberate probes that keep the lint rules on import direction firing; they are not dead code. The second rule (AD-6) keeps `app/` and `components/` reading evidence only through `lib/evidence.ts`: it forbids importing `content/case-studies`, `content/projects` and `lib/evidence-types.ts` directly. AD-6 is about evidence, so the rest of `content/` is outside it.
+
+`content/site.ts` holds the site-wide copy: the wordmark name, the footer (positioning line, location, availability, contact links and the note about the CV) and the lines Home reuses. Components import it directly. It sits under `content/`, so the content review box gates every change to it like any other content.
+
+Every route renders `components/site-frame.tsx` itself, passing its own nav item as `current`: one header with the primary nav, one main, one footer. `components/site-frame.test.tsx` renders every `app/**/page.tsx` and `app/not-found.tsx` and fails, by route, any that skips the frame or marks the wrong nav item.
 
 ## Adding an Evidence Item
 

@@ -102,5 +102,9 @@
     --space-contact-plate-width: var(--space-contact-plate-mobile-width);
     --space-contact-plate-height: var(--space-contact-plate-mobile-height);
     --component-capability-chip-padding: var(--component-capability-chip-padding-mobile);
+    --component-nav-item-gap: var(--component-nav-item-gap-mobile);
+    --component-nav-item-size: var(--component-nav-item-size-mobile);
+    --component-nav-item-leading: var(--component-nav-item-leading-mobile);
+    --component-footer-columns: var(--component-footer-columns-mobile);
   }
 }
