@@ -6,9 +6,11 @@
 // qualifier, that no dated claim is older than a year, and the display order.
 // Each problem names the item, so a failing gate says what to fix.
 
-import { readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
+
+import { CI_PATH, gateStepNames } from "@/scripts/check-readme.mts";
 
 import {
   CAPABILITIES,
@@ -20,6 +22,48 @@ import {
   type Capabilities,
   type EvidenceItem,
 } from "@/lib/evidence";
+
+// The this-website Headline Metric states how many checks run on every
+// merge, so the count is read from the gate rather than trusted. Each gate
+// step is classified here by name, setup or check: a step in neither list
+// fails the suite by name, so adding one (say, a browser install for the
+// end-to-end test) forces a decision instead of silently changing the claim.
+const SETUP_STEPS = [
+  "Check out full history",
+  "Restore confidential term list",
+  "Set up Node from .nvmrc",
+  "Install dependencies",
+];
+const CHECK_STEPS = [
+  "Lint",
+  "Type check",
+  "Script tests",
+  "Unit tests",
+  "Build",
+  "Token drift check",
+  "Repository scan (tree, every blob and commit message in history)",
+  "Secret scan (gitleaks, full history)",
+  "README check",
+  "Content review check",
+  "Branch protection check",
+];
+const COUNT_WORDS = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
+  "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen", "Twenty"];
+
+function classifySteps(steps: readonly string[]): { checks: string[]; problems: string[] } {
+  const known = new Set([...SETUP_STEPS, ...CHECK_STEPS]);
+  return {
+    checks: steps.filter((step) => CHECK_STEPS.includes(step)),
+    problems: [
+      ...steps
+        .filter((step) => !known.has(step))
+        .map((step) => `${CI_PATH}: gate step "${step}" is neither setup nor a check; add it to SETUP_STEPS or CHECK_STEPS in lib/evidence.test.ts`),
+      ...[...known]
+        .filter((name) => !steps.includes(name))
+        .map((name) => `lib/evidence.test.ts lists "${name}", which is not a gate step in ${CI_PATH}`),
+    ],
+  };
+}
 
 function mdxProblems(collection: string, items: readonly EvidenceItem[], files: readonly string[]): string[] {
   const slugs = new Set(items.map((item) => item.slug));
@@ -178,6 +222,19 @@ describe("the content collections", () => {
     expect(staleClaimProblems(evidenceItems, new Date())).toEqual([]);
   });
 
+  test("every gate step in ci.yml is classified as setup or a check", () => {
+    expect(classifySteps(gateStepNames(readFileSync(CI_PATH, "utf8"))).problems).toEqual([]);
+  });
+
+  test("this website's check count matches the gate in ci.yml", () => {
+    const value = projectItems.find((item) => item.slug === "this-website")?.headlineMetric.value ?? "";
+    const { checks } = classifySteps(gateStepNames(readFileSync(CI_PATH, "utf8")));
+    expect(
+      value.startsWith(`${COUNT_WORDS[checks.length]} automated checks`),
+      `The this-website Headline Metric must open with "${COUNT_WORDS[checks.length]} automated checks": the gate runs ${checks.length} (${checks.join(", ")}).`,
+    ).toBe(true);
+  });
+
   test("the display order is the reviewed one", () => {
     expect(
       evidenceItems.map((item) => item.slug),
@@ -200,6 +257,20 @@ describe("the integrity checks", () => {
       href: "/projects/x",
       ...over,
     }) as EvidenceItem;
+
+  test("a gate step in neither list is named, and is not counted as a check", () => {
+    const { checks, problems } = classifySteps([...SETUP_STEPS, "Install browsers", ...CHECK_STEPS]);
+    expect(checks).toEqual(CHECK_STEPS);
+    expect(problems).toEqual([
+      `${CI_PATH}: gate step "Install browsers" is neither setup nor a check; add it to SETUP_STEPS or CHECK_STEPS in lib/evidence.test.ts`,
+    ]);
+  });
+
+  test("a listed step missing from the gate is named, and the count drops with it", () => {
+    const { checks, problems } = classifySteps([...SETUP_STEPS, ...CHECK_STEPS.filter((step) => step !== "Lint")]);
+    expect(checks).toHaveLength(CHECK_STEPS.length - 1);
+    expect(problems).toEqual([`lib/evidence.test.ts lists "Lint", which is not a gate step in ${CI_PATH}`]);
+  });
 
   test("a valid item has no problems", () => {
     expect(itemProblems(item())).toEqual([]);
