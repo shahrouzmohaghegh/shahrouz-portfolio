@@ -26,7 +26,7 @@ content/         Typed content as data; imports nothing from components/ or app/
 public/          Static files served as they are: the hero portrait
 lib/             Shared logic used by routes and components
 styles/          tokens.css (every design value), breakpoints.css (the only breakpoint) and
-                 reveal.css (the scroll reveal and the only print rule)
+                 reveal.css (the scroll reveal and its print reset)
 scripts/         Repository checks and tooling, in TypeScript, each with tests
 .github/         The CI gate, the production watch, the monthly pin review and Dependabot settings
 .githooks/       Local pre-commit and commit-msg hooks
@@ -37,7 +37,7 @@ _bmad-output/    The published subset of the planning documents
 
 `content/site.ts` holds the site-wide copy: the wordmark name, the footer (positioning line, location, availability, contact links and the note about the CV) and the lines Home reuses. Components import it directly. It sits under `content/`, so the content review box gates every change to it like any other content. `content/home.ts` holds Home's own copy the same way: the positioning statement, the kicker, the two figure-pair labels and figures, the portrait `alt`, the Explore link and the two evidence bands below the hero. `app/home.test.tsx` fails if the statement leaves 40 to 45 words, the hero order changes, a band gains or loses a piece or changes order, the hero becomes a reveal target, Home renders an island other than RevealOnScroll, a banned word reaches Home or `/` asks for `noindex` again while the empty route shells stop asking for it.
 
-The scroll reveal works without hiding anything from a visitor who cannot run it. A section opts in with the global class `reveal`. `styles/reveal.css` hides it only under `.js-reveal`, a class RevealOnScroll adds to the root as its first action and never adds under `prefers-reduced-motion: reduce`, so with JavaScript off, with reduced motion and in print every band is at rest. A band's figure size comes from `lib/figure-role.ts`, the Figure demotion rule from the design document, implemented once.
+The scroll reveal works without hiding anything from a visitor who cannot run it. A section opts in with the global class `reveal`. `styles/reveal.css` hides it only under `.js-reveal`, a class RevealOnScroll adds to the root only after marking any band already in view as revealed, and never adds under `prefers-reduced-motion: reduce` (removing it if reduced motion switches on later), so with JavaScript off, with reduced motion and in print every band is at rest. A band's figure size comes from `lib/figure-role.ts`, the Figure demotion rule from the design document, implemented once.
 
 Every route renders `components/site-frame.tsx` itself, passing its own nav item as `current`: one header with the primary nav, one main, one footer. `components/site-frame.test.tsx` renders every `app/**/page.tsx` and `app/not-found.tsx` and fails, by route, any that skips the frame or marks the wrong nav item.
 
@@ -93,7 +93,7 @@ npm scripts:
 - `npm run start`: serves the production build.
 - `npm run lint`: ESLint, including the import direction rule.
 - `npm run typecheck`: `tsc --noEmit` over the site and the scripts.
-- `npm run check:tokens`: keeps `styles/tokens.css` in step with the design document and every stylesheet on the tokens; fails any `opacity: 0` or `translateY` not scoped under `.js-reveal`, and any `@media print` outside `styles/reveal.css`.
+- `npm run check:tokens`: keeps `styles/tokens.css` in step with the design document and every stylesheet on the tokens; fails any `opacity: 0`, `visibility: hidden` or translate not scoped under `.js-reveal`, a `styles/reveal.css` that stops restoring `.js-reveal .reveal.in` under the class names RevealOnScroll exports, and any `@media print` outside `styles/reveal.css` and `styles/print.css` (the detail-page print rules, not yet written).
 - `npm run check:readme`: every dependency justified here, every script and gate step listed in this section, every relative link resolving.
 - `npm run check:content-review`: on a pull request that changes anything under `content/` or `lib/evidence.test.ts`, fails unless the body has the `Shahrouz reviewed the content wording at COMMIT` box ticked with the latest commit that changed them; passes on any other event.
 - `npm run test:scripts`: the tests for every script, with `node --test`.

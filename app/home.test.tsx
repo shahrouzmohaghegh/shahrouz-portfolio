@@ -209,12 +209,16 @@ const BANDS = [
 ] as const;
 
 const classesOf = (tag: string): string[] => (tag.match(/\sclass="([^"]*)"/)?.[1] ?? "").split(/\s+/).filter(Boolean);
-// Every element on Home carrying the global class `reveal`, as [open tag, inner HTML].
-const revealTargets = [...main.matchAll(/(<(\w+)\s[^>]*>)([\s\S]*?)<\/\2>/g)]
-  .filter((m) => classesOf(m[1]).includes("reveal"))
-  .map((m) => ({ open: m[1], inner: m[3] }));
+// Every opening tag on Home carrying the global class `reveal`, nested or
+// not, with the markup up to the next </section> (sections never nest here).
+const revealTargets = [...main.matchAll(/<\w+(?:\s[^>]*)?>/g)]
+  .filter((m) => classesOf(m[0]).includes("reveal"))
+  .map((m) => {
+    const start = (m.index ?? 0) + m[0].length;
+    return { open: m[0], inner: main.slice(start, main.indexOf("</section>", start)) };
+  });
 const BAND_INNER =
-  /^<p class="([^"]*)">([^<]*)<\/p><p class="([^"]*)" data-figure-role="([\w-]+)">([^<]*)<\/p><p class="([^"]*)">([^<]*)<\/p>$/;
+  /^<h2 id="([^"]*)" class="([^"]*)">([^<]*)<\/h2><p class="([^"]*)" data-figure-role="([\w-]+)">([^<]*)<\/p><p class="([^"]*)">([^<]*)<\/p>$/;
 
 describe("the evidence bands below the hero", () => {
   test("content/home.ts holds exactly the two reviewed bands, in order", () => {
@@ -231,7 +235,9 @@ describe("the evidence bands below the hero", () => {
       expect(classesOf(open), `band ${band.tag} is on ${band.tone}`).toContain(bandStyles[band.tone]);
       const parts = inner.match(BAND_INNER);
       expect(parts, `band ${band.tag} holds one tag, one figure and one caption, nothing else`).not.toBeNull();
-      const [, tagClass, tag, figureClass, role, figure, captionClass, caption] = parts ?? [];
+      const [, headingId, tagClass, tag, figureClass, role, figure, captionClass, caption] = parts ?? [];
+      expect(open, `band ${band.tag} is named by its h2`).toContain(`aria-labelledby="${headingId}"`);
+      expect(headingId).not.toBe("");
       expect([tagClass, figureClass, captionClass]).toEqual([bandStyles.tag, bandStyles.figure, bandStyles.caption]);
       expect(decode(tag), `band ${band.tag}: tag`).toBe(band.tag);
       expect(decode(figure), `band ${band.tag}: figure`).toBe(band.figure);
@@ -240,11 +246,16 @@ describe("the evidence bands below the hero", () => {
     });
   });
 
+  test("headings run one h1, then the two band h2s, in order", () => {
+    const headings = [...html.matchAll(/<(h[1-6])[^>]*>([\s\S]*?)<\/\1>/g)].map((m) => `${m[1]} ${decode(m[2])}`);
+    expect(headings).toEqual([`h1 ${site.name}`, ...BANDS.map((band) => `h2 ${band.tag}`)]);
+  });
+
   test("both bands come after the figure pair and the Explore link", () => {
     const explore = positionOf(home.explore.label, "the Explore link");
     expect(explore).toBeGreaterThan(positionOf(FIGURES[1], "the second figure"));
-    const quality = main.indexOf(`>${BANDS[0].tag}</p>`);
-    const security = main.indexOf(`>${BANDS[1].tag}</p>`);
+    const quality = main.indexOf(`>${BANDS[0].tag}</h2>`);
+    const security = main.indexOf(`>${BANDS[1].tag}</h2>`);
     expect(quality, "Quality band").toBeGreaterThan(explore);
     expect(security, "Security posture band").toBeGreaterThan(quality);
   });
@@ -260,12 +271,32 @@ describe("the evidence bands below the hero", () => {
 
 describe("islands on Home", () => {
   const ISLANDS_DIR = join(process.cwd(), "components", "islands");
-  const pageSource = readFileSync(join(process.cwd(), "app", "page.tsx"), "utf8");
+  const source = (path: string): string => readFileSync(join(process.cwd(), path), "utf8");
+  // Every module specifier: import ... from, export ... from, bare import and import().
+  const specifiers = (code: string): string[] =>
+    [...code.matchAll(/\b(?:import|export)\s[^;]*?\bfrom\s*["']([^"']+)["']|\bimport\s*["']([^"']+)["']|\bimport\s*\(\s*["']([^"']+)["']/g)].map(
+      (m) => m[1] ?? m[2] ?? m[3],
+    );
+  // "use client" counts after any leading comments and blank lines.
+  const isClient = (code: string): boolean =>
+    /^["']use client["']/.test(code.replace(/^(?:\s+|\/\/[^\n]*\n?|\/\*[\s\S]*?\*\/)*/, ""));
 
-  test("app/page.tsx renders RevealOnScroll and imports no other island", () => {
-    const islandImports = [...pageSource.matchAll(/from\s+["']([^"']*islands\/[^"']*)["']/g)].map((m) => m[1]);
-    expect(islandImports).toEqual(["@/components/islands/reveal-on-scroll"]);
-    expect(pageSource).toMatch(/<RevealOnScroll\s*\/>/);
+  test("the specifier and directive readers see every form", () => {
+    expect(specifiers('export { X } from "a/islands/x";\nconst y = import("b/islands/y");\nimport "c";')).toEqual([
+      "a/islands/x",
+      "b/islands/y",
+      "c",
+    ]);
+    expect(isClient('// note\n/* block */\n\n"use client";\n')).toBe(true);
+    expect(isClient('const a = "use client";\n')).toBe(false);
+  });
+
+  test("Home and the components it renders reach no island but RevealOnScroll", () => {
+    const islands = ["app/page.tsx", "components/home-hero.tsx", "components/evidence-band.tsx"].flatMap((path) =>
+      specifiers(source(path)).filter((specifier) => /(^|\/)islands\//.test(specifier)),
+    );
+    expect(islands).toEqual(["@/components/islands/reveal-on-scroll"]);
+    expect(source("app/page.tsx")).toMatch(/<RevealOnScroll\s*\/>/);
   });
 
   test("no component outside components/islands/ is a client component", () => {
@@ -275,16 +306,14 @@ describe("islands on Home", () => {
         if (entry.isDirectory()) return path === ISLANDS_DIR ? [] : sources(path);
         return /\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name) ? [path] : [];
       });
-    const clients = [...sources(join(process.cwd(), "components")), ...sources(join(process.cwd(), "app"))].filter(
-      (path) => /^\s*["']use client["']/.test(readFileSync(path, "utf8")),
+    const clients = [...sources(join(process.cwd(), "components")), ...sources(join(process.cwd(), "app"))].filter((path) =>
+      isClient(readFileSync(path, "utf8")),
     );
     expect(clients).toEqual([]);
   });
 
   test("the island imports no content and no other island", () => {
-    const source = readFileSync(join(ISLANDS_DIR, "reveal-on-scroll.tsx"), "utf8");
-    const imports = [...source.matchAll(/^import[^"']*["']([^"']+)["']/gm)].map((m) => m[1]);
-    expect(imports).toEqual(["react"]);
+    expect(specifiers(source("components/islands/reveal-on-scroll.tsx"))).toEqual(["react"]);
   });
 });
 

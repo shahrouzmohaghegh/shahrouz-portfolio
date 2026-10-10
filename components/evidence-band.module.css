@@ -16,6 +16,7 @@
   color: var(--color-on-deep);
 }
 
+/* An h2, set exactly as the meta-label tag. */
 .tag {
   margin: 0 0 var(--component-evidence-band-tag-gap);
   font-family: var(--type-meta-label-family);
