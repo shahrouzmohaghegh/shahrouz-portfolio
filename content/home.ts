@@ -15,7 +15,8 @@ export const home = {
   kicker: "Leadership · Governance · Hands-on",
   // FR-5 as amended 2026-10-11: quality first, then speed. Each label carries
   // its figure's scope (one caps line from 768px, may wrap below). The metric's
-  // name, Fault Feedback Ratio, stays below the fold, in the Quality band and CS-1.
+  // name, Fault Feedback Ratio, appears only where it is defined: the Quality
+  // band caption and the CS-1 case study page, never on a card or above the fold.
   figurePair: [
     { label: "Bad fixes, Vietnam team, part of the 38", figure: "cut by more than 80%" },
     { label: "Cycle time, AI-assisted pilot projects", figure: "30 to 40% faster" },
