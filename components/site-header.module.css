@@ -1,0 +1,54 @@
+/* {components.nav}: wordmark and three inline items, never sticky, no menu. */
+.header {
+  background: var(--color-paper);
+}
+
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  column-gap: var(--component-nav-item-gap);
+  row-gap: var(--space-stack-xs);
+  padding: var(--component-nav-padding);
+}
+
+.wordmark {
+  font-family: var(--type-wordmark-family);
+  font-size: var(--type-wordmark-size);
+  font-weight: var(--type-wordmark-weight);
+  line-height: var(--type-wordmark-leading);
+  letter-spacing: var(--type-wordmark-tracking);
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.items {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--component-nav-item-gap);
+  row-gap: var(--space-stack-xs);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* {typography.ui}, stepping down to {typography.small} below 768px so the
+   wordmark and three items share one line at 375px. */
+.item {
+  font-family: var(--type-ui-family);
+  font-size: var(--component-nav-item-size);
+  font-weight: var(--type-ui-weight);
+  line-height: var(--component-nav-item-leading);
+  color: var(--color-muted);
+  text-decoration: none;
+}
+
+/* The current route: the only oxide mark in the header, colour plus a 1px underline. */
+.item[aria-current="page"] {
+  color: var(--color-accent);
+  text-decoration-line: underline;
+  text-decoration-thickness: var(--component-nav-current-underline-width);
+  text-decoration-color: var(--color-accent);
+}

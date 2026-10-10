@@ -29,8 +29,9 @@ const eslintConfig = defineConfig([
     },
   },
   // AD-6: routes and components read evidence only through lib/evidence.ts,
-  // never from content/ or the type leaf directly, so they never see
-  // CaseStudy or Project.
+  // never from the evidence collections or the type leaf directly, so they
+  // never see CaseStudy or Project. AD-6 is about evidence: site-wide copy
+  // such as content/site.ts is outside the zone and imported directly.
   {
     files: ["app/**", "components/**"],
     rules: {
@@ -40,9 +41,9 @@ const eslintConfig = defineConfig([
           zones: [
             {
               target: ["./app", "./components"],
-              from: ["./content", "./lib/evidence-types.ts"],
+              from: ["./content/case-studies", "./content/projects", "./lib/evidence-types.ts"],
               message:
-                "app/ and components/ read evidence through lib/evidence.ts, never from content/ or lib/evidence-types.ts (AD-6).",
+                "app/ and components/ read evidence through lib/evidence.ts, never from content/case-studies, content/projects or lib/evidence-types.ts (AD-6).",
             },
           ],
         },
