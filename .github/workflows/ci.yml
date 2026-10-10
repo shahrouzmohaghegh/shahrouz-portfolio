@@ -1,5 +1,5 @@
-# The gate. Every push and pull request runs the full current gate, in
-# order; any failing step fails the job. Branch protection on main requires
+# The gate. Every pull request, and every push to main, runs the full
+# current gate, in order; any failing step fails the job. Branch protection on main requires
 # this job, so nothing merges (and Vercel deploys nothing) unless it passes.
 # The git hooks in .githooks/ run a subset locally, but hooks are skippable,
 # so this job is the guarantee.
@@ -7,8 +7,17 @@
 name: CI
 
 on:
+  # Pushes only to main, so a pull request's head commit carries exactly one
+  # gate result, from the pull request run, where the content review check
+  # applies. A push run on a topic branch would pass that check and could
+  # stand in for a failing pull request run.
   push:
+    branches: [main]
+  # edited as well as the defaults, so ticking the content review box in a
+  # pull request body re-runs the gate with the new body (a re-run of an
+  # old job reads the old one).
   pull_request:
+    types: [opened, synchronize, reopened, edited]
 
 permissions:
   contents: read
@@ -94,6 +103,12 @@ jobs:
       - name: README check
         run: npm run check:readme
 
+      # A pull request that changes content/ fails until its body has the
+      # "Shahrouz reviewed the content wording" box from
+      # .github/pull_request_template.md ticked. Other events pass and say why.
+      - name: Content review check
+        run: npm run check:content-review
+
       # Branch protection is what keeps a red gate out of production, so the
       # gate checks the part of it the public branch endpoint shows: main
       # protected, required checks enforced for admins too, and gate among
@@ -102,7 +117,10 @@ jobs:
       # admin token. Drift fails with "has drifted:" and the list; an outage
       # (network, timeout or HTTP error after one retry) fails with "could
       # not read" instead, and a re-run once GitHub recovers clears it.
+      # always(), so a failing step above (a pending content review, say)
+      # never hides whether protection still holds.
       - name: Branch protection check
+        if: always()
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/check-protection.mts

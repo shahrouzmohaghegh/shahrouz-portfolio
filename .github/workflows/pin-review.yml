@@ -1,7 +1,8 @@
 # Monthly facts on every version this project holds back by hand: the
 # Dependabot ignore rules in .github/dependabot.yml and the gitleaks binary
 # pinned in ci.yml, which Dependabot does not track, plus main's branch
-# protection and the domain's registry expiry date, which nothing else
+# protection, the domain's registry expiry date and the public visibility
+# of the cited career-application-system repository, which nothing else
 # watches on a quiet repository. scripts/pin-review.mts keeps one issue,
 # "Dependency pins to review", current with the report. It changes no
 # dependency, setting or protection, and merges nothing.
