@@ -327,6 +327,13 @@ describe("collectFacts and buildReport", () => {
     );
   });
 
+  test("with every cited repository public the key is unchanged from before they were watched", async () => {
+    const key = JSON.parse(markerOf(await reportFor()) ?? "null") as Record<string, unknown>;
+    assert.deepEqual(Object.keys(key), ["typescript", "@types/node", "eslint", "gitleaks", "protection", "domain"]);
+    const sitePrivate = JSON.parse(markerOf(await reportFor(responses({ [SITE_API]: JSON.stringify({ private: true }) }))) ?? "null");
+    assert.deepEqual(sitePrivate.citedRepos, { "shahrouzmohaghegh/shahrouz-portfolio": "private" });
+  });
+
   test("the domain moves the key only when its state changes, not daily", async () => {
     const before = markerOf(await reportFor());
     const nextMonth = await reportFor(responses(), LOCAL, new Date("2026-11-09T12:00:00Z"));

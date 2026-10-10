@@ -234,4 +234,38 @@ describe("check-content-review end to end", () => {
     assert.equal(result.status, 1, result.output);
     assert.match(result.output, /content\/a\.mdx/);
   });
+
+  // The branch changes content/a.mdx and main meanwhile changes the given
+  // file. Returns the branch's content commit and main's head, which is the
+  // pull request's base once main is merged into the branch.
+  function branchAndMain(mainPath: string, mainText: string): { dir: string; branchSha: string; mainHead: string } {
+    const { dir } = cleanRepo();
+    const main = git(dir, "rev-parse", "--abbrev-ref", "HEAD");
+    git(dir, "checkout", "-q", "-b", "feature");
+    write(dir, "content/a.mdx", "Branch prose.\n");
+    const branchSha = commit(dir, "Change content on the branch");
+    git(dir, "checkout", "-q", main);
+    write(dir, mainPath, mainText);
+    const mainHead = commit(dir, "Change content on main");
+    git(dir, "checkout", "-q", "feature");
+    return { dir, branchSha, mainHead };
+  }
+
+  test("a merge of main that only brings in content already on main is not the commit to name", () => {
+    const { dir, branchSha, mainHead } = branchAndMain("content/b.mdx", "Main prose.\n");
+    git(dir, "merge", "-q", "--no-edit", mainHead);
+    const result = run(dir, mainHead, `${line(branchSha.slice(0, 7))}\n`);
+    assert.equal(result.status, 0, result.output);
+  });
+
+  test("a merge resolving a content conflict with its own wording is the commit to name", () => {
+    const { dir, branchSha, mainHead } = branchAndMain("content/a.mdx", "Main prose.\n");
+    const conflicted = spawnSync("git", ["-c", "core.hooksPath=/dev/null", "merge", "-q", "--no-edit", mainHead], { cwd: dir, env: ISOLATED_ENV });
+    assert.notEqual(conflicted.status, 0, "the merge should stop on a conflict");
+    write(dir, "content/a.mdx", "Resolved prose.\n");
+    const merge = commit(dir, "Merge main, resolving the content conflict");
+    const result = run(dir, mainHead, `${line(branchSha.slice(0, 7))}\n`);
+    assert.equal(result.status, 1, result.output);
+    assert.ok(result.output.includes(merge.slice(0, 12)), result.output);
+  });
 });
