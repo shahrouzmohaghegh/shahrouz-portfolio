@@ -6,18 +6,25 @@
 // word reaches the rendered Home, and that the root layout no longer asks for
 // noindex while the empty route shells still do.
 //
+// Below the hero (Story 2.5): exactly two evidence bands, Quality on deep then
+// Security posture on paper, each one tag, one figure and one caption, each
+// carrying the global class `reveal`, sized by Figure demotion. The hero and
+// the figure pair are never reveal targets, and RevealOnScroll is the only
+// island Home renders.
+//
 // The banned words of FR-6 are on the confidential term list, so they are
 // never spelled out here: the check reads the untracked .forbidden-terms, as scripts/check-repo.mts does
 // (CI restores it before this suite runs), and fails closed without it. A
 // failure, including an invalid pattern, names the line number, never the
 // term.
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
 
+import bandStyles from "@/components/evidence-band.module.css";
 import { home } from "@/content/home";
 import { site } from "@/content/site";
 import { caseStudyItems } from "@/lib/evidence";
@@ -74,6 +81,9 @@ function pngSize(path: string): { width: number; height: number } {
 
 const html = renderToStaticMarkup(<>{Home() as ReactNode}</>);
 const main = html.slice(html.search(/<main[\s>]/), html.lastIndexOf("</main>"));
+// The hero section alone: from its opening tag to its </section> (it nests none).
+const heroStart = main.search(/<section[^>]*aria-labelledby="home-name"/);
+const hero = main.slice(heroStart, main.indexOf("</section>", heroStart) + "</section>".length);
 // What a visitor or assistive technology can read: text nodes plus alt, aria-label and title.
 const text = (fragment: string): string => {
   const attributes = [...fragment.matchAll(/\s(?:alt|aria-label|title)="([^"]*)"/g)].map((m) => m[1]);
@@ -155,12 +165,12 @@ describe("the Home hero", () => {
     expect(main).toMatch(new RegExp(`<a[^>]*href="/experience"[^>]*>${escapeRegExp(home.explore.label)}`));
   });
 
-  test("the hero never names the Fault Feedback Ratio or DORA", () => {
+  test("the hero never names the Fault Feedback Ratio, and Home never says DORA", () => {
     // FR-5 as amended 2026-10-11: the metric's name lives in the Quality band
     // and CS-1, and cycle time is never called a DORA metric anywhere.
-    const hero = text(main);
-    expect(hero).not.toMatch(/fault feedback ratio/i);
-    expect(hero).not.toMatch(/\bDORA\b/i);
+    expect(hero).toContain('id="home-name"');
+    expect(text(hero)).not.toMatch(/fault feedback ratio/i);
+    expect(text(main)).not.toMatch(/\bDORA\b/i);
   });
 
   test("CS-1's Headline Metric uses the pair's plain words, never the Fault Feedback Ratio name", () => {
@@ -176,6 +186,105 @@ describe("the Home hero", () => {
     const rendered = text(html);
     const hits = terms.filter(({ pattern }) => pattern.test(rendered)).map(({ line }) => line);
     expect(hits, `Home renders the term on these ${TERMS_FILE} lines`).toEqual([]);
+  });
+});
+
+const BANDS = [
+  {
+    tone: "deep",
+    tag: "Quality",
+    figure: "Over 1 per fix to under 1 in 5",
+    role: "figure-small",
+    caption:
+      "Fault Feedback Ratio: every reopened bug and every new issue linked back to it, per bug fixed, on the 26-person Vietnam team, part of the 38-person function.",
+  },
+  {
+    tone: "paper",
+    tag: "Security posture",
+    figure: "20% to 76%",
+    role: "figure",
+    caption:
+      "Microsoft Defender for Cloud Secure Score across the full production Azure subscription, reported to the Digital Governance Board.",
+  },
+] as const;
+
+const classesOf = (tag: string): string[] => (tag.match(/\sclass="([^"]*)"/)?.[1] ?? "").split(/\s+/).filter(Boolean);
+// Every element on Home carrying the global class `reveal`, as [open tag, inner HTML].
+const revealTargets = [...main.matchAll(/(<(\w+)\s[^>]*>)([\s\S]*?)<\/\2>/g)]
+  .filter((m) => classesOf(m[1]).includes("reveal"))
+  .map((m) => ({ open: m[1], inner: m[3] }));
+const BAND_INNER =
+  /^<p class="([^"]*)">([^<]*)<\/p><p class="([^"]*)" data-figure-role="([\w-]+)">([^<]*)<\/p><p class="([^"]*)">([^<]*)<\/p>$/;
+
+describe("the evidence bands below the hero", () => {
+  test("content/home.ts holds exactly the two reviewed bands, in order", () => {
+    expect(home.bands.map(({ tone, tag, figure, caption }) => ({ tone, tag, figure, caption }))).toEqual(
+      BANDS.map(({ tone, tag, figure, caption }) => ({ tone, tag, figure, caption })),
+    );
+  });
+
+  test("exactly two reveal targets render, both bands, Quality then Security posture", () => {
+    expect(revealTargets, "Home has two reveal targets").toHaveLength(2);
+    revealTargets.forEach(({ open, inner }, i) => {
+      const band = BANDS[i];
+      expect(open.startsWith("<section"), `band ${band.tag} is a section`).toBe(true);
+      expect(classesOf(open), `band ${band.tag} is on ${band.tone}`).toContain(bandStyles[band.tone]);
+      const parts = inner.match(BAND_INNER);
+      expect(parts, `band ${band.tag} holds one tag, one figure and one caption, nothing else`).not.toBeNull();
+      const [, tagClass, tag, figureClass, role, figure, captionClass, caption] = parts ?? [];
+      expect([tagClass, figureClass, captionClass]).toEqual([bandStyles.tag, bandStyles.figure, bandStyles.caption]);
+      expect(decode(tag), `band ${band.tag}: tag`).toBe(band.tag);
+      expect(decode(figure), `band ${band.tag}: figure`).toBe(band.figure);
+      expect(role, `band ${band.tag}: figure role by Figure demotion`).toBe(band.role);
+      expect(decode(caption), `band ${band.tag}: caption`).toBe(band.caption);
+    });
+  });
+
+  test("both bands come after the figure pair and the Explore link", () => {
+    const explore = positionOf(home.explore.label, "the Explore link");
+    expect(explore).toBeGreaterThan(positionOf(FIGURES[1], "the second figure"));
+    const quality = main.indexOf(`>${BANDS[0].tag}</p>`);
+    const security = main.indexOf(`>${BANDS[1].tag}</p>`);
+    expect(quality, "Quality band").toBeGreaterThan(explore);
+    expect(security, "Security posture band").toBeGreaterThan(quality);
+  });
+
+  test("the hero and the figure pair are never reveal targets", () => {
+    expect(hero).not.toMatch(/class="[^"]*\breveal\b/);
+  });
+
+  test("the Secure Score figure appears once on Home, in its band", () => {
+    expect(main.split(BANDS[1].figure)).toHaveLength(2);
+  });
+});
+
+describe("islands on Home", () => {
+  const ISLANDS_DIR = join(process.cwd(), "components", "islands");
+  const pageSource = readFileSync(join(process.cwd(), "app", "page.tsx"), "utf8");
+
+  test("app/page.tsx renders RevealOnScroll and imports no other island", () => {
+    const islandImports = [...pageSource.matchAll(/from\s+["']([^"']*islands\/[^"']*)["']/g)].map((m) => m[1]);
+    expect(islandImports).toEqual(["@/components/islands/reveal-on-scroll"]);
+    expect(pageSource).toMatch(/<RevealOnScroll\s*\/>/);
+  });
+
+  test("no component outside components/islands/ is a client component", () => {
+    const sources = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+        const path = join(dir, entry.name);
+        if (entry.isDirectory()) return path === ISLANDS_DIR ? [] : sources(path);
+        return /\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name) ? [path] : [];
+      });
+    const clients = [...sources(join(process.cwd(), "components")), ...sources(join(process.cwd(), "app"))].filter(
+      (path) => /^\s*["']use client["']/.test(readFileSync(path, "utf8")),
+    );
+    expect(clients).toEqual([]);
+  });
+
+  test("the island imports no content and no other island", () => {
+    const source = readFileSync(join(ISLANDS_DIR, "reveal-on-scroll.tsx"), "utf8");
+    const imports = [...source.matchAll(/^import[^"']*["']([^"']+)["']/gm)].map((m) => m[1]);
+    expect(imports).toEqual(["react"]);
   });
 });
 

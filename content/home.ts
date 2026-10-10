@@ -28,4 +28,25 @@ export const home = {
     height: 1200,
   },
   explore: { label: "Explore selected work", href: "/experience" },
+  // The two evidence bands below the hero (Story 2.5), in order. Each is one
+  // caps tag, one figure and one caption, nothing else. Quality is the only
+  // band repeating an above-fold figure, deliberately: its caption names and
+  // defines the metric the pair states in plain words. The Secure Score
+  // appears nowhere else on Home.
+  bands: [
+    {
+      tone: "deep",
+      tag: "Quality",
+      figure: "Over 1 per fix to under 1 in 5",
+      caption:
+        "Fault Feedback Ratio: every reopened bug and every new issue linked back to it, per bug fixed, on the 26-person Vietnam team, part of the 38-person function.",
+    },
+    {
+      tone: "paper",
+      tag: "Security posture",
+      figure: "20% to 76%",
+      caption:
+        "Microsoft Defender for Cloud Secure Score across the full production Azure subscription, reported to the Digital Governance Board.",
+    },
+  ],
 } as const;

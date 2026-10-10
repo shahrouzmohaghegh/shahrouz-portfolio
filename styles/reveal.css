@@ -1,0 +1,31 @@
+/*
+ * The scroll reveal (AD-14). Global, imported once in app/layout.tsx after
+ * tokens.css and breakpoints.css. Sections opt in with the class `reveal`.
+ *
+ * The hidden state applies only under .js-reveal, which RevealOnScroll adds
+ * to the root as its first action, and never under reduced motion. So with
+ * JavaScript off, with reduced motion, and in print every band is at rest.
+ * scripts/check-tokens.mts fails any opacity: 0 or translateY outside
+ * .js-reveal, and any @media print outside this file.
+ */
+
+.js-reveal .reveal {
+  opacity: 0;
+  transform: translateY(var(--component-reveal-distance));
+  transition:
+    opacity var(--component-reveal-duration) ease-out,
+    transform var(--component-reveal-duration) ease-out;
+}
+
+.js-reveal .reveal.in {
+  opacity: 1;
+  transform: none;
+}
+
+@media print {
+  .js-reveal .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}

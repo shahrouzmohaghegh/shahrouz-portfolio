@@ -1,0 +1,75 @@
+/* {components.evidence-band}: one caps tag, one figure, one caption. The
+   paper band carries a hairline top rule; the deep band inverts and drops
+   it. The figure's role comes from lib/figure-role.ts (Figure demotion). */
+.band {
+  padding: var(--space-section) var(--space-margin);
+}
+
+.paper {
+  border-top: var(--space-rule-hairline) solid var(--color-rule);
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+.deep {
+  background: var(--color-deep);
+  color: var(--color-on-deep);
+}
+
+.tag {
+  margin: 0 0 var(--component-evidence-band-tag-gap);
+  font-family: var(--type-meta-label-family);
+  font-size: var(--type-meta-label-size);
+  font-weight: var(--type-meta-label-weight);
+  line-height: var(--type-meta-label-leading);
+  letter-spacing: var(--type-meta-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.deep .tag {
+  color: var(--color-deep-accent);
+}
+
+.figure {
+  margin: 0 0 var(--component-evidence-band-figure-gap);
+  font-variant-numeric: tabular-nums;
+}
+
+.figure[data-figure-role="figure"] {
+  font-family: var(--type-figure-family);
+  font-size: var(--type-figure-size);
+  font-weight: var(--type-figure-weight);
+  line-height: var(--type-figure-leading);
+  letter-spacing: var(--type-figure-tracking);
+}
+
+.figure[data-figure-role="figure-small"] {
+  font-family: var(--type-figure-small-family);
+  font-size: var(--type-figure-small-size);
+  font-weight: var(--type-figure-small-weight);
+  line-height: var(--type-figure-small-leading);
+  letter-spacing: var(--type-figure-small-tracking);
+}
+
+.figure[data-figure-role="pull-quote"] {
+  font-family: var(--type-pull-quote-family);
+  font-size: var(--type-pull-quote-size);
+  font-weight: var(--type-pull-quote-weight);
+  line-height: var(--type-pull-quote-leading);
+  letter-spacing: var(--type-pull-quote-tracking);
+}
+
+.caption {
+  margin: 0;
+  max-width: var(--space-measure-caption);
+  font-family: var(--type-dek-family);
+  font-size: var(--type-dek-size);
+  font-weight: var(--type-dek-weight);
+  line-height: var(--type-dek-leading);
+  color: var(--color-muted);
+}
+
+.deep .caption {
+  color: var(--color-deep-muted);
+}

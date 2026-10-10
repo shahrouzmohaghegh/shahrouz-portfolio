@@ -375,4 +375,14 @@
   --component-repo-cta-padding: 26px 30px 28px;
   --component-repo-cta-max-width: 660px;
   --component-repo-cta-rail-padding: 14px 15px 15px;
+  /* {components.evidence-band}, from screen-home.html: tag to figure and
+     figure to caption. */
+  --component-evidence-band-tag-gap-mobile: 20px;
+  --component-evidence-band-tag-gap: var(--space-stack-lg);
+  --component-evidence-band-figure-gap-mobile: 18px;
+  --component-evidence-band-figure-gap: 30px;
+  /* The scroll reveal (styles/reveal.css, AD-14): opacity 0 and this offset
+     to rest, ease-out, at 25 percent visibility. */
+  --component-reveal-distance: 10px;
+  --component-reveal-duration: 320ms;
 }

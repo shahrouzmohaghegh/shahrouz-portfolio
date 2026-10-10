@@ -16,6 +16,11 @@
 //   4. Every other stylesheet uses tokens only: no literal colour or length,
 //      type properties set from tokens, no scaled type, no undefined var(),
 //      no @media, @container, @custom-media or media-conditioned @import.
+//   5. The reveal guard (AD-14). No stylesheet declares opacity: 0 or a
+//      translateY in a rule unless every selector of that rule is scoped
+//      under .js-reveal, the root class only RevealOnScroll adds, so nothing
+//      is hidden without script. @media print is allowed in styles/reveal.css
+//      and nowhere else, and app/layout.tsx imports reveal.css last.
 //
 // Zero dependencies: the frontmatter is read with a minimal indentation
 // parser that understands only the four groups it checks.
@@ -29,6 +34,7 @@ export const DESIGN_PATH =
 export const TOKENS_PATH = "styles/tokens.css";
 export const BREAKPOINTS_PATH = "styles/breakpoints.css";
 export const LAYOUT_PATH = "app/layout.tsx";
+export const REVEAL_PATH = "styles/reveal.css";
 
 export const TYPE_FLOOR_PX = 13.5;
 export const FLOOR_EXCEPTIONS = ["meta-label", "nameline", "kicker", "stage-number"];
@@ -48,6 +54,8 @@ export const COMPONENT_REMAPS: TokenMap = {
   "--component-nav-item-size": "var(--component-nav-item-size-mobile)",
   "--component-nav-item-leading": "var(--component-nav-item-leading-mobile)",
   "--component-footer-columns": "var(--component-footer-columns-mobile)",
+  "--component-evidence-band-tag-gap": "var(--component-evidence-band-tag-gap-mobile)",
+  "--component-evidence-band-figure-gap": "var(--component-evidence-band-figure-gap-mobile)",
 };
 
 const KNOWN_TOP_LEVEL = new Set([
@@ -455,6 +463,50 @@ export function breakpointAtRule(statement: string): string | null {
   return null;
 }
 
+// ---------------------------------------------------------------- reveal guard
+
+const REVEAL_SCOPE = /\.js-reveal(?![\w-])/;
+const PRINT_PRELUDE = /^@media\s+print$/i;
+const ZERO_OPACITY = /^(?:0+(?:\.0*)?|\.0+)%?$/;
+const TRANSLATE_Y = /\btranslateY\(/i;
+
+// Splits on `separator` outside parentheses and brackets, so :is(a, b) stays whole.
+function splitTopLevel(text: string, separator: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = "";
+  for (const ch of text) {
+    if (ch === "(" || ch === "[") depth++;
+    else if (ch === ")" || ch === "]") depth = Math.max(0, depth - 1);
+    if (ch === separator && depth === 0) {
+      parts.push(current);
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+  parts.push(current);
+  return parts.map((p) => p.trim()).filter(Boolean);
+}
+
+// True when every selector in the list matches only descendants of an
+// element carrying .js-reveal: the class sits in a compound before the last.
+export function scopedUnderReveal(selectorList: string): boolean {
+  const selectors = splitTopLevel(selectorList, ",");
+  return selectors.length > 0 && selectors.every((selector) => {
+    const compounds = selector.split(/\s*[>+~]\s*|\s+/).filter(Boolean);
+    return compounds.slice(0, -1).some((compound) => REVEAL_SCOPE.test(compound));
+  });
+}
+
+// The hide a declaration makes, if any, for the reveal guard.
+function revealHide(property: string, value: string): string | null {
+  const v = value.replace(/\s*!important\s*$/i, "").trim();
+  if (property.toLowerCase() === "opacity" && ZERO_OPACITY.test(v)) return "opacity: 0 outside .js-reveal (hidden without script)";
+  if (TRANSLATE_Y.test(v)) return "translateY outside .js-reveal";
+  return null;
+}
+
 function scanValue(value: string, defined: ReadonlySet<string>): string[] {
   const problems: string[] = [];
   const bare = value
@@ -486,6 +538,8 @@ export function scanStylesheet(label: string, css: string, defined: ReadonlySet<
   let segment = "";
   let segmentLine = 1;
   let line = 1;
+  // The prelude of each open block, innermost last.
+  const preludes: string[] = [];
   const flush = (isDeclaration: boolean): void => {
     const s = segment.trim();
     if (s && isDeclaration) {
@@ -494,22 +548,31 @@ export function scanStylesheet(label: string, css: string, defined: ReadonlySet<
         const problems = scanValue(m[2], local);
         const typeProblem = typeValueProblem(m[1], m[2].trim());
         if (typeProblem) problems.push(typeProblem);
+        const hide = revealHide(m[1], m[2]);
+        const rule = preludes.at(-1) ?? "";
+        if (hide && (rule.startsWith("@") || !scopedUnderReveal(rule))) problems.push(hide);
         for (const p of problems) failures.push(`${label}:${segmentLine}: ${p}`);
       }
     }
     const atRule = breakpointAtRule(s);
-    if (atRule) failures.push(`${label}:${segmentLine}: ${atRule} belongs only in ${BREAKPOINTS_PATH}`);
+    if (atRule === "@media" && PRINT_PRELUDE.test(s)) {
+      if (label !== REVEAL_PATH) failures.push(`${label}:${segmentLine}: @media print belongs only in ${REVEAL_PATH}`);
+    } else if (atRule) {
+      failures.push(`${label}:${segmentLine}: ${atRule} belongs only in ${BREAKPOINTS_PATH}`);
+    }
     segment = "";
   };
   for (const ch of text) {
     if (segment.trim() === "" && !/\s/.test(ch)) segmentLine = line;
     if (ch === "{") {
+      preludes.push(segment.trim().replace(/\s+/g, " "));
       flush(false);
       depth++;
     } else if (ch === ";") {
       flush(depth > 0);
     } else if (ch === "}") {
       flush(depth > 0);
+      preludes.pop();
       depth = Math.max(0, depth - 1);
     } else {
       segment += ch;
@@ -521,17 +584,22 @@ export function scanStylesheet(label: string, css: string, defined: ReadonlySet<
 }
 
 // The mobile remaps only win if breakpoints.css loads after tokens.css: both
-// target :root at equal specificity.
+// target :root at equal specificity. reveal.css reads the tokens, so it
+// loads after both.
+const LAYOUT_ORDER = ["@/styles/tokens.css", "@/styles/breakpoints.css", "@/styles/reveal.css"];
+
 export function checkLayoutImports(source: string | null): string[] {
   if (source === null) return [`${LAYOUT_PATH}: missing`];
   const imports = [...source.matchAll(/^\s*import\s+["']([^"']+)["']/gm)].map((m) => m[1]);
-  const tokensAt = imports.indexOf("@/styles/tokens.css");
-  const breakpointsAt = imports.indexOf("@/styles/breakpoints.css");
   const failures: string[] = [];
-  if (tokensAt === -1) failures.push(`${LAYOUT_PATH}: must import @/styles/tokens.css`);
-  if (breakpointsAt === -1) failures.push(`${LAYOUT_PATH}: must import @/styles/breakpoints.css`);
-  if (tokensAt !== -1 && breakpointsAt !== -1 && breakpointsAt < tokensAt) {
-    failures.push(`${LAYOUT_PATH}: must import @/styles/tokens.css before @/styles/breakpoints.css`);
+  const at = LAYOUT_ORDER.map((path) => imports.indexOf(path));
+  LAYOUT_ORDER.forEach((path, i) => {
+    if (at[i] === -1) failures.push(`${LAYOUT_PATH}: must import ${path}`);
+  });
+  for (let i = 1; i < LAYOUT_ORDER.length; i++) {
+    if (at[i - 1] !== -1 && at[i] !== -1 && at[i] < at[i - 1]) {
+      failures.push(`${LAYOUT_PATH}: must import ${LAYOUT_ORDER[i - 1]} before ${LAYOUT_ORDER[i]}`);
+    }
   }
   return failures;
 }
