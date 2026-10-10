@@ -1,0 +1,116 @@
+/* Home hero: text, plate, then Explore, wrapping intrinsically with no media
+   query. The text and the fixed plate sit side by side only when the text
+   column can hold its minimum width (enough for the 76px name) beside the
+   plate; otherwise they stack, text first. Explore always takes its own line
+   under them. Every value that switches at the breakpoint is a
+   --component-hero-* pair remapped in breakpoints.css. */
+.hero {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--space-column-gap-desktop);
+  row-gap: var(--space-stack-lg);
+  align-items: center;
+  padding: var(--component-hero-padding);
+}
+
+.text {
+  flex: 1 1 var(--component-hero-text-min-width);
+  display: flex;
+  flex-direction: column;
+  gap: var(--component-hero-stack-gap);
+  min-width: 0;
+}
+
+.name {
+  margin: 0;
+  font-family: var(--type-display-hero-family);
+  font-size: var(--type-display-hero-size);
+  font-weight: var(--type-display-hero-weight);
+  line-height: var(--type-display-hero-leading);
+  letter-spacing: var(--type-display-hero-tracking);
+  color: var(--color-ink);
+}
+
+.kicker {
+  display: var(--component-hero-kicker-display);
+  margin: 0;
+  font-family: var(--type-kicker-family);
+  font-size: var(--type-kicker-size);
+  font-weight: var(--type-kicker-weight);
+  line-height: var(--type-kicker-leading);
+  letter-spacing: var(--type-kicker-tracking);
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.statement {
+  margin: 0;
+  max-width: var(--space-measure-caption);
+  font-family: var(--type-support-family);
+  font-size: var(--type-support-size);
+  font-weight: var(--type-support-weight);
+  line-height: var(--type-support-leading);
+  color: var(--color-ink);
+}
+
+/* Sentence case, never tracked caps; the dot is decorative only. */
+.availability {
+  display: flex;
+  align-items: center;
+  gap: var(--space-stack-xs);
+  margin: 0;
+  font-family: var(--type-small-family);
+  font-size: var(--type-small-size);
+  font-weight: var(--type-small-weight);
+  line-height: var(--type-small-leading);
+  color: var(--color-muted);
+}
+
+.availability::before {
+  content: "";
+  flex: none;
+  width: var(--component-availability-dot-size);
+  height: var(--component-availability-dot-size);
+  border-radius: var(--radius-dot);
+  background: var(--color-accent);
+}
+
+/* {components.hero-plate}: a fixed box; the crop comes only from the box
+   and object-position, so the 1311 x 1200 source is never upscaled. */
+.plate {
+  flex: none;
+  box-sizing: border-box;
+  width: var(--space-hero-plate-width);
+  max-width: 100%;
+  height: var(--space-hero-plate-height);
+  overflow: hidden;
+  border: var(--space-rule-hairline) solid var(--color-rule);
+  border-radius: var(--radius-default);
+  background: var(--component-hero-plate-background);
+}
+
+.portrait {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: var(--component-hero-plate-position);
+}
+
+.explore {
+  flex: 0 0 100%;
+  margin: 0;
+  text-align: var(--component-hero-explore-align);
+}
+
+/* {components.cta-link}. */
+.exploreLink {
+  font-family: var(--type-data-row-family);
+  font-size: var(--type-data-row-size);
+  font-weight: var(--component-cta-link-weight);
+  line-height: var(--type-data-row-leading);
+  color: var(--color-accent);
+  text-decoration-line: underline;
+  text-decoration-thickness: var(--component-cta-link-underline-width);
+  text-decoration-color: var(--color-accent);
+}
