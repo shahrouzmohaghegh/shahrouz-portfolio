@@ -31,7 +31,10 @@ const Home = homeModule.default;
 const STATEMENT =
   "Engineering leader in regulated industries, most recently running a 38-person function through six people-managers, with a standing seat on the Digital Governance Board, reporting to the CEO. Twenty years across banking, payments and healthcare, hands-on throughout, with AI-native delivery measured rather than assumed.";
 
-const LABELS = ["Bug reopen rate, 26 in Vietnam of 38", "Secure Score, full production estate"];
+const LABELS = ["Bug reopen rate, Vietnam team, 26 of the 38", "Cloud Secure Score, full production subscription"];
+const KICKER = "Leadership · Governance · Hands-on";
+const DESCRIPTION =
+  "Engineering leader in regulated industries: a 38-person function, a Digital Governance Board seat reporting to the CEO, and twenty years across banking, payments and healthcare.";
 const FIGURES = ["above 100% to below 20%", "20% to 76%"];
 
 const TERMS_FILE = ".forbidden-terms";
@@ -98,6 +101,10 @@ describe("the Home hero", () => {
     expect(count, `the statement has ${count} words`).toBeLessThanOrEqual(45);
   });
 
+  test("the kicker reads exactly as reviewed", () => {
+    expect(home.kicker).toBe(KICKER);
+  });
+
   test("the hero renders site.availability as its own line, in sentence case", () => {
     expect(site.availability).toBe("Open to conversations about the next role.");
     expect(main).toMatch(new RegExp(`<p[^>]*>${escapeRegExp(site.availability)}</p>`));
@@ -159,7 +166,12 @@ describe("the Home hero", () => {
 describe("indexing", () => {
   test("/ asks for no noindex, from the root layout or its own page", () => {
     expect(metadata.robots, "app/layout.tsx metadata has no robots entry").toBeUndefined();
-    expect("metadata" in homeModule, "app/page.tsx sets no metadata of its own").toBe(false);
+    expect(homeModule.metadata.robots, "app/page.tsx sets no robots").toBeUndefined();
+  });
+
+  test("/ carries its meta description, from content/home.ts", () => {
+    expect(home.description).toBe(DESCRIPTION);
+    expect(homeModule.metadata.description).toBe(home.description);
   });
 
   test.each([
