@@ -382,7 +382,7 @@ Fold discipline at 375px, in render order above that fold: his name as the `h1`,
 
 **This supersedes a claim that was already false.** The previous version of this line put identity, the positioning statement, availability and the portrait all above the fold at 375px. Measured, that stack came to about 876px against 553px of visible viewport, an overrun of roughly 323px before any figure was added. FR-5's amendment did not create that problem, it exposed it.
 
-Below the fold, in order: the portrait plate, the Explore affordance, then the two evidence bands, with the Secure Score band captioned "Cloud Secure Score across the full production subscription, with posture and remediation reported to the Digital Governance Board." The estate size is not published (FR-29, amended 2026-10-07).
+Below the fold, in order: the portrait plate, the Explore affordance, then the two evidence bands, with the Secure Score band captioned "Microsoft Defender for Cloud Secure Score across the full production Azure subscription, reported to the Digital Governance Board." The estate size is not published (FR-29, amended 2026-10-07).
 
 **The two evidence bands deliberately repeat the figure pair's numbers, and that is not repetition for its own sake.** The compact label above the fold compresses the scope into one line, while the band's caption carries FR-34's scope in full prose. The pair is Dana's guarantee that she sees two numbers without scrolling; the band is Marcus's qualified read once he does. Anyone tempted to remove the repetition as duplication should change FR-5 or FR-34 first, not the composition.
 
