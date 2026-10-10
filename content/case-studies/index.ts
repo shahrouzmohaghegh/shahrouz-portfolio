@@ -12,7 +12,7 @@ export const caseStudies: readonly CaseStudy[] = [
       "Hired and ran a 26-person Vietnam team as a direct extension of Sydney, with KPI-driven governance, shift-left quality and one set of engineering standards across both sites.",
     capabilities: ["leadership"],
     headlineMetric: {
-      value: "Bad fixes from over 1 per fix to under 1 in 5",
+      value: "Bad fixes cut by more than 80%",
       qualifier: "on the 26-person Vietnam team, part of the 38-person function",
     },
     href: "/experience/offshore-delivery-turnaround",
