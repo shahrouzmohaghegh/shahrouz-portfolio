@@ -1,0 +1,13 @@
+/* A route shell: the page title alone, until the route gets its content. */
+.shell {
+  padding: var(--space-section) var(--space-margin);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--type-page-title-family);
+  font-size: var(--type-page-title-size);
+  font-weight: var(--type-page-title-weight);
+  line-height: var(--type-page-title-leading);
+  letter-spacing: var(--type-page-title-tracking);
+}

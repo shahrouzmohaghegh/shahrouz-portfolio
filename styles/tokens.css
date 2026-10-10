@@ -329,6 +329,15 @@
   --component-nav-padding-block: 30px;
   --component-nav-padding: var(--component-nav-padding-block) var(--space-margin);
   --component-nav-current-underline-width: 1px;
+  /* Measured, not from the scale: at 375px the 13.5px wordmark (140px) and the
+     three 13.5px items (170px of text) leave 21px for the three gaps inside a
+     331px measure, so {spacing.stack-xs} (8px) wraps the line. */
+  --component-nav-item-gap-mobile: 6px;
+  --component-nav-item-size-mobile: var(--type-small-size);
+  --component-nav-item-size: var(--type-ui-size);
+  --component-nav-item-leading-mobile: var(--type-small-leading);
+  --component-nav-item-leading: var(--type-ui-leading);
+  --component-nav-item-gap: var(--space-stack-lg);
   --component-hero-plate-background: linear-gradient(168deg, var(--color-tone) 0%, var(--color-tone-2) 100%);
   --component-figure-pair-label-gap: 4px;
   --component-figure-pair-row-gap: 12px;
@@ -341,6 +350,8 @@
   --component-sequence-stage-dot-size: 19px;
   --component-sequence-stage-dot-border-width: 1.5px;
   --component-footer-link-underline-width: 1px;
+  --component-footer-columns-mobile: 1fr;
+  --component-footer-columns: 1.4fr 1fr 1fr;
   --component-rail-group-header-tracking: 0.18em;
   --component-contact-hero-route-link-underline-width: 1.5px;
   --component-repo-cta-padding: 26px 30px 28px;

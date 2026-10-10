@@ -215,6 +215,7 @@ graph TD
 - **Binds:** FR-9, FR-13, `EXPERIENCE.md` Not Found
 - **Prevents:** one root `not-found.tsx` emitting a single message where the contract requires two.
 - **Rule:** `app/experience/[slug]/not-found.tsx` and `app/projects/[slug]/not-found.tsx` each render the shared component with their own message. Both call `notFound()` from the route segment so the status is a real 404.
+- **Note (Story 2.2, decided by Shahrouz 2026-10-10):** an unmatched URL outside those segments gets `app/not-found.tsx`, a catch-all only: the route frame with no current nav item, an `h1` "Page not found" and a real 404. The per-slug pages keep their own messages.
 
 ### AD-24: TypeScript throughout, including tooling
 
