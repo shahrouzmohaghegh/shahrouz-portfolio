@@ -178,8 +178,8 @@ describe("the Home hero", () => {
   });
 
   test("the hero never names the Fault Feedback Ratio or bad fixes, and Home never says DORA", () => {
-    // FR-5 as amended 2026-10-11: the metric's name lives in the Quality band
-    // and CS-1, and cycle time is never called a DORA metric anywhere.
+    // FR-5 as amended 2026-10-11: the metric's name lives on the CS-1 page,
+    // and cycle time is never called a DORA metric anywhere.
     expect(hero).toContain('id="home-name"');
     expect(text(hero)).not.toMatch(/fault feedback ratio/i);
     expect(text(hero)).not.toMatch(/bad fixes/i);
@@ -204,17 +204,17 @@ describe("the Home hero", () => {
 const BANDS = [
   {
     tone: "deep",
-    tag: "Quality",
-    figure: "Over 1 per fix to under 1 in 5",
-    role: "figure-small",
+    tag: "Cloud delivery",
+    figure: "8 weeks",
+    role: "figure",
     caption:
-      "Fault Feedback Ratio: every reopened bug and every new issue linked back to it, per bug fixed, on the 26-person Vietnam team, part of the 38-person function.",
+      "Reporting service moved from the on-premise data centre to Azure, with no disruption to the 3,000 pharmacies and 200+ aged care homes it serves.",
   },
   {
     tone: "paper",
     tag: "Security posture",
-    figure: "20% to 76%",
-    role: "figure",
+    figure: "Secure Score from 20% to 76%",
+    role: "figure-small",
     caption:
       "Microsoft Defender for Cloud Secure Score across the full production Azure subscription, reported to the Digital Governance Board.",
   },
@@ -239,7 +239,7 @@ describe("the evidence bands below the hero", () => {
     );
   });
 
-  test("exactly two reveal targets render, both bands, Quality then Security posture", () => {
+  test("exactly two reveal targets render, both bands, Cloud delivery then Security posture", () => {
     expect(revealTargets, "Home has two reveal targets").toHaveLength(2);
     revealTargets.forEach(({ open, inner }, i) => {
       const band = BANDS[i];
@@ -266,10 +266,16 @@ describe("the evidence bands below the hero", () => {
   test("both bands come after the figure pair and the Explore link", () => {
     const explore = positionOf(home.explore.label, "the Explore link");
     expect(explore).toBeGreaterThan(positionOf(ROWS[1].scope, "the second row's scope"));
-    const quality = main.indexOf(`>${BANDS[0].tag}</h2>`);
+    const cloud = main.indexOf(`>${BANDS[0].tag}</h2>`);
     const security = main.indexOf(`>${BANDS[1].tag}</h2>`);
-    expect(quality, "Quality band").toBeGreaterThan(explore);
-    expect(security, "Security posture band").toBeGreaterThan(quality);
+    expect(cloud, "Cloud delivery band").toBeGreaterThan(explore);
+    expect(security, "Security posture band").toBeGreaterThan(cloud);
+  });
+
+  test("Home never shows the Fault Feedback Ratio or its per-fix ratio", () => {
+    // The ratio and its definition live on the CS-1 page only (Shahrouz, PR #19 review).
+    expect(text(main)).not.toMatch(/fault feedback ratio/i);
+    expect(text(main)).not.toMatch(/per fix/i);
   });
 
   test("the hero and the figure pair are never reveal targets", () => {
