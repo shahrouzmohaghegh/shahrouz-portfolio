@@ -13,6 +13,16 @@ export const CAPABILITIES = ["leadership", "ai-native", "executive-influence", "
 
 export type Capability = (typeof CAPABILITIES)[number];
 
+// Each capability's full name, as the card eyebrow and the filter show it.
+// Keyed in CAPABILITIES order; the satisfies clause makes a missing or extra
+// key a type error.
+export const CAPABILITY_NAME = {
+  leadership: "Engineering Leadership",
+  "ai-native": "AI-Native Engineering",
+  "executive-influence": "Executive and Stakeholder Influence",
+  "hands-on": "Hands-On Engineering",
+} as const satisfies Record<Capability, string>;
+
 // One or more, never zero.
 export type Capabilities = readonly [Capability, ...Capability[]];
 

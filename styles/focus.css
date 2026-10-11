@@ -1,0 +1,22 @@
+/*
+ * The focus indicator (UX-DR29, DESIGN.md Focus indicator). Global, imported
+ * once in app/layout.tsx after reveal.css. Every focusable element draws one
+ * ring: a 2px solid outline at a 2px offset, never 0, on :focus-visible so a
+ * mouse click draws none.
+ *
+ * The ring's colour is chosen by the ground the element sits on, not by its
+ * own fill. --focus-ring defaults to {colors.focus-ring} for paper, paper-alt,
+ * panel, tone and tone-2. A deep or studio ground sets --focus-ring to
+ * {colors.focus-ring-on-deep} on itself, and its descendants inherit it (the
+ * deep evidence band does, in evidence-band.module.css).
+ * scripts/check-tokens.mts fails any outline: none or zero offset anywhere.
+ */
+
+:root {
+  --focus-ring: var(--color-focus-ring);
+}
+
+:focus-visible {
+  outline: var(--component-focus-ring-width) solid var(--focus-ring);
+  outline-offset: var(--component-focus-ring-offset);
+}

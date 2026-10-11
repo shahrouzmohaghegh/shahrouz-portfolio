@@ -6,11 +6,17 @@
 // word reaches the rendered Home, and that the root layout no longer asks for
 // noindex while the empty route shells still do.
 //
-// Below the hero (Story 2.5): exactly two evidence bands, Quality on deep then
-// Security posture on paper, each one tag, one figure and one caption, each
-// carrying the global class `reveal`, sized by Figure demotion. The hero and
-// the figure pair are never reveal targets, and RevealOnScroll is the only
-// island Home renders.
+// Below the hero (Story 2.5): exactly two evidence bands, Cloud delivery on
+// deep then Security posture on paper, each one tag, one figure and one
+// caption, each carrying the global class `reveal`, sized by Figure demotion.
+// The hero and the figure pair are never reveal targets, and RevealOnScroll
+// is the only island Home renders.
+//
+// Below the bands (Story 2.6): the Selected work section, one evidence card
+// per case study in collection order, then the cross-link to /experience. It
+// is not a reveal target. A mocked collection with an item added or removed
+// changes the card count, which proves Home follows lib/evidence with no edit
+// to app/page.tsx.
 //
 // The banned words of FR-6 are on the confidential term list, so they are
 // never spelled out here: the check reads the untracked .forbidden-terms, as scripts/check-repo.mts does
@@ -22,12 +28,13 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
+import cardStyles from "@/components/evidence-card.module.css";
 import bandStyles from "@/components/evidence-band.module.css";
 import { home } from "@/content/home";
 import { site } from "@/content/site";
-import { caseStudyItems } from "@/lib/evidence";
+import { CAPABILITY_NAME, caseStudyItems, type EvidenceItem } from "@/lib/evidence";
 import { metadata as contactMetadata } from "./contact/page";
 import { metadata as experienceMetadata } from "./experience/page";
 import { metadata } from "./layout";
@@ -258,9 +265,14 @@ describe("the evidence bands below the hero", () => {
     });
   });
 
-  test("headings run one h1, then the two band h2s, in order", () => {
-    const headings = [...html.matchAll(/<(h[1-6])[^>]*>([\s\S]*?)<\/\1>/g)].map((m) => `${m[1]} ${decode(m[2])}`);
-    expect(headings).toEqual([`h1 ${site.name}`, ...BANDS.map((band) => `h2 ${band.tag}`)]);
+  test("headings run one h1, the two band h2s, then Selected work and one h3 per card, in order", () => {
+    const headings = [...html.matchAll(/<(h[1-6])[^>]*>([\s\S]*?)<\/\1>/g)].map((m) => `${m[1]} ${text(m[2])}`);
+    expect(headings).toEqual([
+      `h1 ${site.name}`,
+      ...BANDS.map((band) => `h2 ${band.tag}`),
+      `h2 ${home.selectedWork.heading}`,
+      ...caseStudyItems.map((item) => `h3 ${item.title}`),
+    ]);
   });
 
   test("both bands come after the figure pair and the Explore link", () => {
@@ -282,8 +294,98 @@ describe("the evidence bands below the hero", () => {
     expect(hero).not.toMatch(/class="[^"]*\breveal\b/);
   });
 
-  test("the Secure Score figure appears once on Home, in its band", () => {
-    expect(main.split(BANDS[1].figure)).toHaveLength(2);
+  test("outside Selected work, the Secure Score figure appears once on Home, in its band", () => {
+    // The Digital Governance Board card's Headline Metric restates it, as the
+    // mockup does; the hero and the other band never do.
+    expect(main.replace(selected, "").split(BANDS[1].figure)).toHaveLength(2);
+  });
+});
+
+// The Selected work section: from its opening tag to its </section>.
+const selectedStart = main.search(/<section[^>]*aria-labelledby="selected-work"/);
+const selected = selectedStart === -1 ? "" : main.slice(selectedStart, main.indexOf("</section>", selectedStart) + "</section>".length);
+const cardsIn = (fragment: string): string[] => fragment.split("<article").slice(1).map((card) => card.slice(0, card.indexOf("</article>")));
+const metricSentence = ({ headlineMetric }: EvidenceItem): string =>
+  "qualifier" in headlineMetric && headlineMetric.qualifier ? `${headlineMetric.value} ${headlineMetric.qualifier}` : headlineMetric.value;
+
+describe("Selected work below the bands", () => {
+  test("content/home.ts holds the reviewed words", () => {
+    expect(home.selectedWork).toEqual({
+      heading: "Selected work",
+      cta: "Read the case study",
+      crossLink: { label: "All case studies", href: "/experience" },
+    });
+  });
+
+  test("the section renders after both bands, with its h2", () => {
+    expect(selectedStart, "Home has a Selected work section").toBeGreaterThan(-1);
+    expect(selectedStart).toBeGreaterThan(main.indexOf(`>${BANDS[1].tag}</h2>`));
+    expect(selected).toMatch(new RegExp(`<h2 id="selected-work"[^>]*>${escapeRegExp(home.selectedWork.heading)}</h2>`));
+  });
+
+  test("one card per case study, in collection order, each complete", () => {
+    const cards = cardsIn(selected);
+    expect(cards, "one card per case study").toHaveLength(caseStudyItems.length);
+    cards.forEach((card, i) => {
+      const item = caseStudyItems[i];
+      const hrefs = [...card.matchAll(/<a [^>]*href="([^"]*)"/g)].map((m) => m[1]);
+      expect(hrefs, `${item.slug}: title and CTA link to its page`).toEqual([item.href, item.href]);
+      expect(card, `${item.slug}: linked h3 title`).toMatch(new RegExp(`<h3[^>]*><a [^>]*>${escapeRegExp(item.title)}</a></h3>`));
+      for (const capability of item.capabilities) {
+        expect(text(card), `${item.slug}: eyebrow ${capability}`).toContain(CAPABILITY_NAME[capability]);
+      }
+      expect(decode(card), `${item.slug}: metric with its qualifier`).toContain(`>${metricSentence(item)}</p>`);
+      expect(decode(card), `${item.slug}: summary`).toContain(`>${item.summary}</p>`);
+      expect(text(card), `${item.slug}: CTA`).toMatch(new RegExp(`${escapeRegExp(home.selectedWork.cta)}$`));
+      expect(card, `${item.slug}: card styles`).toContain(`class="${cardStyles.metric}"`);
+    });
+  });
+
+  test("Projects are not in Selected work; the nav reaches them", () => {
+    expect(selected).not.toMatch(/href="\/projects\//);
+  });
+
+  test("the cross-link goes to /experience after the cards", () => {
+    const { label, href } = home.selectedWork.crossLink;
+    const at = selected.search(new RegExp(`<a [^>]*href="${href}"[^>]*>${escapeRegExp(label)}`));
+    expect(at, "the cross-link renders").toBeGreaterThan(-1);
+    expect(at).toBeGreaterThan(selected.lastIndexOf("</article>"));
+  });
+
+  test("the section is not a reveal target", () => {
+    expect(selected).not.toMatch(/class="[^"]*\breveal\b/);
+    expect(revealTargets.map(({ open }) => open)).not.toContainEqual(expect.stringContaining('aria-labelledby="selected-work"'));
+  });
+
+  test("app/page.tsx passes the collection and lists no item itself", () => {
+    const page = readFileSync(join(process.cwd(), "app/page.tsx"), "utf8");
+    expect(page).toMatch(/<SelectedWork items=\{caseStudyItems\}\s*\/>/);
+    for (const item of caseStudyItems) {
+      expect(page, `app/page.tsx names ${item.slug}`).not.toContain(item.slug);
+      expect(page, `app/page.tsx names ${item.title}`).not.toContain(item.title);
+    }
+  });
+
+  test.each([
+    ["added", (items: readonly EvidenceItem[]) => [...items, { ...items[0], slug: "mock-added", title: "A mocked case study", href: "/experience/mock-added" }]],
+    ["removed", (items: readonly EvidenceItem[]) => items.slice(1)],
+  ])("a mocked collection with an item %s changes the card count", async (_change, change) => {
+    vi.resetModules();
+    vi.doMock("@/lib/evidence", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("@/lib/evidence")>();
+      return { ...actual, caseStudyItems: change(actual.caseStudyItems) };
+    });
+    try {
+      const mocked = await import("./page");
+      const markup = renderToStaticMarkup(<>{mocked.default() as ReactNode}</>);
+      const expected = change(caseStudyItems);
+      const cards = cardsIn(markup);
+      expect(cards).toHaveLength(expected.length);
+      expect(cards.map((card) => card.match(/href="([^"]*)"/)?.[1])).toEqual(expected.map((item) => item.href));
+    } finally {
+      vi.doUnmock("@/lib/evidence");
+      vi.resetModules();
+    }
   });
 });
 
@@ -310,7 +412,13 @@ describe("islands on Home", () => {
   });
 
   test("Home and the components it renders reach no island but RevealOnScroll", () => {
-    const islands = ["app/page.tsx", "components/home-hero.tsx", "components/evidence-band.tsx"].flatMap((path) =>
+    const islands = [
+      "app/page.tsx",
+      "components/home-hero.tsx",
+      "components/evidence-band.tsx",
+      "components/selected-work.tsx",
+      "components/evidence-card.tsx",
+    ].flatMap((path) =>
       specifiers(source(path)).filter((specifier) => /(^|\/)islands\//.test(specifier)),
     );
     expect(islands).toEqual(["@/components/islands/reveal-on-scroll"]);
