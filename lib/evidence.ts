@@ -15,6 +15,7 @@ import { CAPABILITIES, type Capabilities, type EvidenceItem } from "@/lib/eviden
 // Everything consumers need, and not CaseStudy or Project (AD-6).
 export {
   CAPABILITIES,
+  CAPABILITY_NAME,
   EVIDENCE_ROUTE,
   type Capabilities,
   type Capability,

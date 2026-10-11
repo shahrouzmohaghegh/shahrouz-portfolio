@@ -114,5 +114,6 @@
     --component-footer-columns: var(--component-footer-columns-mobile);
     --component-evidence-band-tag-gap: var(--component-evidence-band-tag-gap-mobile);
     --component-evidence-band-figure-gap: var(--component-evidence-band-figure-gap-mobile);
+    --component-card-grid-columns: var(--component-card-grid-columns-mobile);
   }
 }

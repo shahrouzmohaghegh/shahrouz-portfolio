@@ -1,0 +1,40 @@
+/* The Selected work section on Home: an h2, the card grid, then the
+   cross-link. Paper ground under a hairline top rule, like the paper band
+   above it. The grid's columns are a --component-card-grid-columns pair:
+   three equal columns from 768px, one below. */
+.section {
+  padding: var(--space-section) var(--space-margin);
+  border-top: var(--space-rule-hairline) solid var(--color-rule);
+  background: var(--color-paper);
+}
+
+.heading {
+  margin: 0 0 var(--space-stack-xl);
+  font-family: var(--type-section-title-family);
+  font-size: var(--type-section-title-size);
+  font-weight: var(--type-section-title-weight);
+  line-height: var(--type-section-title-leading);
+  letter-spacing: var(--type-section-title-tracking);
+  color: var(--color-ink);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: var(--component-card-grid-columns);
+  gap: var(--space-card-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  min-width: 0;
+}
+
+.crossLink {
+  margin: var(--space-stack-xl) 0 0;
+}
+
+.crossLinkAnchor {
+  composes: ctaLink from "./cta-link.module.css";
+}

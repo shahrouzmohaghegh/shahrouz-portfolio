@@ -1,0 +1,13 @@
+/* {components.cta-link}: oxide, 600, {typography.data-row}, with a 1.5px
+   oxide underline. Defined once here; the hero's Explore link composes it,
+   and so do the evidence card's CTA and the Selected work cross-link. */
+.ctaLink {
+  font-family: var(--type-data-row-family);
+  font-size: var(--type-data-row-size);
+  font-weight: var(--component-cta-link-weight);
+  line-height: var(--type-data-row-leading);
+  color: var(--color-accent);
+  text-decoration-line: underline;
+  text-decoration-thickness: var(--component-cta-link-underline-width);
+  text-decoration-color: var(--color-accent);
+}

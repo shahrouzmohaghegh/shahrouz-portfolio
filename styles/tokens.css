@@ -381,6 +381,22 @@
   --component-evidence-band-tag-gap: var(--space-stack-lg);
   --component-evidence-band-figure-gap-mobile: 18px;
   --component-evidence-band-figure-gap: 30px;
+  /* {components.evidence-card}, from screen-home.html: the space under the
+     2px top rule and between its parts. */
+  --component-evidence-card-padding-top: 20px;
+  --component-evidence-card-eyebrow-gap: 12px;
+  --component-evidence-card-gap: 10px;
+  --component-evidence-card-summary-gap: var(--space-stack-sm);
+  --component-evidence-card-metric-weight: 600;
+  /* Card grids: three equal columns at {spacing.card-gap} from 768px, one
+     column below. minmax(0, 1fr) lets a long word wrap instead of widening
+     a column. */
+  --component-card-grid-columns-mobile: minmax(0, 1fr);
+  --component-card-grid-columns: repeat(3, minmax(0, 1fr));
+  /* The focus indicator (DESIGN.md Focus indicator, styles/focus.css): a 2px
+     outline at a 2px offset. The offset is load-bearing and never 0. */
+  --component-focus-ring-width: 2px;
+  --component-focus-ring-offset: 2px;
   /* The scroll reveal (styles/reveal.css, AD-14): opacity 0 and this offset
      to rest, ease-out, at 25 percent visibility. */
   --component-reveal-distance: 10px;
