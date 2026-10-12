@@ -4,8 +4,9 @@
 // text is the link, the metric with its qualifier as one sentence (or the
 // value alone when no qualifier is required, with no stray separator), the
 // summary, then the CTA to the same href. The title's level, h2 or h3, is
-// the surface's choice (headingLevel); the suite renders h3 unless it says. The card reads only EvidenceItem
-// through lib/evidence and never imports content/.
+// the surface's choice (headingLevel); the suite renders h3 unless a test
+// passes 2. The card reads only EvidenceItem through lib/evidence and never
+// imports content/.
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

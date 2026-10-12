@@ -255,8 +255,6 @@ describe("the content collections", () => {
   });
 });
 
-// The checks themselves, against fixtures, so a check that stops catching
-// anything fails here rather than passing quietly above.
 // The one listing-title function (AD-16). It returns the bare segment; the
 // root layout's template adds " | Shahrouz Mohaghegh", so the suffix appears
 // once. Epic 4 extends it with the selected capability.
@@ -275,6 +273,8 @@ describe("the listing title", () => {
   });
 });
 
+// The checks themselves, against fixtures, so a check that stops catching
+// anything fails here rather than passing quietly above.
 describe("the integrity checks", () => {
   const item = (over: Partial<Record<keyof EvidenceItem, unknown>> = {}): EvidenceItem =>
     ({
