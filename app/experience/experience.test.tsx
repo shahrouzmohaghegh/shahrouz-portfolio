@@ -51,7 +51,7 @@ describe("the /experience listing", () => {
       heading: "Experience",
       description:
         "Case studies in engineering leadership: an offshore delivery turnaround, AI-native engineering measured across pilot projects, and a standing seat on the Digital Governance Board.",
-      intro: "Each case study runs Context, Decisions, Actions, Outcome and Lessons.",
+      intro: "Work from regulated healthcare, each with the decisions behind it, what they cost, and the measured outcome.",
       cta: "Read the case study",
     });
   });
