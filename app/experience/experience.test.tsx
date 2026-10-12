@@ -49,6 +49,8 @@ describe("the /experience listing", () => {
   test("content/experience.ts holds the reviewed words", () => {
     expect(experience).toEqual({
       heading: "Experience",
+      description:
+        "Case studies in engineering leadership: an offshore delivery turnaround, AI-native engineering measured across pilot projects, and a standing seat on the Digital Governance Board.",
       intro: "Each case study runs Context, Decisions, Actions, Outcome and Lessons.",
       cta: "Read the case study",
     });
@@ -136,6 +138,10 @@ describe("the listing titles", () => {
     expect(projectsMetadata.title).toBe(listingTitle("project"));
   });
 
+  test("the h1 and the title name the listing the same way", () => {
+    expect(experience.heading).toBe(listingTitle("case-study"));
+  });
+
   test("the root template renders each with the site name once", () => {
     expect(template.replace("%s", String(experienceModule.metadata.title))).toBe("Experience | Shahrouz Mohaghegh");
     expect(template.replace("%s", String(projectsMetadata.title))).toBe("Projects | Shahrouz Mohaghegh");
@@ -160,6 +166,10 @@ describe("indexing and rendering", () => {
     expect(experienceModule.metadata.robots).toBeUndefined();
   });
 
+  test("/experience carries its meta description, from content/experience.ts", () => {
+    expect(experienceModule.metadata.description).toBe(experience.description);
+  });
+
   test("the route stays static: no search params, no dynamic rendering", () => {
     const page = source("app/experience/page.tsx");
     expect(page).not.toMatch(/searchParams|export const dynamic|cookies\(|headers\(/);
@@ -172,7 +182,7 @@ describe("indexing and rendering", () => {
     expect(islands).toEqual([]);
   });
 
-  test("the card grid's columns are declared in one stylesheet only", () => {
+  test("only card-grid.module.css among the module stylesheets lays out the card grid's columns", () => {
     const sheets = (dir: string): string[] =>
       readdirSync(join(process.cwd(), dir), { withFileTypes: true }).flatMap((entry) => {
         const path = join(dir, entry.name);

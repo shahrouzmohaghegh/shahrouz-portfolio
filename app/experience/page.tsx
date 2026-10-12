@@ -6,7 +6,7 @@ import { experience } from "@/content/experience";
 import { caseStudyItems, listingTitle } from "@/lib/evidence";
 import styles from "./experience.module.css";
 
-export const metadata: Metadata = { title: listingTitle("case-study") };
+export const metadata: Metadata = { title: listingTitle("case-study"), description: experience.description };
 
 // The case study listing (Story 3.1): the h1, one intro line, then one
 // evidence card per case study in the shared grid, titles as h2 under the h1.
