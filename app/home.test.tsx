@@ -295,12 +295,23 @@ describe("the evidence bands below the hero", () => {
     expect(hero).not.toMatch(/class="[^"]*\breveal\b/);
   });
 
-  test("outside Selected work, the Secure Score figure appears once on Home, in its band", () => {
-    // The Digital Governance Board card's Headline Metric restates it, as the
-    // mockup does; the hero and the other band never do.
+  test("the Secure Score figure appears once on Home, in its band", () => {
+    expect(main.split(BANDS[1].figure)).toHaveLength(2);
+  });
+
+  // Each card adds something Home has not already said: no card metric
+  // restates a figure-pair number or a band figure's number.
+  test("no Selected work card repeats a number from the figure pair or the bands", () => {
     expect(selected, "Home has a Selected work section").not.toBe("");
-    expect(selected, "the Digital Governance Board card restates the figure").toContain(BANDS[1].figure);
-    expect(main.replace(selected, "").split(BANDS[1].figure)).toHaveLength(2);
+    const numbers = [...ROWS.map((row) => row.figure), ...BANDS.map((band) => band.figure)].flatMap(
+      (figure) => figure.match(/\d+(?:\s+to\s+\d+)?%?(?:\s+weeks)?/g) ?? [],
+    );
+    expect(numbers.length, "the figures carry numbers").toBeGreaterThan(0);
+    for (const card of cardsIn(selected)) {
+      const metric = decode(card.match(new RegExp(`class="${cardStyles.metric}"[^>]*>([^<]*)<`))?.[1] ?? "");
+      expect(metric, "every card has a metric").not.toBe("");
+      for (const number of numbers) expect(metric, `card metric repeats "${number}"`).not.toContain(number);
+    }
   });
 });
 
