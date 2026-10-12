@@ -8,7 +8,7 @@
 // content now, so it no longer does).
 //
 // Below the hero (Story 2.5): exactly two evidence bands, Cloud delivery on
-// deep then Security posture on paper, each one tag, one figure and one
+// deep then Release discipline on paper, each one tag, one figure and one
 // caption, each carrying the global class `reveal`, sized by Figure demotion.
 // The hero and the figure pair are never reveal targets, and RevealOnScroll
 // is the only island Home renders.
@@ -217,15 +217,15 @@ const BANDS = [
     figure: "8 weeks",
     role: "figure",
     caption:
-      "Reporting service moved from the on-premise data centre to Azure with no service disruption.",
+      "Reporting service moved from the on-premise data centre to Azure, with no service disruption.",
   },
   {
     tone: "paper",
-    tag: "Security posture",
-    figure: "steadily improving Secure Score",
-    role: "figure-small",
+    tag: "Release discipline",
+    figure: "70% fewer post-deployment hotfixes",
+    role: "pull-quote",
     caption:
-      "Microsoft Defender for Cloud Secure Score across the production environment, reported to the Digital Governance Board.",
+      "Pre-mortems and tabletop exercises before major releases, which I introduced and ran, contributed to 70% fewer post-deployment hotfixes and zero rollbacks.",
   },
 ] as const;
 
@@ -248,7 +248,7 @@ describe("the evidence bands below the hero", () => {
     );
   });
 
-  test("exactly two reveal targets render, both bands, Cloud delivery then Security posture", () => {
+  test("exactly two reveal targets render, both bands, Cloud delivery then Release discipline", () => {
     expect(revealTargets, "Home has two reveal targets").toHaveLength(2);
     revealTargets.forEach(({ open, inner }, i) => {
       const band = BANDS[i];
@@ -281,23 +281,27 @@ describe("the evidence bands below the hero", () => {
     const explore = positionOf(home.explore.label, "the Explore link");
     expect(explore).toBeGreaterThan(positionOf(ROWS[1].scope, "the second row's scope"));
     const cloud = main.indexOf(`>${BANDS[0].tag}</h2>`);
-    const security = main.indexOf(`>${BANDS[1].tag}</h2>`);
+    const release = main.indexOf(`>${BANDS[1].tag}</h2>`);
     expect(cloud, "Cloud delivery band").toBeGreaterThan(explore);
-    expect(security, "Security posture band").toBeGreaterThan(cloud);
+    expect(release, "Release discipline band").toBeGreaterThan(cloud);
   });
 
   test("Home never shows the Fault Feedback Ratio or its per-fix ratio", () => {
     // The ratio and its definition live on the CS-1 page only (Shahrouz, PR #19 review).
     expect(text(main)).not.toMatch(/fault feedback ratio/i);
-    expect(text(main)).not.toMatch(/per change/i);
+    expect(text(main)).not.toMatch(/per\sfix/i);
   });
 
   test("the hero and the figure pair are never reveal targets", () => {
     expect(hero).not.toMatch(/class="[^"]*\breveal\b/);
   });
 
-  test("the Secure Score figure appears once on Home, in its band", () => {
-    expect(main.split(BANDS[1].figure)).toHaveLength(2);
+  test("the hotfix figure appears on Home only in its band", () => {
+    // The caption restates the figure in its sentence, so the band holds it
+    // twice; nowhere else on Home does.
+    const band = revealTargets[1]?.inner ?? "";
+    expect(band, "the Release discipline band shows the figure").toContain(BANDS[1].figure);
+    expect(main.replace(band, "")).not.toContain(BANDS[1].figure);
   });
 
   // Each card adds something Home has not already said: no card metric

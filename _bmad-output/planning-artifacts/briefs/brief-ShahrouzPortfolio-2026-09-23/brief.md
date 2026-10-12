@@ -15,7 +15,7 @@ handoff_to: "John (Product Manager), for PRD"
 
 ## Executive Summary
 
-Shahrouz Mohaghegh is a senior engineering leader with more than twenty years across banking, payments and regulated healthcare, most recently running a 38-person engineering function at the employer with a standing seat on the company's Digital Governance Board. The site is aimed at the people who hire for Head of Engineering, Engineering Director, Chief Engineer and equivalent roles.
+Shahrouz Mohaghegh is a senior engineering leader with more than twenty years across banking, payments and regulated healthcare, most recently running a 38-person engineering function with a standing seat on the company's Digital Governance Board. The site is aimed at the people who hire for Head of Engineering, Engineering Director, Chief Engineer and equivalent roles.
 
 This product is a personal website that does one job: **make a recruiter, a CTO or a technical interviewer reach the correct conclusion about him faster than a résumé can.** That conclusion is specific. He leads engineering organisations and transformation, he has never stopped being technically credible, and he understands how AI and agentic engineering are changing software delivery. Not a junior portfolio, not a résumé on the web, not an AI influencer page.
 
@@ -68,7 +68,7 @@ The most important analytical point in this brief, and it cuts against instinct.
 
 An audit of his past positioning against senior engineering position descriptions found two things:
 
-- **His strongest and most defensible number is the one he uses least.** The offshore delivery turnaround, bug rework measure cut by more than 80%, is among the claims he has used least, while AI governance claims are among those he has used most. The turnaround is hard, specific, unusual and defensible. The AI claims are increasingly generic.
+- **His strongest and most defensible number is the one he uses least.** The offshore delivery turnaround, bad fixes cut by more than 80%, is among the claims he has used least, while AI governance claims are among those he has used most. The turnaround is hard, specific, unusual and defensible. The AI claims are increasingly generic.
 - **AI is the loudest demand signal but not the screening one.** AI appears in 91% of position descriptions with the most raw mentions, yet stakeholder influence appears in 100% and delivery execution in 95%. Employers are excited about AI and screen on delivery credibility.
 
 **The design consequence: the site must not be AI-first.** If the homepage leads with agentic engineering, he looks like precisely the thing `scope.md` §2 forbids. Lead with what he led and what it measurably produced. Let AI-native engineering be the sharpest of several proof points, grounded in measured delivery outcomes rather than positioned as the headline.
@@ -91,7 +91,7 @@ Five capabilities, used as the site's organising spine, as the filter values, an
 
 | # | Capability | Why it earns its place | Est. |
 |---|---|---|---|
-| M1 | **Home** | The 30-second skim. Positioning statement, scale markers (38-person function led through six people-managers, Digital Governance Board seat, **bug rework measure cut by more than 80%**, steadily improving Secure Score, regulated healthcare and payments), availability, and clear routes into depth. | 3h |
+| M1 | **Home** | The 30-second skim. Positioning statement, scale markers (38-person function led through six people-managers, Digital Governance Board seat, **bad fixes cut by more than 80%**, regulated healthcare and payments), availability, and clear routes into depth. | 3h |
 | M2 | **Experience and Engineering Leadership** | Four case studies in Context / Decisions / Actions / Outcome / Lessons form, covering capabilities 1 to 4. Selective, not a résumé transcription. AI-Native evidence arrives through SH3 or, if that slips, as a fifth case study. | 8h |
 | M3 | **Projects and Technical Work** | Tier 1 at launch: the Career Application System and this website. Both public, inspectable, and near-zero content cost. | 3h |
 | M4 | **Capability filter** | The one V1 interaction. Filters case studies and projects together from a shared typed data model, with filter state in the URL so a view is linkable. **Must render a defined empty state**, since capability 5 has no must-have evidence until SH3 lands. | 3h |
@@ -135,7 +135,7 @@ The critical insight: this is a **selection, compression and clearance** exercis
 |---|---|---|
 | Home | Résumé V1 summary, `personal-facts.md` | Low. Compression only. |
 | Case study: Delivery and Quality | Story SB-S4 (offshore turnaround) | Low. Strong numbers, already structured. |
-| Case study: Security and Governance | Story SB-S11 (steadily improving Secure Score) | Low. |
+| Case study: Security and Governance | Story SB-S11 (security governance through the board) | Low. |
 | Case study: Cloud and Platform | Story SB-S1 (Azure modernisation), résumé V1 | Low. |
 | Case study: Organisation and People | Stories SB-S5, SB-S12, SB-S20 | Medium. Needs a point of view, not an achievement list. |
 | Project: Career Application System | Public repository and its C4 docs | Very low. Already written and shared. |
