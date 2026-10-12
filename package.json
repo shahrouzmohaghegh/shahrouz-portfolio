@@ -20,11 +20,15 @@
     "watch:production": "node scripts/production-watch.mts --print"
   },
   "dependencies": {
+    "@mdx-js/loader": "^3.1.1",
+    "@mdx-js/react": "^3.1.1",
+    "@next/mdx": "16.3.8",
     "next": "16.3.8",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
   "devDependencies": {
+    "@types/mdx": "^2.0.14",
     "@types/node": "^24",
     "@types/react": "^19",
     "@types/react-dom": "^19",

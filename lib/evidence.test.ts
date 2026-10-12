@@ -10,17 +10,22 @@ import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 
+import { writtenCaseStudySlugs } from "@/content/case-studies";
 import { CI_PATH, gateStepNames } from "@/scripts/check-readme.mts";
 
 import {
   CAPABILITIES,
   CAPABILITY_NAME,
+  CASE_STUDY_SECTIONS,
   EVIDENCE_ROUTE,
   caseStudyItems,
   evidenceItems,
   inCanonicalOrder,
+  isWritten,
   listingTitle,
+  nextCaseStudy,
   projectItems,
+  writtenCaseStudyItems,
   type Capabilities,
   type EvidenceItem,
 } from "@/lib/evidence";
@@ -78,6 +83,51 @@ function mdxProblems(collection: string, items: readonly EvidenceItem[], files: 
     ...[...slugs].filter((slug) => !mdx.has(slug)).map((slug) => `${collection}: "${slug}" has no ${slug}.mdx`),
     ...[...mdx].filter((slug) => !slugs.has(slug)).map((slug) => `${collection}: ${slug}.mdx has no entry in index.ts`),
   ];
+}
+
+// A written case study (non-empty MDX) holds exactly the five sections, in
+// CASE_STUDY_SECTIONS order, each as one <Section name="..."> (the name in
+// double or single quotes, or a braced string), and nothing else: no text
+// outside a Section, and no Markdown heading anywhere, since each section's
+// only heading is the h2 Section renders. An empty file is unwritten and is
+// not checked here; it gets no page.
+const SECTION_NAME = /\bname=(?:"([^"]*)"|'([^']*)'|\{\s*"([^"]*)"\s*\}|\{\s*'([^']*)'\s*\})/;
+
+function sectionProblems(slug: string, source: string): string[] {
+  if (!isWritten(source)) return [];
+  const expected = CASE_STUDY_SECTIONS.map((section) => section.id);
+  const tags = [...source.matchAll(/<Section\b[^>]*>/g)].map(([tag]) => tag);
+  const names = tags.map((tag) => {
+    const match = tag.match(SECTION_NAME);
+    return match ? (match[1] ?? match[2] ?? match[3] ?? match[4]) : undefined;
+  });
+  const problems: string[] = [];
+  if (names.includes(undefined)) problems.push(`case-studies: "${slug}" has a <Section> with no name="..."`);
+  const outside = source.replace(/<Section\b[^>]*>[\s\S]*?<\/Section>/g, "").trim();
+  if (outside !== "") problems.push(`case-studies: "${slug}" has content outside a <Section>: "${outside.slice(0, 40)}"`);
+  const headings = source.split("\n").filter((line) => /^ {0,3}#{1,6}(\s|$)/.test(line));
+  if (headings.length > 0) problems.push(`case-studies: "${slug}" has a Markdown heading ("${headings[0].trim()}"); Section renders each section's only heading`);
+  const found = names.filter((name): name is string => name !== undefined);
+  if (found.join(",") !== expected.join(",")) {
+    problems.push(
+      `case-studies: "${slug}" sections are [${found.join(", ")}]; a written case study needs exactly [${expected.join(", ")}], in that order`,
+    );
+  }
+  return problems;
+}
+
+// The committed list of written case studies (the proxy and the page both
+// read it) against the MDX files that are actually written.
+function writtenListProblems(listed: readonly string[], written: readonly string[], order: readonly string[]): string[] {
+  const problems = [
+    ...written.filter((slug) => !listed.includes(slug)).map((slug) => `case-studies: ${slug}.mdx is written but "${slug}" is not in writtenCaseStudySlugs`),
+    ...listed.filter((slug) => !written.includes(slug)).map((slug) => `case-studies: "${slug}" is in writtenCaseStudySlugs but ${slug}.mdx is empty`),
+    ...[...new Set(listed.filter((slug, i) => listed.indexOf(slug) !== i))].map((slug) => `case-studies: "${slug}" is in writtenCaseStudySlugs more than once`),
+  ];
+  if (problems.length === 0 && listed.join(",") !== order.filter((slug) => listed.includes(slug)).join(",")) {
+    problems.push("case-studies: writtenCaseStudySlugs is not in collection order");
+  }
+  return problems;
 }
 
 function duplicateSlugs(items: readonly EvidenceItem[]): string[] {
@@ -190,6 +240,13 @@ describe("the content collections", () => {
     expect(mdxProblems("projects", projectItems, mdxFiles("projects"))).toEqual([]);
   });
 
+  test("every written case study holds the five sections in order", () => {
+    const problems = caseStudyItems.flatMap((item) =>
+      sectionProblems(item.slug, readFileSync(fileURLToPath(new URL(`../content/case-studies/${item.slug}.mdx`, import.meta.url)), "utf8")),
+    );
+    expect(problems).toEqual([]);
+  });
+
   test("case studies are case studies and projects are projects", () => {
     expect(caseStudyItems.filter((item) => item.kind !== "case-study").map((item) => item.slug)).toEqual([]);
     expect(projectItems.filter((item) => item.kind !== "project").map((item) => item.slug)).toEqual([]);
@@ -252,6 +309,71 @@ describe("the content collections", () => {
       evidenceItems.map((item) => item.slug),
       "Order in content/*/index.ts is display order. Confirm a reorder, an addition or a removal by updating DISPLAY_ORDER in lib/evidence.test.ts.",
     ).toEqual(DISPLAY_ORDER);
+  });
+});
+
+// The five case-study sections (Story 3.2): one list, read by the Section
+// component, the rail and the integrity check.
+describe("the case-study sections", () => {
+  test("are context, decisions, actions, outcome and lessons, each with its label", () => {
+    expect(CASE_STUDY_SECTIONS).toEqual([
+      { id: "context", label: "Context" },
+      { id: "decisions", label: "Decisions" },
+      { id: "actions", label: "Actions" },
+      { id: "outcome", label: "Outcome" },
+      { id: "lessons", label: "Lessons" },
+    ]);
+  });
+});
+
+// A case study gets a page only once its MDX is written (Story 3.2).
+describe("written case studies", () => {
+  const item = (slug: string): EvidenceItem =>
+    ({ ...caseStudyItems[0], slug, href: `/experience/${slug}` }) as EvidenceItem;
+
+  test("an empty or whitespace-only MDX is unwritten", () => {
+    expect(isWritten("")).toBe(false);
+    expect(isWritten(" \n\t\n")).toBe(false);
+    expect(isWritten('<Section name="context">x</Section>')).toBe(true);
+  });
+
+  test("the committed written list names exactly the case studies whose MDX is written, in collection order", () => {
+    const written = mdxFiles("case-studies")
+      .filter((file) => file.endsWith(".mdx"))
+      .filter((file) => isWritten(readFileSync(fileURLToPath(new URL(`../content/case-studies/${file}`, import.meta.url)), "utf8")))
+      .map((file) => file.slice(0, -".mdx".length));
+    expect(
+      writtenListProblems(writtenCaseStudySlugs, written, caseStudyItems.map((each) => each.slug)),
+      "Update writtenCaseStudySlugs in content/case-studies/index.ts in the same change as the MDX: the proxy 404s every slug not on it.",
+    ).toEqual([]);
+  });
+
+  test("writtenCaseStudyItems reads the committed list, in collection order", () => {
+    expect(writtenCaseStudyItems().map((each) => each.slug)).toEqual(
+      caseStudyItems.filter((each) => writtenCaseStudySlugs.includes(each.slug)).map((each) => each.slug),
+    );
+  });
+
+  test("a written list that drifts from the MDX files is named", () => {
+    const order = ["a", "b", "c"];
+    expect(writtenListProblems(["a", "c"], ["c", "a"], order)).toEqual([]);
+    expect(writtenListProblems([], ["b"], order)).toEqual(['case-studies: b.mdx is written but "b" is not in writtenCaseStudySlugs']);
+    expect(writtenListProblems(["b"], [], order)).toEqual(['case-studies: "b" is in writtenCaseStudySlugs but b.mdx is empty']);
+    expect(writtenListProblems(["c", "a"], ["a", "c"], order)).toEqual(["case-studies: writtenCaseStudySlugs is not in collection order"]);
+    expect(writtenListProblems(["a", "a"], ["a"], order)).toEqual(['case-studies: "a" is in writtenCaseStudySlugs more than once']);
+  });
+
+  test("the next case study is the following written one, wrapping to the first", () => {
+    const written = [item("a"), item("b"), item("c")];
+    expect(nextCaseStudy(written, "a")?.slug).toBe("b");
+    expect(nextCaseStudy(written, "b")?.slug).toBe("c");
+    expect(nextCaseStudy(written, "c")?.slug).toBe("a");
+  });
+
+  test("there is no next case study when only one is written, or the slug is not written", () => {
+    expect(nextCaseStudy([item("a")], "a")).toBeUndefined();
+    expect(nextCaseStudy([item("a"), item("b")], "nope")).toBeUndefined();
+    expect(nextCaseStudy([], "a")).toBeUndefined();
   });
 });
 
@@ -329,6 +451,72 @@ describe("the integrity checks", () => {
   test("an entry with no MDX file is named", () => {
     expect(mdxProblems("projects", [item(), item({ slug: "lonely" })], ["x.mdx", "index.ts"])).toEqual([
       'projects: "lonely" has no lonely.mdx',
+    ]);
+  });
+
+  const section = (name: string) => `<Section name="${name}">\n\nProse.\n\n</Section>`;
+  const fiveSections = ["context", "decisions", "actions", "outcome", "lessons"].map(section).join("\n\n");
+
+  test("a written case study with the five sections in order passes, and an empty one is not checked", () => {
+    expect(sectionProblems("x", fiveSections)).toEqual([]);
+    expect(sectionProblems("x", "")).toEqual([]);
+    expect(sectionProblems("x", "\n  \n")).toEqual([]);
+  });
+
+  test.each([
+    ["a missing section", ["context", "decisions", "actions", "outcome"]],
+    ["an extra section", ["context", "decisions", "actions", "outcome", "lessons", "appendix"]],
+    ["a repeated section", ["context", "decisions", "decisions", "actions", "outcome", "lessons"]],
+    ["sections out of order", ["context", "actions", "decisions", "outcome", "lessons"]],
+  ])("%s is named, with the slug", (_label, names) => {
+    const problems = sectionProblems("x", names.map(section).join("\n\n"));
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain('"x" sections are');
+    expect(problems[0]).toContain("[context, decisions, actions, outcome, lessons]");
+  });
+
+  test("single-quoted and braced string names count as names", () => {
+    const names = ["context", "decisions", "actions", "outcome", "lessons"];
+    const forms = [(n: string) => `name='${n}'`, (n: string) => `name={"${n}"}`, (n: string) => `name={ '${n}' }`];
+    for (const form of forms) {
+      const source = names.map((n) => `<Section ${form(n)}>\n\nProse.\n\n</Section>`).join("\n\n");
+      expect(sectionProblems("x", source), form("context")).toEqual([]);
+    }
+  });
+
+  test("prose with no section at all is named twice: the sections and the stray content", () => {
+    const problems = sectionProblems("x", "Just prose.");
+    expect(problems).toEqual([
+      'case-studies: "x" has content outside a <Section>: "Just prose."',
+      'case-studies: "x" sections are []; a written case study needs exactly [context, decisions, actions, outcome, lessons], in that order',
+    ]);
+  });
+
+  test("content outside the sections is named, with the slug", () => {
+    expect(sectionProblems("x", `Intro line.\n\n${fiveSections}`)).toEqual(['case-studies: "x" has content outside a <Section>: "Intro line."']);
+    expect(sectionProblems("x", `${fiveSections}\n\nA closing word.`)).toEqual([
+      'case-studies: "x" has content outside a <Section>: "A closing word."',
+    ]);
+  });
+
+  test.each([
+    ["inside a section", `<Section name="context">\n\n## Background\n\nProse.\n\n</Section>`],
+    ["a level-six heading", `<Section name="context">\n\n###### Small\n\n</Section>`],
+  ])("a Markdown heading %s is named, with the slug", (_label, first) => {
+    const source = [first, ...["decisions", "actions", "outcome", "lessons"].map(section)].join("\n\n");
+    const problems = sectionProblems("x", source);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/^case-studies: "x" has a Markdown heading \("#+ \w+"\)/);
+  });
+
+  test("a hash that is not a heading passes", () => {
+    const source = fiveSections.replace("Prose.", "Issue #12 and #hashtag, mid-line.");
+    expect(sectionProblems("x", source)).toEqual([]);
+  });
+
+  test("a section with no name is named", () => {
+    expect(sectionProblems("x", `<Section>\n\nProse.\n\n</Section>\n\n${fiveSections}`)).toEqual([
+      'case-studies: "x" has a <Section> with no name="..."',
     ]);
   });
 

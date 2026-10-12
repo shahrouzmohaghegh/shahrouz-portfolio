@@ -85,3 +85,6 @@ next-env.d.ts
 
 # Local list of confidential terms read by scripts/check-repo.mjs
 /.forbidden-terms
+
+# Local Obsidian vault settings
+/.obsidian/
