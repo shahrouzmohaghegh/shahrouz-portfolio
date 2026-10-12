@@ -526,7 +526,7 @@ The test for a new element nobody specified: is this something he is saying, or 
 - Caps labels are always tracked out between `0.2em` and `0.32em`: `{typography.meta-label}`, `{typography.nameline}`, `{typography.kicker}`. Caps are never used for anything longer than five words.
 - Body measure is capped at `{spacing.measure-body}`. Evidence captions cap at `{spacing.measure-caption}`.
 - One h1 per route. Heading order is never skipped for visual size; size comes from the token, not from the tag.
-- Mobile is a separate ramp, not a scale factor. `{typography.display-hero}` at 76px becomes `{typography.display-hero-mobile}` at 34px, and `{typography.figure}` at 164px becomes `{typography.figure-mobile}` at 80px. A long figure phrase such as "above 100% to below 20%" drops to `{typography.figure-small-mobile}` and is allowed to break across two lines.
+- Mobile is a separate ramp, not a scale factor. `{typography.display-hero}` at 76px becomes `{typography.display-hero-mobile}` at 34px, and `{typography.figure}` at 164px becomes `{typography.figure-mobile}` at 80px. A long figure phrase of 15 to 32 characters drops to `{typography.figure-small-mobile}` and is allowed to break across two lines.
 
 **The nav wordmark has its own token, `{typography.wordmark}`, and the reason matters.** Serif was considered and rejected: at nav scale it adds no expressive value and would turn four clean exceptions into five with a fuzzy one. Tracked small caps (`{typography.nameline}`) was then specified and also proved wrong: at `0.32em` the full name measures about 198px and cannot sit beside three inline nav items at 375px, where there is no disclosure menu to hide behind. So the wordmark is sans at 17.5px desktop and 13.5px mobile, untracked, weight 600. If it is ever rendered at display scale it becomes a serif role.
 
@@ -558,7 +558,7 @@ Named because the ramp now has three figure sizes and the rule for choosing betw
 | Figure content | Token |
 |---|---|
 | Up to 14 characters, for example `8 weeks` | `{typography.figure}` 164px |
-| 15 to 32 characters, for example `above 100% to below 20%` | `{typography.figure-small}` 104px |
+| 15 to 32 characters, for example `Bad fixes cut by more than 80%` | `{typography.figure-small}` 104px |
 | Longer than 32 characters, or a URL | `{typography.pull-quote}` 31px, still serif, still an outcome-slot figure |
 
 **Step two, by company.** A figure that shares a band with other figures demotes **one further step**. A figure alone in its band does not. This is why `mockups/screen-home.html` sets a short third Home figure at `{typography.figure-small}` while `mockups/direction-f1-foundry.html` sets it at `{typography.figure}`: the screen renders the three-up evidence row and is correct, the direction file renders it alone and is superseded, which is the decision already recorded in Open items. A figure inside `{components.outcome-band}` is always alone, so length alone governs it.
