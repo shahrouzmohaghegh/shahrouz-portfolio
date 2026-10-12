@@ -1,0 +1,14 @@
+/* The evidence card grid. Its columns are a --component-card-grid-columns
+   pair: three equal columns from 768px, one below. */
+.grid {
+  display: grid;
+  grid-template-columns: var(--component-card-grid-columns);
+  gap: var(--space-card-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  min-width: 0;
+}
