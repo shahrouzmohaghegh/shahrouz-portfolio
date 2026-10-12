@@ -25,7 +25,7 @@ export const caseStudies: readonly CaseStudy[] = [
       "Cycle time, throughput and adoption measured across pilot projects, and the governance pack that unblocked the capability, carried through the AI governance board review.",
     capabilities: ["ai-native"],
     headlineMetric: {
-      value: "Cycle time down 30 to 40%",
+      value: "Delivery throughput up 25 to 30%",
       qualifier: "across pilot projects",
     },
     href: "/experience/ai-native-engineering",
@@ -38,8 +38,8 @@ export const caseStudies: readonly CaseStudy[] = [
       "A two-year seat on the Digital Governance Board, reporting to the CEO, with cloud security posture and remediation progress visible to that board.",
     capabilities: ["executive-influence"],
     headlineMetric: {
-      value: "Cloud Secure Score from 20% to 76%",
-      qualifier: "across the full production subscription",
+      value: "Peer to the CFO, CDIO, Head of Operations and Head of Security",
+      qualifier: "for two years, reporting to the CEO",
     },
     href: "/experience/digital-governance-board",
   },
