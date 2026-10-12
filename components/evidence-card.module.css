@@ -1,0 +1,79 @@
+/* {components.evidence-card}: a 2px ink rule on top, capability eyebrows, a
+   sans title whose text is the link, the headline metric in oxide, a one-line
+   summary and a CTA. No image, no shadow, no border box, and the card is not
+   a click target as a whole. */
+.card {
+  min-width: 0;
+  padding-top: var(--component-evidence-card-padding-top);
+  border-top: var(--space-rule-card) solid var(--color-ink);
+  overflow-wrap: break-word;
+}
+
+.eyebrows {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--space-stack-sm);
+  row-gap: var(--space-stack-xs);
+  margin: 0 0 var(--component-evidence-card-eyebrow-gap);
+  padding: 0;
+  list-style: none;
+}
+
+.eyebrow {
+  font-family: var(--type-meta-label-family);
+  font-size: var(--type-meta-label-size);
+  font-weight: var(--type-meta-label-weight);
+  line-height: var(--type-meta-label-leading);
+  letter-spacing: var(--type-meta-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.title {
+  margin: 0 0 var(--component-evidence-card-gap);
+  font-family: var(--type-card-title-family);
+  font-size: var(--type-card-title-size);
+  font-weight: var(--type-card-title-weight);
+  line-height: var(--type-card-title-leading);
+  letter-spacing: var(--type-card-title-tracking);
+  color: var(--color-ink);
+}
+
+/* Underlined on hover and focus only: permitted because the CTA below is a
+   visible, underlined link to the same place. */
+.titleLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+.titleLink:hover,
+.titleLink:focus-visible {
+  text-decoration-line: underline;
+}
+
+.metric {
+  margin: 0 0 var(--component-evidence-card-gap);
+  font-family: var(--type-body-family);
+  font-size: var(--type-body-size);
+  font-weight: var(--component-evidence-card-metric-weight);
+  line-height: var(--type-body-leading);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-accent);
+}
+
+.summary {
+  margin: 0 0 var(--component-evidence-card-summary-gap);
+  font-family: var(--type-small-family);
+  font-size: var(--type-small-size);
+  font-weight: var(--type-small-weight);
+  line-height: var(--type-small-leading);
+  color: var(--color-muted);
+}
+
+.more {
+  margin: 0;
+}
+
+.cta {
+  composes: ctaLink from "./cta-link.module.css";
+}

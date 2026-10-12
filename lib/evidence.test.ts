@@ -14,6 +14,7 @@ import { CI_PATH, gateStepNames } from "@/scripts/check-readme.mts";
 
 import {
   CAPABILITIES,
+  CAPABILITY_NAME,
   EVIDENCE_ROUTE,
   caseStudyItems,
   evidenceItems,
@@ -205,6 +206,16 @@ describe("the content collections", () => {
     for (const item of evidenceItems) {
       expect(item.capabilities, item.slug).toEqual(CAPABILITIES.filter((c) => item.capabilities.includes(c)));
     }
+  });
+
+  test("CAPABILITY_NAME gives every capability its full name, and nothing else", () => {
+    expect(Object.keys(CAPABILITY_NAME)).toEqual([...CAPABILITIES]);
+    expect(Object.values(CAPABILITY_NAME)).toEqual([
+      "Engineering Leadership",
+      "AI-Native Engineering",
+      "Executive and Stakeholder Influence",
+      "Hands-On Engineering",
+    ]);
   });
 
   test("evidenceItems is both collections, case studies first", () => {

@@ -24,7 +24,12 @@
 //      styles/reveal.css must restore .js-reveal .reveal.in to opacity 1 and
 //      transform none, with both class names read from the island's
 //      constants. @media print is allowed only in styles/reveal.css and
-//      styles/print.css, and app/layout.tsx imports reveal.css last.
+//      styles/print.css, and app/layout.tsx imports reveal.css after
+//      breakpoints.css.
+//   6. The focus indicator (UX-DR29). No stylesheet removes or flattens an
+//      outline: outline: none, a zero outline or outline-width, outline-style
+//      none or hidden, and a zero outline-offset all fail. app/layout.tsx
+//      imports styles/focus.css, which draws the one ring, after reveal.css.
 //
 // Zero dependencies: the frontmatter is read with a minimal indentation
 // parser that understands only the four groups it checks.
@@ -43,6 +48,8 @@ export const REVEAL_PATH = "styles/reveal.css";
 export const PRINT_PATH = "styles/print.css";
 export const PRINT_PATHS = [REVEAL_PATH, PRINT_PATH];
 export const ISLAND_PATH = "components/islands/reveal-on-scroll.tsx";
+// The one focus ring rule (UX-DR29): ground-selected through --focus-ring.
+export const FOCUS_PATH = "styles/focus.css";
 
 export const TYPE_FLOOR_PX = 13.5;
 export const FLOOR_EXCEPTIONS = ["meta-label", "nameline", "kicker", "stage-number"];
@@ -64,6 +71,7 @@ export const COMPONENT_REMAPS: TokenMap = {
   "--component-footer-columns": "var(--component-footer-columns-mobile)",
   "--component-evidence-band-tag-gap": "var(--component-evidence-band-tag-gap-mobile)",
   "--component-evidence-band-figure-gap": "var(--component-evidence-band-figure-gap-mobile)",
+  "--component-card-grid-columns": "var(--component-card-grid-columns-mobile)",
 };
 
 const KNOWN_TOP_LEVEL = new Set([
@@ -471,6 +479,24 @@ export function breakpointAtRule(statement: string): string | null {
   return null;
 }
 
+// ---------------------------------------------------------------- focus guard
+
+const ZERO_LENGTH = /^[+-]?(?:0+\.?0*|\.0+)(?:[a-z]+)?$/i;
+
+// The problem a declaration makes for the focus indicator, if any: it may
+// never be removed, given no width, or drawn at a zero offset (DESIGN.md
+// Focus indicator: the 2px offset is load-bearing).
+export function focusProblem(property: string, value: string): string | null {
+  const p = property.toLowerCase();
+  const v = value.replace(/\s*!important\s*$/i, "").trim();
+  const parts = v.split(/\s+/);
+  const message = `${p}: ${v} removes or flattens the focus indicator (UX-DR29)`;
+  if (p === "outline" && parts.some((part) => /^(?:none|hidden)$/i.test(part) || ZERO_LENGTH.test(part))) return message;
+  if (p === "outline-style" && /^(?:none|hidden)$/i.test(v)) return message;
+  if ((p === "outline-width" || p === "outline-offset") && ZERO_LENGTH.test(v)) return message;
+  return null;
+}
+
 // ---------------------------------------------------------------- reveal guard
 
 const REVEAL_SCOPE = /\.js-reveal(?![\w-])/;
@@ -636,6 +662,8 @@ export function scanStylesheet(label: string, css: string, defined: ReadonlySet<
         const hide = revealHide(m[1], m[2]);
         const rule = preludes.at(-1) ?? "";
         if (hide && (rule.startsWith("@") || !scopedUnderReveal(rule))) problems.push(hide);
+        const focus = focusProblem(m[1], m[2]);
+        if (focus) problems.push(focus);
         for (const p of problems) failures.push(`${label}:${segmentLine}: ${p}`);
       }
     }
@@ -671,9 +699,9 @@ export function scanStylesheet(label: string, css: string, defined: ReadonlySet<
 }
 
 // The mobile remaps only win if breakpoints.css loads after tokens.css: both
-// target :root at equal specificity. reveal.css reads the tokens, so it
-// loads after both.
-const LAYOUT_ORDER = ["@/styles/tokens.css", "@/styles/breakpoints.css", "@/styles/reveal.css"];
+// target :root at equal specificity. reveal.css and focus.css read the
+// tokens, so they load after both, focus.css last.
+const LAYOUT_ORDER = ["@/styles/tokens.css", "@/styles/breakpoints.css", "@/styles/reveal.css", "@/styles/focus.css"];
 
 export function checkLayoutImports(source: string | null): string[] {
   if (source === null) return [`${LAYOUT_PATH}: missing`];

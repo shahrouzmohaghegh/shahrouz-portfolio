@@ -11,7 +11,9 @@
   color: var(--color-ink);
 }
 
+/* A deep ground: its links take the on-deep focus ring (styles/focus.css). */
 .deep {
+  --focus-ring: var(--color-focus-ring-on-deep);
   background: var(--color-deep);
   color: var(--color-on-deep);
 }
