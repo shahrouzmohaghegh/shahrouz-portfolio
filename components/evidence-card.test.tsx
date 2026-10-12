@@ -12,7 +12,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
 
 import { caseStudyItems, inCanonicalOrder, type EvidenceItem } from "@/lib/evidence";
-import { EvidenceCard } from "./evidence-card";
+import { EvidenceCard, cardTitleId } from "./evidence-card";
 import styles from "./evidence-card.module.css";
 
 const CTA = "Read the case study";
@@ -71,6 +71,17 @@ describe("the evidence card", () => {
     const hrefs = [...html.matchAll(/<a [^>]*href="([^"]*)"/g)].map((m) => m[1]);
     expect(hrefs).toEqual([QUALIFIED.href, QUALIFIED.href]);
     expect(byClass(html, styles.cta)).toEqual([CTA]);
+  });
+
+  test("the CTA is described by the title link, whose id comes from the slug", () => {
+    const html = render(QUALIFIED);
+    const id = cardTitleId(QUALIFIED.slug);
+    expect(id).toContain(QUALIFIED.slug);
+    const links = [...html.matchAll(/<a [^>]*>/g)].map((m) => m[0]);
+    expect(links[0], "the title link carries the id").toContain(`id="${id}"`);
+    expect(links[1], "the CTA points at it").toContain(`aria-describedby="${id}"`);
+    expect(html.split(`id="${id}"`)).toHaveLength(2);
+    expect(cardTitleId(UNQUALIFIED.slug)).not.toBe(id);
   });
 
   test("the metric and its qualifier read as one sentence", () => {

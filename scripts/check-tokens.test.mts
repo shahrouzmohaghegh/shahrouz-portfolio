@@ -447,7 +447,10 @@ describe("the focus indicator (UX-DR29)", () => {
   });
 
   test("outline: none and a zero outline or offset fail in any stylesheet", () => {
-    for (const decl of ["outline: none", "outline: 0", "outline-offset: 0", "outline-offset: 0px", "outline-width: 0", "outline-style: none"]) {
+    for (const decl of [
+      "outline: none", "outline: 0", "outline: hidden", "outline-offset: 0", "outline-offset: 0px", "outline-offset: 0 !important",
+      "outline-width: 0", "outline-style: none", "outline-style: none !important", "outline-style: hidden",
+    ]) {
       const failures = scan(`a:focus {\n  ${decl};\n}`).filter((f) => !f.includes("literal length"));
       assert.equal(failures.length, 1, decl);
       assert.match(failures[0], /x\.module\.css:2: .*focus indicator/, decl);

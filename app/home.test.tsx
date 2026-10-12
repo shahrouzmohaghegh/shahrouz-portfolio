@@ -32,6 +32,7 @@ import { describe, expect, test, vi } from "vitest";
 
 import cardStyles from "@/components/evidence-card.module.css";
 import bandStyles from "@/components/evidence-band.module.css";
+import { metricSentence } from "@/components/evidence-card";
 import { home } from "@/content/home";
 import { site } from "@/content/site";
 import { CAPABILITY_NAME, caseStudyItems, type EvidenceItem } from "@/lib/evidence";
@@ -297,6 +298,8 @@ describe("the evidence bands below the hero", () => {
   test("outside Selected work, the Secure Score figure appears once on Home, in its band", () => {
     // The Digital Governance Board card's Headline Metric restates it, as the
     // mockup does; the hero and the other band never do.
+    expect(selected, "Home has a Selected work section").not.toBe("");
+    expect(selected, "the Digital Governance Board card restates the figure").toContain(BANDS[1].figure);
     expect(main.replace(selected, "").split(BANDS[1].figure)).toHaveLength(2);
   });
 });
@@ -305,8 +308,6 @@ describe("the evidence bands below the hero", () => {
 const selectedStart = main.search(/<section[^>]*aria-labelledby="selected-work"/);
 const selected = selectedStart === -1 ? "" : main.slice(selectedStart, main.indexOf("</section>", selectedStart) + "</section>".length);
 const cardsIn = (fragment: string): string[] => fragment.split("<article").slice(1).map((card) => card.slice(0, card.indexOf("</article>")));
-const metricSentence = ({ headlineMetric }: EvidenceItem): string =>
-  "qualifier" in headlineMetric && headlineMetric.qualifier ? `${headlineMetric.value} ${headlineMetric.qualifier}` : headlineMetric.value;
 
 describe("Selected work below the bands", () => {
   test("content/home.ts holds the reviewed words", () => {
