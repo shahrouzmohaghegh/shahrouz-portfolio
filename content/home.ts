@@ -46,7 +46,7 @@ export const home = {
       tag: "Release discipline",
       figure: "70% fewer post-deployment hotfixes",
       caption:
-        "Pre-mortems and tabletop exercises before every major release, which I introduced and ran; hotfixes after deployment fell by 70% compared with the releases before them, with zero rollbacks.",
+        "Pre-mortems and tabletop exercises before major releases, which I introduced and ran, contributed to 70% fewer post-deployment hotfixes and zero rollbacks.",
     },
   ],
   // The Selected work section below the bands (Story 2.6). Its cards come

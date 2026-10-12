@@ -225,7 +225,7 @@ const BANDS = [
     figure: "70% fewer post-deployment hotfixes",
     role: "pull-quote",
     caption:
-      "Pre-mortems and tabletop exercises before every major release, which I introduced and ran; hotfixes after deployment fell by 70% compared with the releases before them, with zero rollbacks.",
+      "Pre-mortems and tabletop exercises before major releases, which I introduced and ran, contributed to 70% fewer post-deployment hotfixes and zero rollbacks.",
   },
 ] as const;
 
@@ -296,8 +296,12 @@ describe("the evidence bands below the hero", () => {
     expect(hero).not.toMatch(/class="[^"]*\breveal\b/);
   });
 
-  test("the hotfix figure appears once on Home, in its band", () => {
-    expect(main.split(BANDS[1].figure)).toHaveLength(2);
+  test("the hotfix figure appears on Home only in its band", () => {
+    // The caption restates the figure in its sentence, so the band holds it
+    // twice; nowhere else on Home does.
+    const band = revealTargets[1]?.inner ?? "";
+    expect(band, "the Release discipline band shows the figure").toContain(BANDS[1].figure);
+    expect(main.replace(band, "")).not.toContain(BANDS[1].figure);
   });
 
   // Each card adds something Home has not already said: no card metric
