@@ -50,6 +50,7 @@ vi.mock("@/lib/evidence", async (importOriginal) => {
 
 const route = await import("./page");
 const NotFoundPage = (await import("./not-found")).default;
+const target = await import("../../case-study-not-available/page");
 
 const [first, second, third] = caseStudyItems;
 const params = (slug: string) => ({ params: Promise.resolve({ slug }) });
@@ -192,6 +193,27 @@ describe("an unwritten or unknown case study", () => {
       ["/", "Home"],
     ]);
     expect(main).not.toMatch(/<form[\s>]|<input[\s>]|<h2[\s>]/);
+  });
+});
+
+// What proxy.ts serves, with status 404, for an unwritten or unknown slug:
+// the same treatment as not-found.tsx, as static HTML, kept out of search.
+describe("the static case-study not-found page", () => {
+  const main = mainOf(renderToStaticMarkup(<target.default />));
+
+  test("renders the same h1, sentence and three links as not-found.tsx", () => {
+    expect(main).toBe(mainOf(renderToStaticMarkup(<NotFoundPage />)));
+    expect(main).toMatch(/<h1[^>]*>This case study is not available\.<\/h1>/);
+  });
+
+  test("keeps the tab title and asks for noindex", () => {
+    expect(target.metadata.title).toBe(caseStudyPage.notFound.title);
+    expect(caseStudyPage.notFound.title).toBe("Case study not available");
+    expect(target.metadata.robots).toEqual({ index: false });
+  });
+
+  test("is static: it reads no params, search params or request", () => {
+    expect(source("app/case-study-not-available/page.tsx")).not.toMatch(/params|searchParams|cookies\(|headers\(|export const dynamic/);
   });
 });
 

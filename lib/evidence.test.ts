@@ -10,6 +10,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 
+import { writtenCaseStudySlugs } from "@/content/case-studies";
 import { CI_PATH, gateStepNames } from "@/scripts/check-readme.mts";
 
 import {
@@ -99,6 +100,20 @@ function sectionProblems(slug: string, source: string): string[] {
     problems.push(
       `case-studies: "${slug}" sections are [${found.join(", ")}]; a written case study needs exactly [${expected.join(", ")}], in that order`,
     );
+  }
+  return problems;
+}
+
+// The committed list of written case studies (the proxy and the page both
+// read it) against the MDX files that are actually written.
+function writtenListProblems(listed: readonly string[], written: readonly string[], order: readonly string[]): string[] {
+  const problems = [
+    ...written.filter((slug) => !listed.includes(slug)).map((slug) => `case-studies: ${slug}.mdx is written but "${slug}" is not in writtenCaseStudySlugs`),
+    ...listed.filter((slug) => !written.includes(slug)).map((slug) => `case-studies: "${slug}" is in writtenCaseStudySlugs but ${slug}.mdx is empty`),
+    ...[...new Set(listed.filter((slug, i) => listed.indexOf(slug) !== i))].map((slug) => `case-studies: "${slug}" is in writtenCaseStudySlugs more than once`),
+  ];
+  if (problems.length === 0 && listed.join(",") !== order.filter((slug) => listed.includes(slug)).join(",")) {
+    problems.push("case-studies: writtenCaseStudySlugs is not in collection order");
   }
   return problems;
 }
@@ -310,11 +325,30 @@ describe("written case studies", () => {
     expect(isWritten('<Section name="context">x</Section>')).toBe(true);
   });
 
-  test("are the case studies whose MDX is written, in collection order", () => {
-    const expected = caseStudyItems.filter((each) =>
-      isWritten(readFileSync(fileURLToPath(new URL(`../content/case-studies/${each.slug}.mdx`, import.meta.url)), "utf8")),
+  test("the committed written list names exactly the case studies whose MDX is written, in collection order", () => {
+    const written = mdxFiles("case-studies")
+      .filter((file) => file.endsWith(".mdx"))
+      .filter((file) => isWritten(readFileSync(fileURLToPath(new URL(`../content/case-studies/${file}`, import.meta.url)), "utf8")))
+      .map((file) => file.slice(0, -".mdx".length));
+    expect(
+      writtenListProblems(writtenCaseStudySlugs, written, caseStudyItems.map((each) => each.slug)),
+      "Update writtenCaseStudySlugs in content/case-studies/index.ts in the same change as the MDX: the proxy 404s every slug not on it.",
+    ).toEqual([]);
+  });
+
+  test("writtenCaseStudyItems reads the committed list, in collection order", () => {
+    expect(writtenCaseStudyItems().map((each) => each.slug)).toEqual(
+      caseStudyItems.filter((each) => writtenCaseStudySlugs.includes(each.slug)).map((each) => each.slug),
     );
-    expect(writtenCaseStudyItems().map((each) => each.slug)).toEqual(expected.map((each) => each.slug));
+  });
+
+  test("a written list that drifts from the MDX files is named", () => {
+    const order = ["a", "b", "c"];
+    expect(writtenListProblems(["a", "c"], ["c", "a"], order)).toEqual([]);
+    expect(writtenListProblems([], ["b"], order)).toEqual(['case-studies: b.mdx is written but "b" is not in writtenCaseStudySlugs']);
+    expect(writtenListProblems(["b"], [], order)).toEqual(['case-studies: "b" is in writtenCaseStudySlugs but b.mdx is empty']);
+    expect(writtenListProblems(["c", "a"], ["a", "c"], order)).toEqual(["case-studies: writtenCaseStudySlugs is not in collection order"]);
+    expect(writtenListProblems(["a", "a"], ["a"], order)).toEqual(['case-studies: "a" is in writtenCaseStudySlugs more than once']);
   });
 
   test("the next case study is the following written one, wrapping to the first", () => {
