@@ -1,0 +1,49 @@
+/* A detail route's not-found page: the padding of a route shell
+   (app/shell.module.css, not composed from here, since components never
+   reach into app/) and the h1 in {typography.page-title}, on paper, one sentence in {typography.body-lead}, then three links in
+   {components.cross-listing-link} style, each underlined so the signal is
+   never colour alone. */
+.notFound {
+  padding: var(--space-section) var(--space-margin);
+  background: var(--color-paper);
+}
+
+.heading {
+  margin: 0;
+  font-family: var(--type-page-title-family);
+  font-size: var(--type-page-title-size);
+  font-weight: var(--type-page-title-weight);
+  line-height: var(--type-page-title-leading);
+  letter-spacing: var(--type-page-title-tracking);
+  color: var(--color-ink);
+}
+
+.body {
+  max-width: var(--space-measure-body);
+  margin: var(--space-stack-md) 0 var(--space-stack-lg);
+  font-family: var(--type-body-lead-family);
+  font-size: var(--type-body-lead-size);
+  font-weight: var(--type-body-lead-weight);
+  line-height: var(--type-body-lead-leading);
+  color: var(--color-ink);
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-stack-sm) var(--space-stack-lg);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.link {
+  font-family: var(--type-ui-family);
+  font-size: var(--type-ui-size);
+  font-weight: var(--type-ui-weight);
+  line-height: var(--type-ui-leading);
+  color: var(--color-accent);
+  text-decoration-line: underline;
+  text-decoration-thickness: var(--component-cross-listing-link-underline-width);
+  text-underline-offset: var(--component-cross-listing-link-underline-offset);
+}

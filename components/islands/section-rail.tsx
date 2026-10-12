@@ -1,0 +1,125 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+
+import styles from "./section-rail.module.css";
+
+// SectionRail (AD-14): the in-page section list on a detail route, and the
+// second and last island on the register. It imports no content and no
+// other island: the sections, their labels and the rail's own words come in
+// as props.
+//
+// The server renders a plain nav of in-page anchors, numbered 01 onward by a
+// CSS counter, so with JavaScript off it is a working contents list and no
+// anchor claims to be current. With script, startSectionRail keeps
+// aria-current="true" on exactly one anchor, following the sections through
+// an IntersectionObserver, and an activated anchor moves focus to its
+// section (each section is tabindex="-1"). Without IntersectionObserver it
+// does nothing at all.
+
+export const RAIL_CURRENT = { name: "aria-current", value: "true" } as const;
+// A section counts as in view while it overlaps the top 40 percent of the
+// viewport, so the current anchor follows the section being read, not the
+// one just scrolling in at the bottom.
+export const RAIL_ROOT_MARGIN = "0px 0px -60% 0px";
+
+export type RailSection = { readonly id: string; readonly label: string };
+
+type RailLink = Pick<Element, "getAttribute" | "setAttribute" | "removeAttribute">;
+type RailTarget = { focus(options?: FocusOptions): void };
+
+export type SectionRailEnvironment = {
+  nav: { querySelectorAll(selector: string): ArrayLike<RailLink> } & Pick<EventTarget, "addEventListener" | "removeEventListener">;
+  document: { getElementById(id: string): RailTarget | null };
+  window: { location: Pick<Location, "hash"> };
+  IntersectionObserver: typeof IntersectionObserver | undefined;
+};
+
+// Returns a cleanup that disconnects, stops listening and clears the marker.
+export function startSectionRail({ nav, document, window, IntersectionObserver: Observer }: SectionRailEnvironment): () => void {
+  if (Observer === undefined) return () => {};
+
+  const pairs = Array.from(nav.querySelectorAll('a[href^="#"]')).flatMap((link) => {
+    const id = decodeURIComponent((link.getAttribute("href") ?? "").slice(1));
+    const target = id === "" ? null : document.getElementById(id);
+    return target === null ? [] : [{ link, target, hash: `#${id}` }];
+  });
+  if (pairs.length === 0) return () => {};
+
+  const mark = (current: RailLink): void => {
+    for (const { link } of pairs) {
+      if (link === current) link.setAttribute(RAIL_CURRENT.name, RAIL_CURRENT.value);
+      else link.removeAttribute(RAIL_CURRENT.name);
+    }
+  };
+  mark((pairs.find((pair) => pair.hash === window.location.hash) ?? pairs[0]).link);
+
+  const inView = new Set<unknown>();
+  const observer = new Observer(
+    (entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) inView.add(entry.target);
+        else inView.delete(entry.target);
+      }
+      // The last section in document order that is in the band: the one
+      // whose start the reader has most recently passed. A section scrolled
+      // to the top leaves the tail of the one before it in the band too, and
+      // the later one is the one being read. With none in view the marker
+      // stays put.
+      const last = [...pairs].reverse().find((pair) => inView.has(pair.target));
+      if (last) mark(last.link);
+    },
+    { rootMargin: RAIL_ROOT_MARGIN },
+  );
+  for (const { target } of pairs) observer.observe(target as unknown as Element);
+
+  // The browser still follows the link and scrolls to the section; focus
+  // moves there too, without a second scroll, so the next Tab continues from
+  // the section a keyboard user chose.
+  const onClick = (event: Event): void => {
+    const origin = event.target as { closest?: (selector: string) => unknown } | null;
+    const link = typeof origin?.closest === "function" ? origin.closest("a") : null;
+    const pair = pairs.find((each) => each.link === link);
+    if (!pair) return;
+    mark(pair.link);
+    pair.target.focus({ preventScroll: true });
+  };
+  nav.addEventListener("click", onClick);
+
+  return () => {
+    observer.disconnect();
+    nav.removeEventListener("click", onClick);
+    for (const { link } of pairs) link.removeAttribute(RAIL_CURRENT.name);
+  };
+}
+
+export type SectionRailProps = {
+  readonly sections: readonly RailSection[];
+  // The visible label above the list ("On this page").
+  readonly label: string;
+  // The nav's accessible name ("Sections of this case study").
+  readonly ariaLabel: string;
+};
+
+export function SectionRail({ sections, label, ariaLabel }: SectionRailProps) {
+  const ref = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const nav = ref.current;
+    if (nav === null) return;
+    return startSectionRail({ nav, document, window, IntersectionObserver: window.IntersectionObserver });
+  }, []);
+  return (
+    <nav ref={ref} aria-label={ariaLabel} className={styles.rail}>
+      <p className={styles.label}>{label}</p>
+      <ol className={styles.list}>
+        {sections.map(({ id, label: itemLabel }) => (
+          <li key={id} className={styles.item}>
+            <a href={`#${id}`} className={styles.link}>
+              {itemLabel}
+            </a>
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
+}

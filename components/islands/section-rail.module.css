@@ -1,0 +1,75 @@
+/* {components.section-rail}: the label, then the in-page anchors, each with
+   a hairline rule on top and numbered 01 onward by a CSS counter in
+   {typography.stage-number}. Items in {typography.ui}, muted; the current
+   one in {colors.accent} at 600. Sticky beside the body from 768px; below
+   it a static {colors.panel} box above the body. Every switch is a
+   --component-section-rail-* pair remapped in breakpoints.css. */
+.rail {
+  position: var(--component-section-rail-position);
+  top: var(--space-stack-lg);
+  align-self: start;
+  min-width: 0;
+  padding: var(--component-section-rail-padding);
+  border: var(--component-section-rail-border);
+  background: var(--component-section-rail-background);
+}
+
+.label {
+  margin: 0 0 var(--space-stack-sm);
+  font-family: var(--type-meta-label-family);
+  font-size: var(--type-meta-label-size);
+  font-weight: var(--type-meta-label-weight);
+  line-height: var(--type-meta-label-leading);
+  letter-spacing: var(--type-meta-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: rail;
+}
+
+.item {
+  counter-increment: rail;
+}
+
+/* Inside a nav, so no underline is required (EXPERIENCE.md link
+   affordance); the current anchor is marked by colour, weight and
+   aria-current. */
+.link {
+  display: flex;
+  gap: var(--component-section-rail-counter-gap);
+  align-items: baseline;
+  padding: var(--component-section-rail-item-padding);
+  border-top: var(--space-rule-hairline) solid var(--color-rule);
+  font-family: var(--type-ui-family);
+  font-size: var(--type-ui-size);
+  font-weight: var(--type-ui-weight);
+  line-height: var(--type-ui-leading);
+  color: var(--color-muted);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.link::before {
+  content: counter(rail, decimal-leading-zero);
+  flex: none;
+  font-family: var(--type-stage-number-family);
+  font-size: var(--type-stage-number-size);
+  font-weight: var(--type-stage-number-weight);
+  line-height: var(--type-stage-number-leading);
+  letter-spacing: var(--type-stage-number-tracking);
+  font-variant-numeric: tabular-nums;
+}
+
+.link:hover {
+  text-decoration-line: underline;
+}
+
+.link[aria-current="true"] {
+  font-weight: var(--component-section-rail-current-weight);
+  color: var(--color-accent);
+}
