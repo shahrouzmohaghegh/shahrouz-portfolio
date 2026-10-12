@@ -30,8 +30,8 @@ type RailTarget = { focus(options?: FocusOptions): void };
 
 export type SectionRailEnvironment = {
   nav: { querySelectorAll(selector: string): ArrayLike<RailLink> } & Pick<EventTarget, "addEventListener" | "removeEventListener">;
-  document: { getElementById(id: string): RailTarget | null };
-  window: { location: Pick<Location, "hash"> };
+  document: { getElementById(id: string): RailTarget | null; documentElement: Pick<Element, "scrollHeight"> };
+  window: { location: Pick<Location, "hash"> } & Pick<Window, "scrollY" | "innerHeight" | "addEventListener" | "removeEventListener">;
   IntersectionObserver: typeof IntersectionObserver | undefined;
 };
 
@@ -55,19 +55,24 @@ export function startSectionRail({ nav, document, window, IntersectionObserver: 
   mark((pairs.find((pair) => pair.hash === window.location.hash) ?? pairs[0]).link);
 
   const inView = new Set<unknown>();
+  // Scrolled to the bottom, the last section is current: one shorter than
+  // the 60 percent below the band never reaches the band by scrolling.
+  // Otherwise the last section in document order that is in the band: the
+  // one whose start the reader has most recently passed. A section scrolled
+  // to the top leaves the tail of the one before it in the band too, and the
+  // later one is the one being read. With none in view the marker stays put.
+  const update = (): void => {
+    const atBottom = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 1;
+    const last = atBottom ? pairs[pairs.length - 1] : [...pairs].reverse().find((pair) => inView.has(pair.target));
+    if (last) mark(last.link);
+  };
   const observer = new Observer(
     (entries) => {
       for (const entry of entries) {
         if (entry.isIntersecting) inView.add(entry.target);
         else inView.delete(entry.target);
       }
-      // The last section in document order that is in the band: the one
-      // whose start the reader has most recently passed. A section scrolled
-      // to the top leaves the tail of the one before it in the band too, and
-      // the later one is the one being read. With none in view the marker
-      // stays put.
-      const last = [...pairs].reverse().find((pair) => inView.has(pair.target));
-      if (last) mark(last.link);
+      update();
     },
     { rootMargin: RAIL_ROOT_MARGIN },
   );
@@ -76,7 +81,11 @@ export function startSectionRail({ nav, document, window, IntersectionObserver: 
   // The browser still follows the link and scrolls to the section; focus
   // moves there too, without a second scroll, so the next Tab continues from
   // the section a keyboard user chose.
+  // A modified or non-primary click opens a new tab or window, so this tab's
+  // focus and marker stay where they are.
   const onClick = (event: Event): void => {
+    const mouse = event as MouseEvent;
+    if (mouse.defaultPrevented || (mouse.button ?? 0) !== 0 || mouse.ctrlKey || mouse.metaKey || mouse.shiftKey || mouse.altKey) return;
     const origin = event.target as { closest?: (selector: string) => unknown } | null;
     const link = typeof origin?.closest === "function" ? origin.closest("a") : null;
     const pair = pairs.find((each) => each.link === link);
@@ -85,10 +94,12 @@ export function startSectionRail({ nav, document, window, IntersectionObserver: 
     pair.target.focus({ preventScroll: true });
   };
   nav.addEventListener("click", onClick);
+  window.addEventListener("scroll", update, { passive: true });
 
   return () => {
     observer.disconnect();
     nav.removeEventListener("click", onClick);
+    window.removeEventListener("scroll", update);
     for (const { link } of pairs) link.removeAttribute(RAIL_CURRENT.name);
   };
 }

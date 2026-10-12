@@ -24,7 +24,6 @@ components/      Server components; read content, never import upward
   islands/       The only client components, each named in the architecture
 content/         Typed content as data; imports nothing from components/ or app/
 public/          Static files served as they are: the hero portrait
-proxy.ts         The Next.js proxy: answers an unwritten case study with its not-found page and a 404
 lib/             Shared logic used by routes and components
 styles/          tokens.css (every design value), breakpoints.css (the only breakpoint),
                  reveal.css (the scroll reveal and its print reset) and focus.css (the focus ring)
@@ -32,6 +31,8 @@ scripts/         Repository checks and tooling, in TypeScript, each with tests
 .github/         The CI gate, the production watch, the monthly pin review and Dependabot settings
 .githooks/       Local pre-commit and commit-msg hooks
 _bmad-output/    The published subset of the planning documents
+mdx-components.tsx  The components every MDX file can use (Section), required by @next/mdx
+proxy.ts         The Next.js proxy: answers an unwritten case study with its not-found page and a 404
 ```
 
 `content/ad-10-probe.ts` and `components/ad-6-probe.ts` are deliberate probes that keep the lint rules on import direction firing; they are not dead code. The second rule (AD-6) keeps `app/` and `components/` reading evidence only through `lib/evidence.ts`: it forbids importing `content/case-studies`, `content/projects` and `lib/evidence-types.ts` directly. AD-6 is about evidence, so the rest of `content/` is outside it.
@@ -178,7 +179,7 @@ Two repository settings keep this cheap:
 
 Two layers tell Shahrouz when production breaks, so a visitor never has to.
 
-- **In the repository:** four times an hour `.github/workflows/production-watch.yml` runs `scripts/production-watch.mts`. It checks that `https://shahrouzmohaghegh.com/` answers 200 with his name on the page; that `https://www.`, `http://` and `http://www.` each redirect (308) to it; and that the latest GitHub deployment in the `Production` environment, which Vercel records, has neither failed nor sat queued or in progress for over 30 minutes. A check must fail on three passes a minute apart to count, and an open issue closes only after three clean passes, so a blip changes nothing. While anything is wrong, one issue, "Production is down", stays open, assigned to Shahrouz and labelled `production`, listing the problems; it gets a comment only when the set of failing checks changes, and closes itself with a "Recovered" comment. Only issues and comments written by the GitHub Actions bot count, so nobody else can silence or close an alert. It needs no secret beyond the job's own token, and touches issues only inside GitHub Actions.
+- **In the repository:** four times an hour `.github/workflows/production-watch.yml` runs `scripts/production-watch.mts`. It checks that `https://shahrouzmohaghegh.com/` answers 200 with his name on the page; that `https://www.`, `http://` and `http://www.` each redirect (308) to it; that a case-study URL that will never exist and `https://shahrouzmohaghegh.com/case-study-not-available` each answer 404 with the h1 "This case study is not available." in the HTML, so a Next.js change that brought back a blank or 200 not-found page (see the proxy under How it is structured) is caught on the live server; and that the latest GitHub deployment in the `Production` environment, which Vercel records, has neither failed nor sat queued or in progress for over 30 minutes. A check must fail on three passes a minute apart to count, and an open issue closes only after three clean passes, so a blip changes nothing. While anything is wrong, one issue, "Production is down", stays open, assigned to Shahrouz and labelled `production`, listing the problems; it gets a comment only when the set of failing checks changes, and closes itself with a "Recovered" comment. Only issues and comments written by the GitHub Actions bot count, so nobody else can silence or close an alert. It needs no secret beyond the job's own token, and touches issues only inside GitHub Actions.
 - **Outside it:** an UptimeRobot keyword monitor in Shahrouz's own account requests the apex every five minutes and alerts him by email when the page stops answering or no longer contains his name. It never pauses and does not depend on GitHub, which can delay or skip scheduled runs. Its configuration lives in that account, not here.
 
 After a Vercel instant rollback the site recovers, but the deployment problem stays open until a new deploy succeeds, because the latest commit on `main` is not what is live.

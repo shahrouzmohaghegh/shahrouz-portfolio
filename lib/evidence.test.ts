@@ -86,15 +86,27 @@ function mdxProblems(collection: string, items: readonly EvidenceItem[], files: 
 }
 
 // A written case study (non-empty MDX) holds exactly the five sections, in
-// CASE_STUDY_SECTIONS order, each as one <Section name="...">. An empty
-// file is unwritten and is not checked here; it gets no page.
+// CASE_STUDY_SECTIONS order, each as one <Section name="..."> (the name in
+// double or single quotes, or a braced string), and nothing else: no text
+// outside a Section, and no Markdown heading anywhere, since each section's
+// only heading is the h2 Section renders. An empty file is unwritten and is
+// not checked here; it gets no page.
+const SECTION_NAME = /\bname=(?:"([^"]*)"|'([^']*)'|\{\s*"([^"]*)"\s*\}|\{\s*'([^']*)'\s*\})/;
+
 function sectionProblems(slug: string, source: string): string[] {
   if (!isWritten(source)) return [];
   const expected = CASE_STUDY_SECTIONS.map((section) => section.id);
   const tags = [...source.matchAll(/<Section\b[^>]*>/g)].map(([tag]) => tag);
-  const names = tags.map((tag) => tag.match(/\bname="([^"]*)"/)?.[1]);
+  const names = tags.map((tag) => {
+    const match = tag.match(SECTION_NAME);
+    return match ? (match[1] ?? match[2] ?? match[3] ?? match[4]) : undefined;
+  });
   const problems: string[] = [];
   if (names.includes(undefined)) problems.push(`case-studies: "${slug}" has a <Section> with no name="..."`);
+  const outside = source.replace(/<Section\b[^>]*>[\s\S]*?<\/Section>/g, "").trim();
+  if (outside !== "") problems.push(`case-studies: "${slug}" has content outside a <Section>: "${outside.slice(0, 40)}"`);
+  const headings = source.split("\n").filter((line) => /^ {0,3}#{1,6}(\s|$)/.test(line));
+  if (headings.length > 0) problems.push(`case-studies: "${slug}" has a Markdown heading ("${headings[0].trim()}"); Section renders each section's only heading`);
   const found = names.filter((name): name is string => name !== undefined);
   if (found.join(",") !== expected.join(",")) {
     problems.push(
@@ -456,13 +468,50 @@ describe("the integrity checks", () => {
     ["an extra section", ["context", "decisions", "actions", "outcome", "lessons", "appendix"]],
     ["a repeated section", ["context", "decisions", "decisions", "actions", "outcome", "lessons"]],
     ["sections out of order", ["context", "actions", "decisions", "outcome", "lessons"]],
-    ["prose with no section at all", []],
   ])("%s is named, with the slug", (_label, names) => {
-    const source = names.length === 0 ? "Just prose." : names.map(section).join("\n\n");
-    const problems = sectionProblems("x", source);
+    const problems = sectionProblems("x", names.map(section).join("\n\n"));
     expect(problems).toHaveLength(1);
     expect(problems[0]).toContain('"x" sections are');
     expect(problems[0]).toContain("[context, decisions, actions, outcome, lessons]");
+  });
+
+  test("single-quoted and braced string names count as names", () => {
+    const names = ["context", "decisions", "actions", "outcome", "lessons"];
+    const forms = [(n: string) => `name='${n}'`, (n: string) => `name={"${n}"}`, (n: string) => `name={ '${n}' }`];
+    for (const form of forms) {
+      const source = names.map((n) => `<Section ${form(n)}>\n\nProse.\n\n</Section>`).join("\n\n");
+      expect(sectionProblems("x", source), form("context")).toEqual([]);
+    }
+  });
+
+  test("prose with no section at all is named twice: the sections and the stray content", () => {
+    const problems = sectionProblems("x", "Just prose.");
+    expect(problems).toEqual([
+      'case-studies: "x" has content outside a <Section>: "Just prose."',
+      'case-studies: "x" sections are []; a written case study needs exactly [context, decisions, actions, outcome, lessons], in that order',
+    ]);
+  });
+
+  test("content outside the sections is named, with the slug", () => {
+    expect(sectionProblems("x", `Intro line.\n\n${fiveSections}`)).toEqual(['case-studies: "x" has content outside a <Section>: "Intro line."']);
+    expect(sectionProblems("x", `${fiveSections}\n\nA closing word.`)).toEqual([
+      'case-studies: "x" has content outside a <Section>: "A closing word."',
+    ]);
+  });
+
+  test.each([
+    ["inside a section", `<Section name="context">\n\n## Background\n\nProse.\n\n</Section>`],
+    ["a level-six heading", `<Section name="context">\n\n###### Small\n\n</Section>`],
+  ])("a Markdown heading %s is named, with the slug", (_label, first) => {
+    const source = [first, ...["decisions", "actions", "outcome", "lessons"].map(section)].join("\n\n");
+    const problems = sectionProblems("x", source);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/^case-studies: "x" has a Markdown heading \("#+ \w+"\)/);
+  });
+
+  test("a hash that is not a heading passes", () => {
+    const source = fiveSections.replace("Prose.", "Issue #12 and #hashtag, mid-line.");
+    expect(sectionProblems("x", source)).toEqual([]);
   });
 
   test("a section with no name is named", () => {
