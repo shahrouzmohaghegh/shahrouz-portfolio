@@ -9,8 +9,9 @@
 // read the static markup. A dynamic route ([slug]) is rendered for a real
 // slug, with lib/evidence mocked to treat that case study as written and to
 // give it an empty body, since every MDX is empty until Story 3.3 and an
-// unwritten slug renders the not-found page instead. A header or footer inside <main> (an article's own
-// header, say) is not a landmark and is not counted.
+// unwritten slug renders the not-found page instead. A header or footer
+// inside <main> (an article's own header, say) is not a landmark and is not
+// counted.
 
 import { readdirSync } from "node:fs";
 import { join, relative, sep } from "node:path";

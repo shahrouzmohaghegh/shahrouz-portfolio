@@ -6,17 +6,28 @@
   padding: var(--space-section) var(--space-margin) var(--space-stack-xl);
 }
 
+/* "Case study", then the list of capabilities, wrapping as one line of
+   eyebrows. */
 .eyebrows {
   display: flex;
   flex-wrap: wrap;
   column-gap: var(--space-stack-sm);
   row-gap: var(--space-stack-xs);
   margin: 0 0 var(--space-stack-md);
+}
+
+.capabilities {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--space-stack-sm);
+  row-gap: var(--space-stack-xs);
+  margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .eyebrow {
+  margin: 0;
   font-family: var(--type-meta-label-family);
   font-size: var(--type-meta-label-size);
   font-weight: var(--component-case-study-eyebrow-weight);

@@ -20,7 +20,16 @@ const SECTIONS = [
 
 type Entry = { target: FakeSection; isIntersecting: boolean };
 type Callback = (entries: Entry[]) => void;
-type Listener = (event: { target: unknown }) => void;
+type ClickEvent = {
+  target: unknown;
+  defaultPrevented?: boolean;
+  button?: number;
+  ctrlKey?: boolean;
+  metaKey?: boolean;
+  shiftKey?: boolean;
+  altKey?: boolean;
+};
+type Listener = (event: ClickEvent) => void;
 
 class FakeSection {
   readonly id: string;
@@ -87,7 +96,10 @@ function setup({ hash = "", observer = true }: { hash?: string; observer?: boole
   const sections = SECTIONS.map(({ id }) => new FakeSection(id));
   const links = SECTIONS.map(({ id }) => new FakeLink(`#${id}`));
   const listeners = new Set<Listener>();
+  const scrollListeners = new Set<() => void>();
   const observers: FakeObserver[] = [];
+  // A page 3000px tall in an 800px viewport, scrolled to the top.
+  const page = { scrollY: 0, innerHeight: 800, scrollHeight: 3000 };
   const nav = {
     querySelectorAll: (selector: string) => (selector === 'a[href^="#"]' ? links : []),
     addEventListener: (type: string, listener: Listener) => type === "click" && listeners.add(listener),
@@ -95,8 +107,25 @@ function setup({ hash = "", observer = true }: { hash?: string; observer?: boole
   };
   const environment = {
     nav,
-    document: { getElementById: (id: string) => sections.find((section) => section.id === id) ?? null },
-    window: { location: { hash } },
+    document: {
+      getElementById: (id: string) => sections.find((section) => section.id === id) ?? null,
+      documentElement: {
+        get scrollHeight() {
+          return page.scrollHeight;
+        },
+      },
+    },
+    window: {
+      location: { hash },
+      get scrollY() {
+        return page.scrollY;
+      },
+      get innerHeight() {
+        return page.innerHeight;
+      },
+      addEventListener: (type: string, listener: () => void) => type === "scroll" && scrollListeners.add(listener),
+      removeEventListener: (type: string, listener: () => void) => type === "scroll" && scrollListeners.delete(listener),
+    },
     IntersectionObserver: observer
       ? class {
           constructor(callback: Callback, options: IntersectionObserverInit) {
@@ -108,13 +137,59 @@ function setup({ hash = "", observer = true }: { hash?: string; observer?: boole
       : undefined,
   } as unknown as SectionRailEnvironment;
   const current = (): string[] => links.filter((link) => link.getAttribute("aria-current") === "true").map((link) => link.getAttribute("href") ?? "");
-  const click = (target: unknown): void => listeners.forEach((listener) => listener({ target }));
-  return { sections, links, listeners, observers, environment, current, click };
+  const click = (target: unknown, modifiers: Omit<ClickEvent, "target"> = {}): void =>
+    listeners.forEach((listener) => listener({ target, button: 0, ...modifiers }));
+  const scrollTo = (y: number): void => {
+    page.scrollY = y;
+    scrollListeners.forEach((listener) => listener());
+  };
+  return { sections, links, listeners, scrollListeners, observers, environment, current, click, scrollTo };
 }
 
 describe("startSectionRail", () => {
   test("the current marker is aria-current=\"true\"", () => {
     expect(RAIL_CURRENT).toEqual({ name: "aria-current", value: "true" });
+  });
+
+  test("the band is the top 40 percent of the viewport", () => {
+    expect(RAIL_ROOT_MARGIN).toBe("0px 0px -60% 0px");
+  });
+
+  test("scrolled to the bottom, the last anchor is current even if its section never reached the band", () => {
+    const { current, environment, observers, sections, scrollTo } = setup();
+    startSectionRail(environment);
+    observers[0].fire([sections[3], true]);
+    expect(current()).toEqual(["#outcome"]);
+    scrollTo(2198);
+    expect(current()).toEqual(["#outcome"]);
+    scrollTo(2200);
+    expect(current()).toEqual(["#lessons"]);
+    // Back up: the section in the band is current again.
+    scrollTo(2000);
+    expect(current()).toEqual(["#outcome"]);
+  });
+
+  test("an observer callback at the bottom also marks the last anchor", () => {
+    const { current, environment, observers, sections, scrollTo } = setup();
+    startSectionRail(environment);
+    scrollTo(2200);
+    observers[0].fire([sections[3], true]);
+    expect(current()).toEqual(["#lessons"]);
+  });
+
+  test.each([
+    ["Ctrl", { ctrlKey: true }],
+    ["Cmd", { metaKey: true }],
+    ["Shift", { shiftKey: true }],
+    ["Alt", { altKey: true }],
+    ["a middle", { button: 1 }],
+    ["an already handled", { defaultPrevented: true }],
+  ])("%s click leaves focus and the marker alone", (_label, modifiers) => {
+    const { current, environment, links, sections, click } = setup();
+    startSectionRail(environment);
+    click(links[2], modifiers);
+    expect(current()).toEqual(["#context"]);
+    expect(sections[2].focused).toEqual([]);
   });
 
   test("with script, exactly one anchor is current from the start: the first", () => {
@@ -191,10 +266,11 @@ describe("startSectionRail", () => {
   });
 
   test("without IntersectionObserver nothing happens: no aria-current, no listener", () => {
-    const { current, environment, listeners } = setup({ observer: false });
+    const { current, environment, listeners, scrollListeners } = setup({ observer: false });
     const stop = startSectionRail(environment);
     expect(current()).toEqual([]);
     expect(listeners.size).toBe(0);
+    expect(scrollListeners.size).toBe(0);
     expect(() => stop()).not.toThrow();
   });
 
@@ -206,12 +282,14 @@ describe("startSectionRail", () => {
     expect(current()).toEqual(["#decisions"]);
   });
 
-  test("the cleanup disconnects, removes the listener and the marker", () => {
-    const { current, environment, observers, listeners } = setup();
+  test("the cleanup disconnects, removes the listeners and the marker", () => {
+    const { current, environment, observers, listeners, scrollListeners } = setup();
     const stop = startSectionRail(environment);
+    expect(scrollListeners.size).toBe(1);
     stop();
     expect(observers[0].disconnected).toBe(true);
     expect(listeners.size).toBe(0);
+    expect(scrollListeners.size).toBe(0);
     expect(current()).toEqual([]);
   });
 });

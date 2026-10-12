@@ -53,14 +53,17 @@ export default async function CaseStudyPage({ params }: Props) {
   return (
     <SiteFrame current="/experience">
       <header className={styles.head}>
-        <ul className={styles.eyebrows}>
-          <li className={styles.eyebrow}>{caseStudyPage.eyebrow}</li>
-          {item.capabilities.map((capability) => (
-            <li key={capability} className={styles.eyebrow}>
-              {CAPABILITY_NAME[capability]}
-            </li>
-          ))}
-        </ul>
+        {/* "Case study" sits before the list, so the list holds the capabilities only. */}
+        <div className={styles.eyebrows}>
+          <p className={styles.eyebrow}>{caseStudyPage.eyebrow}</p>
+          <ul className={styles.capabilities}>
+            {item.capabilities.map((capability) => (
+              <li key={capability} className={styles.eyebrow}>
+                {CAPABILITY_NAME[capability]}
+              </li>
+            ))}
+          </ul>
+        </div>
         <h1 className={styles.title}>{item.title}</h1>
         <p className={styles.dek}>{item.summary}</p>
       </header>

@@ -1,6 +1,7 @@
 /* A detail route's not-found page: the padding of a route shell
    (app/shell.module.css, not composed from here, since components never
-   reach into app/) and the h1 in {typography.page-title}, on paper, one sentence in {typography.body-lead}, then three links in
+   reach into app/) and the h1 in {typography.page-title}, on paper, one
+   sentence in {typography.body-lead}, then three links in
    {components.cross-listing-link} style, each underlined so the signal is
    never colour alone. */
 .notFound {

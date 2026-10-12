@@ -7,10 +7,13 @@
 // components/islands/section-rail.test.ts.
 //
 // Matrix (spec I/O table): a written slug renders the header, a rail of five,
-// the sections in order and the next link; an empty or unknown slug calls
-// notFound(), which serves this segment's not-found page with a 404; the last
-// written item's next link wraps to the first; one written item has no next
-// link. Malformed MDX is the integrity suite's (lib/evidence.test.ts).
+// the sections in order and the next link; the last written item's next link
+// wraps to the first; one written item has no next link. An empty or unknown
+// slug is answered by proxy.ts first, with the static
+// app/case-study-not-available page and a 404 (lib/not-found-rewrite.test.ts
+// covers the rewrite; this suite covers the page). Should one reach this route
+// anyway, the page calls notFound() as the fallback, serving this segment's
+// not-found.tsx. Malformed MDX is the integrity suite's (lib/evidence.test.ts).
 
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -58,6 +61,11 @@ const params = (slug: string) => ({ params: Promise.resolve({ slug }) });
 const decode = (s: string): string =>
   s.replace(/&#x27;|&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
 const text = (fragment: string): string => decode(fragment.replace(/<[^>]*>/g, " ")).replace(/\s+/g, " ").trim();
+// The hrefs the Primary nav marks with aria-current.
+const primaryCurrent = (html: string): string[] => {
+  const nav = html.match(/<nav [^>]*aria-label="Primary"[^>]*>([\s\S]*?)<\/nav>/)?.[1] ?? "";
+  return [...nav.matchAll(/<a ([^>]*)>/g)].filter(([, attrs]) => /aria-current=/.test(attrs)).map(([, attrs]) => attrs.match(/href="([^"]*)"/)?.[1] ?? "");
+};
 const mainOf = (html: string): string => html.slice(html.search(/<main[\s>]/), html.lastIndexOf("</main>"));
 const source = (path: string): string => readFileSync(join(process.cwd(), path), "utf8");
 
@@ -80,8 +88,10 @@ describe("a written case study", () => {
     state.written = [first.slug, second.slug];
     const main = mainOf(await renderPage(first.slug));
     const header = main.slice(0, main.indexOf("</header>"));
+    // "Case study" is its own element before the list, so the list holds the capabilities only.
+    expect(header).toMatch(new RegExp(`<p[^>]*>${caseStudyPage.eyebrow}</p><ul`));
     const eyebrows = [...header.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/g)].map((m) => text(m[1]));
-    expect(eyebrows).toEqual([caseStudyPage.eyebrow, ...first.capabilities.map((c) => CAPABILITY_NAME[c])]);
+    expect(eyebrows).toEqual(first.capabilities.map((c) => CAPABILITY_NAME[c]));
     expect(header).toMatch(new RegExp(`<h1[^>]*>${first.title}</h1>`));
     expect(decode(header)).toContain(`>${first.summary}</p>`);
     expect(header.indexOf("<h1")).toBeLessThan(header.indexOf(first.summary.slice(0, 20)));
@@ -147,6 +157,11 @@ describe("a written case study", () => {
     expect(text(main)).not.toContain(caseStudyPage.nextLabel);
   });
 
+  test("the primary nav marks Experience as the current item", async () => {
+    state.written = [first.slug];
+    expect(primaryCurrent(await renderPage(first.slug))).toEqual(["/experience"]);
+  });
+
   test("the title is the item's title, with the site name added once by the root template, and the description its summary", async () => {
     state.written = [first.slug];
     const metadata = await route.generateMetadata(params(first.slug));
@@ -158,7 +173,8 @@ describe("a written case study", () => {
   });
 });
 
-describe("an unwritten or unknown case study", () => {
+// The fallback: proxy.ts answers these slugs before the route is reached.
+describe("an unwritten or unknown case study that reaches the route", () => {
   test("only written case studies are generated", () => {
     state.written = [];
     expect(route.generateStaticParams()).toEqual([]);
@@ -166,23 +182,23 @@ describe("an unwritten or unknown case study", () => {
     expect(route.generateStaticParams()).toEqual([{ slug: first.slug }, { slug: third.slug }]);
   });
 
-  test("an empty MDX is not found, page and metadata alike", async () => {
+  test("an empty MDX falls back to notFound(), page and metadata alike", async () => {
     state.written = [first.slug];
     await expectNotFound(() => renderPage(second.slug));
     await expectNotFound(() => route.generateMetadata(params(second.slug)));
   });
 
-  test("an unknown slug is not found", async () => {
+  test("an unknown slug falls back to notFound()", async () => {
     state.written = [first.slug];
     await expectNotFound(() => renderPage("nope"));
   });
 
-  test("an ungenerated slug reaches the page, so notFound() serves this segment's not-found page", () => {
+  test("the fallback keeps dynamicParams at its default, so notFound() serves this segment's not-found page", () => {
     // dynamicParams = false would answer it with the root app/not-found.tsx instead.
     expect("dynamicParams" in route).toBe(false);
   });
 
-  test("the not-found page: the h1, one sentence, then Experience, Projects and Home", () => {
+  test("the fallback not-found page: the h1, one sentence, then Experience, Projects and Home", () => {
     const main = mainOf(renderToStaticMarkup(<NotFoundPage />));
     expect(main).toMatch(/<h1[^>]*>This case study is not available\.<\/h1>/);
     expect(main).toMatch(/<p[^>]*>The page may have moved, or the link may be incomplete\.<\/p>/);
@@ -204,6 +220,10 @@ describe("the static case-study not-found page", () => {
   test("renders the same h1, sentence and three links as not-found.tsx", () => {
     expect(main).toBe(mainOf(renderToStaticMarkup(<NotFoundPage />)));
     expect(main).toMatch(/<h1[^>]*>This case study is not available\.<\/h1>/);
+  });
+
+  test("marks no primary nav item as current", () => {
+    expect(primaryCurrent(renderToStaticMarkup(<target.default />))).toEqual([]);
   });
 
   test("keeps the tab title and asks for noindex", () => {

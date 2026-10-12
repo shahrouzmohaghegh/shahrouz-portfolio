@@ -6,9 +6,12 @@ import { caseStudyPage } from "@/content/case-study-page";
 
 export const metadata: Metadata = { title: caseStudyPage.notFound.title };
 
-// The case-study not-found page (AD-23): an unwritten or unknown slug under
-// /experience lands here with a 404, not on the catch-all app/not-found.tsx.
-// The frame marks no nav item, like every not-found page.
+// The fallback case-study not-found page (AD-23). An unwritten or unknown
+// slug under /experience is answered by proxy.ts first, which rewrites it
+// with a 404 to the static app/case-study-not-available page, because
+// Next.js 16.3.8 renders this file only on the client (blank with
+// JavaScript off). This page serves only a notFound() that still reaches
+// the route. The frame marks no nav item, like every not-found page.
 export default function CaseStudyNotFound() {
   const { heading, body, links } = caseStudyPage.notFound;
   return (
