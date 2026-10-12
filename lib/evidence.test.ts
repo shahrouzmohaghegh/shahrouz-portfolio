@@ -19,6 +19,7 @@ import {
   caseStudyItems,
   evidenceItems,
   inCanonicalOrder,
+  listingTitle,
   projectItems,
   type Capabilities,
   type EvidenceItem,
@@ -251,6 +252,24 @@ describe("the content collections", () => {
       evidenceItems.map((item) => item.slug),
       "Order in content/*/index.ts is display order. Confirm a reorder, an addition or a removal by updating DISPLAY_ORDER in lib/evidence.test.ts.",
     ).toEqual(DISPLAY_ORDER);
+  });
+});
+
+// The one listing-title function (AD-16). It returns the bare segment; the
+// root layout's template adds " | Shahrouz Mohaghegh", so the suffix appears
+// once. Epic 4 extends it with the selected capability.
+describe("the listing title", () => {
+  test.each([
+    ["case-study", "Experience"],
+    ["project", "Projects"],
+  ] as const)("%s listing is titled %s", (kind, title) => {
+    expect(listingTitle(kind)).toBe(title);
+  });
+
+  test("each kind's title is distinct and carries no site-name suffix", () => {
+    const titles = (Object.keys(EVIDENCE_ROUTE) as Array<keyof typeof EVIDENCE_ROUTE>).map(listingTitle);
+    expect(new Set(titles).size).toBe(titles.length);
+    for (const title of titles) expect(title).not.toMatch(/Shahrouz|\|/);
   });
 });
 

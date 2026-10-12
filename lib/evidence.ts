@@ -10,7 +10,7 @@
 
 import { caseStudies } from "@/content/case-studies";
 import { projects } from "@/content/projects";
-import { CAPABILITIES, type Capabilities, type EvidenceItem } from "@/lib/evidence-types";
+import { CAPABILITIES, type Capabilities, type EvidenceItem, type EvidenceKind } from "@/lib/evidence-types";
 
 // Everything consumers need, and not CaseStudy or Project (AD-6).
 export {
@@ -40,3 +40,14 @@ function expose(item: EvidenceItem): EvidenceItem {
 export const caseStudyItems: readonly EvidenceItem[] = caseStudies.map(expose);
 export const projectItems: readonly EvidenceItem[] = projects.map(expose);
 export const evidenceItems: readonly EvidenceItem[] = [...caseStudyItems, ...projectItems];
+
+// The one listing title (AD-16): /experience and /projects both export
+// metadata.title from it, so no route composes its own. It returns the bare
+// segment, and the root layout's template adds " | Shahrouz Mohaghegh", so
+// the suffix appears once. Unfiltered only; Epic 4 extends it with the
+// selected capability.
+const LISTING_TITLE = { "case-study": "Experience", project: "Projects" } as const satisfies Record<EvidenceKind, string>;
+
+export function listingTitle(kind: EvidenceKind): string {
+  return LISTING_TITLE[kind];
+}
