@@ -17,11 +17,12 @@ import styles from "./case-study.module.css";
 type Props = { params: Promise<{ slug: string }> };
 
 // One page per written case study, generated at build. A case study whose
-// MDX is still empty gets no page: it, like any unknown slug, reaches the
-// page on request, which calls notFound() and so serves this segment's
-// not-found.tsx with a 404. dynamicParams stays at its default on purpose:
-// set to false, Next.js answers an ungenerated slug with the root
-// app/not-found.tsx instead (measured on next start, 2026-10-12).
+// MDX is still empty gets no page. proxy.ts answers it, like any unknown
+// slug, with the static app/case-study-not-available page and a 404, before
+// this route is reached, because Next.js 16.3.8 renders a segment
+// not-found.tsx only on the client. notFound() below stays as the fallback
+// and serves this segment's not-found.tsx. dynamicParams stays at its
+// default: set to false, Next.js answers with the root not-found page.
 export function generateStaticParams(): Array<{ slug: string }> {
   return writtenCaseStudyItems().map(({ slug }) => ({ slug }));
 }

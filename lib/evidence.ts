@@ -8,11 +8,9 @@
 // This module alone will own parsing, filtering and serialising the
 // capability parameter (AD-13); that arrives with the filter.
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import type { MDXContent } from "mdx/types";
 
-import { caseStudies } from "@/content/case-studies";
+import { caseStudies, writtenCaseStudySlugs } from "@/content/case-studies";
 import { projects } from "@/content/projects";
 import { CAPABILITIES, type Capabilities, type EvidenceItem, type EvidenceKind } from "@/lib/evidence-types";
 
@@ -72,19 +70,17 @@ export type CaseStudySectionId = (typeof CASE_STUDY_SECTIONS)[number]["id"];
 
 // A case study gets a page only once its MDX is written: an empty or
 // whitespace-only file is unwritten, and its slug 404s like an unknown one.
+// The integrity suite applies this to every MDX file and fails while
+// writtenCaseStudySlugs disagrees.
 export function isWritten(source: string): boolean {
   return source.trim() !== "";
 }
 
-// Read at build, when the detail route generates its static params; the
-// route is fully static, so nothing reads these files at request time.
-function caseStudySource(slug: string): string {
-  return readFileSync(join(process.cwd(), "content", "case-studies", `${slug}.mdx`), "utf8");
-}
-
-// The case studies whose MDX is written, in collection order.
+// The case studies on the committed written list (writtenCaseStudySlugs in
+// content/case-studies/index.ts, which proxy.ts reads too), in collection
+// order.
 export function writtenCaseStudyItems(): readonly EvidenceItem[] {
-  return caseStudyItems.filter((item) => isWritten(caseStudySource(item.slug)));
+  return caseStudyItems.filter((item) => writtenCaseStudySlugs.includes(item.slug));
 }
 
 // The written case study after `slug`, wrapping from the last to the first.
