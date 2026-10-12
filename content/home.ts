@@ -39,14 +39,14 @@ export const home = {
       tag: "Cloud delivery",
       figure: "8 weeks",
       caption:
-        "Reporting service moved from the on-premise data centre to Azure with no service disruption.",
+        "Reporting service moved from the on-premise data centre to Azure, with no service disruption.",
     },
     {
       tone: "paper",
-      tag: "Security posture",
-      figure: "steadily improving Secure Score",
+      tag: "Release discipline",
+      figure: "70% fewer post-deployment hotfixes",
       caption:
-        "Microsoft Defender for Cloud Secure Score across the production environment, reported to the Digital Governance Board.",
+        "Pre-mortems and tabletop exercises before every major release, which I introduced and ran; hotfixes after deployment fell by 70% compared with the releases before them, with zero rollbacks.",
     },
   ],
   // The Selected work section below the bands (Story 2.6). Its cards come

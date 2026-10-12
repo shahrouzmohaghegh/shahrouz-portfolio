@@ -170,7 +170,8 @@ function itemProblems(item: EvidenceItem): string[] {
 // The items whose Headline Metric may stand without a qualifier. Each one is
 // a figure Shahrouz confirmed needs no scope; the escape hatch is not a way
 // round FR-34.
-const REVIEWED_UNQUALIFIED = ["career-application-system", "this-website"];
+// digital-governance-board: Shahrouz supplied its sentence on 2026-10-12; it states no figure.
+const REVIEWED_UNQUALIFIED = ["career-application-system", "digital-governance-board", "this-website"];
 
 // The display order, reviewed. index.ts order is display order, so a
 // reorder there is a content decision and is confirmed by updating this list.

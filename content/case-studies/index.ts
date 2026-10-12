@@ -9,11 +9,11 @@ export const caseStudies: readonly CaseStudy[] = [
     kind: "case-study",
     title: "Offshore delivery turnaround",
     summary:
-      "Hired and ran a Vietnam team as a direct extension of Sydney, with KPI-driven governance, shift-left quality and one set of engineering standards across both sites.",
+      "Hired and ran the Vietnam team as a direct extension of Sydney, with KPI-driven governance, shift-left quality and one set of engineering standards across both sites.",
     capabilities: ["leadership"],
     headlineMetric: {
       value: "Bad fixes cut by more than 80%",
-      qualifier: "on the Vietnam team, part of the 38-person function",
+      qualifier: "on the Vietnam team, part of the 38-person function across Sydney and Vietnam",
     },
     href: "/experience/offshore-delivery-turnaround",
   },
@@ -38,8 +38,8 @@ export const caseStudies: readonly CaseStudy[] = [
       "A two-year seat on the Digital Governance Board, reporting to the CEO, with cloud security posture and remediation progress visible to that board.",
     capabilities: ["executive-influence"],
     headlineMetric: {
-      value: "A peer of the executive team",
-      qualifier: "for two years, reporting to the CEO",
+      value: "Reported directly to the CEO and held a standing role in executive digital governance.",
+      qualifierNotRequired: true,
     },
     href: "/experience/digital-governance-board",
   },

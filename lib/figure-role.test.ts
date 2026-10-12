@@ -21,9 +21,9 @@ describe("figureRole", () => {
   });
 
   test("Home's band figures size as DESIGN.md's worked examples say", () => {
-    expect(figureRole("steady improvement")).toBe("figure");
-    expect(figureRole("cut by more than 80%")).toBe("figure-small");
-    expect(figureRole("cut by more than 80%")).toBe("figure-small");
+    expect(figureRole("8 weeks")).toBe("figure");
+    expect(figureRole("Bad fixes cut by more than 80%")).toBe("figure-small");
+    expect(figureRole("70% fewer post-deployment hotfixes")).toBe("pull-quote");
   });
 
   test("characters are counted as rendered, not as UTF-16 units", () => {
