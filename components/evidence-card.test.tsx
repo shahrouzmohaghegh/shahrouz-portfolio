@@ -3,8 +3,10 @@
 // per capability in full-name form and canonical order, an h3 whose whole
 // text is the link, the metric with its qualifier as one sentence (or the
 // value alone when no qualifier is required, with no stray separator), the
-// summary, then the CTA to the same href. The card reads only EvidenceItem
-// through lib/evidence and never imports content/.
+// summary, then the CTA to the same href. The title's level, h2 or h3, is
+// the surface's choice (headingLevel); the suite renders h3 unless a test
+// passes 2. The card reads only EvidenceItem through lib/evidence and never
+// imports content/.
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -38,7 +40,8 @@ const UNQUALIFIED: EvidenceItem = {
   href: "/projects/sample-unqualified",
 };
 
-const render = (item: EvidenceItem): string => renderToStaticMarkup(<EvidenceCard item={item} ctaLabel={CTA} />);
+const render = (item: EvidenceItem, headingLevel: 2 | 3 = 3): string =>
+  renderToStaticMarkup(<EvidenceCard item={item} ctaLabel={CTA} headingLevel={headingLevel} />);
 const textOf = (fragment: string): string => fragment.replace(/<[^>]*>/g, "").replace(/&#x27;/g, "'").replace(/&amp;/g, "&");
 const classOf = (cls: string): RegExp => new RegExp(`class="${cls}"`);
 // The opening tag and text of every element carrying the class, in order.
@@ -64,6 +67,14 @@ describe("the evidence card", () => {
     const html = render(QUALIFIED);
     const h3 = html.match(/<h3[^>]*>([\s\S]*?)<\/h3>/)?.[1] ?? "";
     expect(h3).toMatch(new RegExp(`^<a [^>]*href="${QUALIFIED.href}"[^>]*>${QUALIFIED.title}</a>$`));
+  });
+
+  test.each([2, 3] as const)("headingLevel %i renders the title as that heading, and no other", (level) => {
+    const html = render(QUALIFIED, level);
+    const headings = [...html.matchAll(/<(h[1-6])[^>]*>([\s\S]*?)<\/\1>/g)];
+    expect(headings.map((m) => m[1])).toEqual([`h${level}`]);
+    expect(headings[0][2]).toMatch(new RegExp(`^<a [^>]*id="${cardTitleId(QUALIFIED.slug)}"[^>]*href="${QUALIFIED.href}"[^>]*>${QUALIFIED.title}</a>$`));
+    expect(headings[0][0], "the title keeps its styles at either level").toContain(`class="${styles.title}"`);
   });
 
   test("the CTA links to the same href as the title", () => {

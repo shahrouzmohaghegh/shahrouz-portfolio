@@ -393,6 +393,9 @@
      a column. */
   --component-card-grid-columns-mobile: minmax(0, 1fr);
   --component-card-grid-columns: repeat(3, minmax(0, 1fr));
+  /* A listing's intro line under its h1, from screen-experience.html .sub:
+     the dek capped at 52ch, narrower than {spacing.measure-body}. */
+  --component-listing-intro-measure: 52ch;
   /* The focus indicator (DESIGN.md Focus indicator, styles/focus.css): a 2px
      outline at a 2px offset. The offset is load-bearing and never 0. */
   --component-focus-ring-width: 2px;

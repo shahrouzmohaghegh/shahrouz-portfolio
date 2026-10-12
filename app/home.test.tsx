@@ -4,7 +4,8 @@
 // site.availability, then each figure-pair row: number, words, scope. Also
 // checks the statement stays inside FR-4's 40 to 45 words, that no banned
 // word reaches the rendered Home, and that the root layout no longer asks for
-// noindex while the empty route shells still do.
+// noindex while the empty route shells still do (/experience has its
+// content now, so it no longer does).
 //
 // Below the hero (Story 2.5): exactly two evidence bands, Cloud delivery on
 // deep then Security posture on paper, each one tag, one figure and one
@@ -429,6 +430,7 @@ describe("islands on Home", () => {
       "components/home-hero.tsx",
       "components/evidence-band.tsx",
       "components/selected-work.tsx",
+      "components/card-grid.tsx",
       "components/evidence-card.tsx",
     ].flatMap((path) =>
       specifiers(source(path)).filter((specifier) => /(^|\/)islands\//.test(specifier)),
@@ -466,8 +468,11 @@ describe("indexing", () => {
     expect(homeModule.metadata.description).toBe(home.description);
   });
 
+  test("/experience has its content, so it asks for no noindex", () => {
+    expect(experienceMetadata.robots).toBeUndefined();
+  });
+
   test.each([
-    ["/experience", experienceMetadata],
     ["/projects", projectsMetadata],
     ["/contact", contactMetadata],
   ])("the empty shell %s asks for noindex, nofollow", (_route, routeMetadata) => {

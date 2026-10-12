@@ -1,0 +1,20 @@
+/* The /experience listing: the page title and section padding of a route
+   shell (app/shell.module.css), the intro line in the dek role, muted, at
+   the listing measure, then the card grid (components/card-grid.module.css). */
+.listing {
+  composes: shell from "../shell.module.css";
+}
+
+.title {
+  composes: title from "../shell.module.css";
+}
+
+.intro {
+  max-width: var(--component-listing-intro-measure);
+  margin: var(--space-stack-sm) 0 var(--space-stack-xl);
+  font-family: var(--type-dek-family);
+  font-size: var(--type-dek-size);
+  font-weight: var(--type-dek-weight);
+  line-height: var(--type-dek-leading);
+  color: var(--color-muted);
+}
