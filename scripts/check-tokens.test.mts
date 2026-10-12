@@ -95,9 +95,11 @@ describe("the real repository", () => {
     // COMPONENT_REMAPS: nav padding block; the five Home hero pairs (padding,
     // stack gap, kicker display, plate position, Explore alignment); chip
     // padding, nav item gap, size and leading, footer columns; the two
-    // evidence band gaps (tag, figure); the card grid columns
-    const expected = typeRemaps + 7 + 14;
-    assert.equal(expected, 94);
+    // evidence band gaps (tag, figure); the card grid columns; the case-study
+    // columns and the four section rail pairs (position, background, border,
+    // padding)
+    const expected = typeRemaps + 7 + 19;
+    assert.equal(expected, 99);
     assert.equal(Object.keys(expectedRemaps(groups)).length, expected);
   });
 

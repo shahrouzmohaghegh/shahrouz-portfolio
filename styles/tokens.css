@@ -396,6 +396,27 @@
   /* A listing's intro line under its h1, from screen-experience.html .sub:
      the dek capped at 52ch, narrower than {spacing.measure-body}. */
   --component-listing-intro-measure: 52ch;
+  /* The case-study detail (Story 3.2), from screen-case-study.html: a 212px
+     rail column beside the body from 768px, one column below. The rail is
+     sticky beside the body and, below 768px, a static {colors.panel} box
+     with a hairline border above it; each of those switches is a pair
+     remapped in breakpoints.css. */
+  --component-case-study-columns-mobile: minmax(0, 1fr);
+  --component-case-study-columns: 212px minmax(0, 1fr);
+  --component-section-rail-position-mobile: static;
+  --component-section-rail-position: sticky;
+  --component-section-rail-background-mobile: var(--color-panel);
+  --component-section-rail-background: transparent;
+  --component-section-rail-border-mobile: var(--space-rule-hairline) solid var(--color-rule);
+  --component-section-rail-border: none;
+  --component-section-rail-padding-mobile: 18px 18px 14px;
+  --component-section-rail-padding: 0;
+  --component-section-rail-item-padding: 8px 0;
+  --component-section-rail-counter-gap: 12px;
+  --component-section-rail-current-weight: 600;
+  /* The case-study eyebrow, from screen-case-study.html .csmeta:
+     {typography.meta-label} in {colors.accent} at 600. */
+  --component-case-study-eyebrow-weight: 600;
   /* The focus indicator (DESIGN.md Focus indicator, styles/focus.css): a 2px
      outline at a 2px offset. The offset is load-bearing and never 0. */
   --component-focus-ring-width: 2px;

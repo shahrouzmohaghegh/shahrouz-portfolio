@@ -1,0 +1,27 @@
+/* A case-study section in the body column: the h2 in
+   {typography.subsection-title}, then the prose in {typography.body}.
+   Story 3.3's content components bring their own styles. The section takes
+   focus from the rail, and styles/focus.css draws its ring. */
+.section {
+  padding-bottom: var(--space-stack-xl);
+  scroll-margin-top: var(--space-stack-lg);
+}
+
+.heading {
+  margin: 0 0 var(--space-stack-sm);
+  font-family: var(--type-subsection-title-family);
+  font-size: var(--type-subsection-title-size);
+  font-weight: var(--type-subsection-title-weight);
+  line-height: var(--type-subsection-title-leading);
+  letter-spacing: var(--type-subsection-title-tracking);
+  color: var(--color-ink);
+}
+
+.section > p {
+  margin: 0 0 var(--space-stack-sm);
+  font-family: var(--type-body-family);
+  font-size: var(--type-body-size);
+  font-weight: var(--type-body-weight);
+  line-height: var(--type-body-leading);
+  color: var(--color-ink);
+}

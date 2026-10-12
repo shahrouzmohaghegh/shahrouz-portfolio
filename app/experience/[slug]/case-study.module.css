@@ -1,0 +1,84 @@
+/* The case-study detail, from screen-case-study.html: the header (.cshead),
+   then the rail beside the body (.csgrid), then the next link (.nextlink).
+   The rail column and the stacking below 768px come from the
+   --component-case-study-columns pair in breakpoints.css. */
+.head {
+  padding: var(--space-section) var(--space-margin) var(--space-stack-xl);
+}
+
+/* "Case study", then the list of capabilities, wrapping as one line of
+   eyebrows. */
+.eyebrows {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--space-stack-sm);
+  row-gap: var(--space-stack-xs);
+  margin: 0 0 var(--space-stack-md);
+}
+
+.capabilities {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--space-stack-sm);
+  row-gap: var(--space-stack-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.eyebrow {
+  margin: 0;
+  font-family: var(--type-meta-label-family);
+  font-size: var(--type-meta-label-size);
+  font-weight: var(--component-case-study-eyebrow-weight);
+  line-height: var(--type-meta-label-leading);
+  letter-spacing: var(--type-meta-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+.title {
+  margin: 0 0 var(--space-stack-md);
+  font-family: var(--type-page-title-family);
+  font-size: var(--type-page-title-size);
+  font-weight: var(--type-page-title-weight);
+  line-height: var(--type-page-title-leading);
+  letter-spacing: var(--type-page-title-tracking);
+  color: var(--color-ink);
+  overflow-wrap: break-word;
+}
+
+.dek {
+  max-width: var(--space-measure-body);
+  margin: 0;
+  font-family: var(--type-dek-family);
+  font-size: var(--type-dek-size);
+  font-weight: var(--type-dek-weight);
+  line-height: var(--type-dek-leading);
+  color: var(--color-muted);
+}
+
+/* Row gap applies only when stacked (rail above body), column gap only side
+   by side, so neither needs a breakpoint. */
+.grid {
+  display: grid;
+  grid-template-columns: var(--component-case-study-columns);
+  gap: var(--space-stack-lg) var(--space-column-gap-desktop);
+  align-items: start;
+  padding: var(--space-stack-xl) var(--space-margin);
+}
+
+.body {
+  min-width: 0;
+  max-width: var(--space-measure-body);
+  overflow-wrap: break-word;
+}
+
+.next {
+  margin: 0;
+  padding: 0 var(--space-margin) var(--space-section);
+}
+
+.nextLink {
+  composes: ctaLink from "../../../components/cta-link.module.css";
+}

@@ -44,3 +44,9 @@ export const caseStudies: readonly CaseStudy[] = [
     href: "/experience/digital-governance-board",
   },
 ];
+
+// The case studies whose <slug>.mdx is written, in collection order. Only
+// these get a page: proxy.ts answers every other /experience/<slug> with the
+// case-study not-found page and a 404. Add a slug here in the same change
+// that writes its MDX; lib/evidence.test.ts fails while the two disagree.
+export const writtenCaseStudySlugs: readonly string[] = [];

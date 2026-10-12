@@ -17,7 +17,10 @@ import {
   HTTP_WWW,
   ISSUE_TITLE,
   LABEL,
+  MISSING_CASE_STUDY,
   NAME,
+  NOT_FOUND_HEADING,
+  NOT_FOUND_PAGE,
   PASSES,
   RETRY_MS,
   STUCK_MS,
@@ -26,6 +29,8 @@ import {
   changeComment,
   checkApex,
   checkDeployment,
+  checkNotFound,
+  checkOnce,
   checkRedirect,
   defaultHttp,
   deploymentsUrl,
@@ -52,6 +57,7 @@ import {
   type Problem,
   type Spawn,
 } from "./production-watch.mts";
+import { caseStudyPage } from "../content/case-study-page.ts";
 
 const REPO = "owner/site";
 const NOW = new Date("2026-10-09T12:00:00Z");
@@ -60,7 +66,16 @@ const DEPLOY_ID = 42;
 // ---------------------------------------------------------------- fixtures
 
 type Answer = HttpResponse | Error;
-type Site = { apex?: Answer; www?: Answer; http?: Answer; httpWww?: Answer; deployments?: Answer; statuses?: Answer };
+type Site = {
+  apex?: Answer;
+  www?: Answer;
+  http?: Answer;
+  httpWww?: Answer;
+  missing?: Answer;
+  notFoundPage?: Answer;
+  deployments?: Answer;
+  statuses?: Answer;
+};
 
 const ok = (body: string): HttpResponse => ({ status: 200, location: null, body });
 const redirect = (status: number, location: string | null): HttpResponse => ({ status, location, body: "" });
@@ -68,11 +83,15 @@ const json = (value: unknown, status = 200): HttpResponse => ({ status, location
 const deployState = (state: string, createdAt = NOW.toISOString()): HttpResponse =>
   json([{ state, target_url: "https://vercel.com/log", created_at: createdAt }]);
 
+const notFound = (body = `<main><h1 class="x">${NOT_FOUND_HEADING}</h1></main>`): HttpResponse => ({ status: 404, location: null, body });
+
 const HEALTHY: Required<Site> = {
   apex: ok(`<html><h1>${NAME}</h1></html>`),
   www: redirect(308, APEX),
   http: redirect(308, APEX),
   httpWww: redirect(308, WWW),
+  missing: notFound(),
+  notFoundPage: notFound(),
   deployments: json([{ id: DEPLOY_ID, sha: "abcdef1234567" }]),
   statuses: deployState("success"),
 };
@@ -84,6 +103,8 @@ function fakeHttp(site: Site): Http {
     [WWW]: merged.www,
     [HTTP]: merged.http,
     [HTTP_WWW]: merged.httpWww,
+    [MISSING_CASE_STUDY]: merged.missing,
+    [NOT_FOUND_PAGE]: merged.notFoundPage,
     [deploymentsUrl(REPO)]: merged.deployments,
     [statusesUrl(REPO, DEPLOY_ID)]: merged.statuses,
   };
@@ -178,6 +199,42 @@ const apexProblem: Problem = { check: "apex", detail: "x" };
 const deployProblem: Problem = { check: "deployment", detail: "y" };
 
 // ---------------------------------------------------------------- checks
+
+describe("checkNotFound", () => {
+  const cases = [
+    ["missing-case-study", MISSING_CASE_STUDY, "missing"],
+    ["not-found-page", NOT_FOUND_PAGE, "notFoundPage"],
+  ] as const;
+
+  test("the heading is the one content/case-study-page.ts renders", () => {
+    assert.equal(NOT_FOUND_HEADING, caseStudyPage.notFound.heading);
+    assert.match(MISSING_CASE_STUDY, /^https:\/\/shahrouzmohaghegh\.com\/experience\/[a-z-]+$/);
+  });
+
+  for (const [check, url, key] of cases) {
+    test(`${check}: a 404 with the h1 passes`, async () => {
+      assert.equal(await checkNotFound(fakeHttp({}), check, url), null);
+    });
+    test(`${check}: a 200 is named, with the URL and status`, async () => {
+      const problem = await checkNotFound(fakeHttp({ [key]: ok(`<h1>${NOT_FOUND_HEADING}</h1>`) }), check, url);
+      assert.deepEqual(problem, { check, detail: `${url} answered HTTP 200, not 404` });
+    });
+    test(`${check}: a blank 404 (the h1 only in the script payload) is named`, async () => {
+      const body = `<body><div hidden=""></div><script>self.__next_f.push("${NOT_FOUND_HEADING}")</script></body>`;
+      const problem = await checkNotFound(fakeHttp({ [key]: notFound(body) }), check, url);
+      assert.deepEqual(problem, { check, detail: `${url} answered 404, but the HTML has no h1 "${NOT_FOUND_HEADING}"` });
+    });
+    test(`${check}: a network error is named`, async () => {
+      const problem = await checkNotFound(fakeHttp({ [key]: new Error("timeout") }), check, url);
+      assert.deepEqual(problem, { check, detail: `${url} did not answer: timeout` });
+    });
+  }
+
+  test("checkOnce reports both, in CHECK_IDS order", async () => {
+    const problems = await checkOnce(fakeHttp({ missing: ok(""), notFoundPage: ok("") }), REPO, NOW);
+    assert.deepEqual(problems.map((p) => p.check), ["missing-case-study", "not-found-page"]);
+  });
+});
 
 describe("checkApex", () => {
   test("200 containing the name passes", async () => {
@@ -430,7 +487,7 @@ describe("planIssues", () => {
 describe("keyOf", () => {
   test("lists failing checks in a fixed order", () => {
     assert.equal(keyOf([deployProblem, apexProblem]), "apex,deployment");
-    assert.deepEqual([...CHECK_IDS], ["apex", "www", "http", "http-www", "deployment"]);
+    assert.deepEqual([...CHECK_IDS], ["apex", "www", "http", "http-www", "missing-case-study", "not-found-page", "deployment"]);
   });
 });
 

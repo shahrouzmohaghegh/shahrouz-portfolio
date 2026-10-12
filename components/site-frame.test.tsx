@@ -6,18 +6,32 @@
 // that forgets <SiteFrame> fails here by name, because the glob finds it.
 //
 // Rendered with react-dom/server under the node environment, so the checks
-// read the static markup. A header or footer inside <main> (an article's own
-// header, say) is not a landmark and is not counted.
+// read the static markup. A dynamic route ([slug]) is rendered for a real
+// slug, with lib/evidence mocked to treat that case study as written and to
+// give it an empty body, since every MDX is empty until Story 3.3 and an
+// unwritten slug renders the not-found page instead. A header or footer
+// inside <main> (an article's own header, say) is not a landmark and is not
+// counted.
 
 import { readdirSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ComponentType, ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
 import { site } from "@/content/site";
+import { caseStudyItems } from "@/lib/evidence";
 import { SiteFooter } from "./site-footer";
+
+vi.mock("@/lib/evidence", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/evidence")>();
+  return {
+    ...actual,
+    writtenCaseStudyItems: () => actual.caseStudyItems.slice(0, 1),
+    caseStudyBody: async () => () => null,
+  };
+});
 
 const APP_DIR = fileURLToPath(new URL("../app/", import.meta.url));
 const NAV_HREFS = ["/", "/experience", "/projects", "/contact"];
@@ -45,10 +59,15 @@ function routeOf(file: string): string {
   return `/${segments.join("/")}`;
 }
 
+// The params a dynamic route is rendered with: a written case study's slug.
+function paramsOf(file: string): Record<string, string> {
+  return relative(APP_DIR, file).split(sep).includes("[slug]") ? { slug: caseStudyItems[0].slug } : {};
+}
+
 // Calls the component itself first, so an async server component resolves.
 async function render(file: string): Promise<string> {
   const { default: Page } = (await import(file)) as RouteModule;
-  const props = { params: Promise.resolve({}), searchParams: Promise.resolve({}) };
+  const props = { params: Promise.resolve(paramsOf(file)), searchParams: Promise.resolve({}) };
   const element = (await (Page as (p: typeof props) => ReactNode | Promise<ReactNode>)(props)) as ReactNode;
   return renderToStaticMarkup(<>{element}</>);
 }
