@@ -21,9 +21,9 @@ describe("figureRole", () => {
   });
 
   test("Home's band figures size as DESIGN.md's worked examples say", () => {
-    expect(figureRole("20% to 76%")).toBe("figure");
-    expect(figureRole("Over 1 per fix to under 1 in 5")).toBe("figure-small");
-    expect(figureRole("above 100% to below 20%")).toBe("figure-small");
+    expect(figureRole("8 weeks")).toBe("figure");
+    expect(figureRole("Bad fixes cut by more than 80%")).toBe("figure-small");
+    expect(figureRole("70% fewer post-deployment hotfixes")).toBe("pull-quote");
   });
 
   test("characters are counted as rendered, not as UTF-16 units", () => {

@@ -35,7 +35,7 @@ export const projects: readonly Project[] = [
     kind: "project",
     title: "Platform modernisation and upgrade work",
     summary:
-      "25 microservices taken from .NET 8 to .NET 10 using agentic loops, and the reporting service reshaped onto containerised .NET Core on AKS in 8 weeks with no disruption.",
+      "Microservices taken from .NET 8 to .NET 10 using agentic loops, and a reporting service reshaped onto containerised .NET Core on AKS in 8 weeks with no disruption.",
     capabilities: ["hands-on"],
     headlineMetric: {
       value: "Unit test coverage from near zero to 95%",
