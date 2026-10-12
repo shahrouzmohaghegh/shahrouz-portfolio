@@ -72,6 +72,11 @@ export const COMPONENT_REMAPS: TokenMap = {
   "--component-evidence-band-tag-gap": "var(--component-evidence-band-tag-gap-mobile)",
   "--component-evidence-band-figure-gap": "var(--component-evidence-band-figure-gap-mobile)",
   "--component-card-grid-columns": "var(--component-card-grid-columns-mobile)",
+  "--component-case-study-columns": "var(--component-case-study-columns-mobile)",
+  "--component-section-rail-position": "var(--component-section-rail-position-mobile)",
+  "--component-section-rail-background": "var(--component-section-rail-background-mobile)",
+  "--component-section-rail-border": "var(--component-section-rail-border-mobile)",
+  "--component-section-rail-padding": "var(--component-section-rail-padding-mobile)",
 };
 
 const KNOWN_TOP_LEVEL = new Set([

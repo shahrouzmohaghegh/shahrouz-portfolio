@@ -15,12 +15,16 @@ import { CI_PATH, gateStepNames } from "@/scripts/check-readme.mts";
 import {
   CAPABILITIES,
   CAPABILITY_NAME,
+  CASE_STUDY_SECTIONS,
   EVIDENCE_ROUTE,
   caseStudyItems,
   evidenceItems,
   inCanonicalOrder,
+  isWritten,
   listingTitle,
+  nextCaseStudy,
   projectItems,
+  writtenCaseStudyItems,
   type Capabilities,
   type EvidenceItem,
 } from "@/lib/evidence";
@@ -78,6 +82,25 @@ function mdxProblems(collection: string, items: readonly EvidenceItem[], files: 
     ...[...slugs].filter((slug) => !mdx.has(slug)).map((slug) => `${collection}: "${slug}" has no ${slug}.mdx`),
     ...[...mdx].filter((slug) => !slugs.has(slug)).map((slug) => `${collection}: ${slug}.mdx has no entry in index.ts`),
   ];
+}
+
+// A written case study (non-empty MDX) holds exactly the five sections, in
+// CASE_STUDY_SECTIONS order, each as one <Section name="...">. An empty
+// file is unwritten and is not checked here; it gets no page.
+function sectionProblems(slug: string, source: string): string[] {
+  if (!isWritten(source)) return [];
+  const expected = CASE_STUDY_SECTIONS.map((section) => section.id);
+  const tags = [...source.matchAll(/<Section\b[^>]*>/g)].map(([tag]) => tag);
+  const names = tags.map((tag) => tag.match(/\bname="([^"]*)"/)?.[1]);
+  const problems: string[] = [];
+  if (names.includes(undefined)) problems.push(`case-studies: "${slug}" has a <Section> with no name="..."`);
+  const found = names.filter((name): name is string => name !== undefined);
+  if (found.join(",") !== expected.join(",")) {
+    problems.push(
+      `case-studies: "${slug}" sections are [${found.join(", ")}]; a written case study needs exactly [${expected.join(", ")}], in that order`,
+    );
+  }
+  return problems;
 }
 
 function duplicateSlugs(items: readonly EvidenceItem[]): string[] {
@@ -190,6 +213,13 @@ describe("the content collections", () => {
     expect(mdxProblems("projects", projectItems, mdxFiles("projects"))).toEqual([]);
   });
 
+  test("every written case study holds the five sections in order", () => {
+    const problems = caseStudyItems.flatMap((item) =>
+      sectionProblems(item.slug, readFileSync(fileURLToPath(new URL(`../content/case-studies/${item.slug}.mdx`, import.meta.url)), "utf8")),
+    );
+    expect(problems).toEqual([]);
+  });
+
   test("case studies are case studies and projects are projects", () => {
     expect(caseStudyItems.filter((item) => item.kind !== "case-study").map((item) => item.slug)).toEqual([]);
     expect(projectItems.filter((item) => item.kind !== "project").map((item) => item.slug)).toEqual([]);
@@ -252,6 +282,52 @@ describe("the content collections", () => {
       evidenceItems.map((item) => item.slug),
       "Order in content/*/index.ts is display order. Confirm a reorder, an addition or a removal by updating DISPLAY_ORDER in lib/evidence.test.ts.",
     ).toEqual(DISPLAY_ORDER);
+  });
+});
+
+// The five case-study sections (Story 3.2): one list, read by the Section
+// component, the rail and the integrity check.
+describe("the case-study sections", () => {
+  test("are context, decisions, actions, outcome and lessons, each with its label", () => {
+    expect(CASE_STUDY_SECTIONS).toEqual([
+      { id: "context", label: "Context" },
+      { id: "decisions", label: "Decisions" },
+      { id: "actions", label: "Actions" },
+      { id: "outcome", label: "Outcome" },
+      { id: "lessons", label: "Lessons" },
+    ]);
+  });
+});
+
+// A case study gets a page only once its MDX is written (Story 3.2).
+describe("written case studies", () => {
+  const item = (slug: string): EvidenceItem =>
+    ({ ...caseStudyItems[0], slug, href: `/experience/${slug}` }) as EvidenceItem;
+
+  test("an empty or whitespace-only MDX is unwritten", () => {
+    expect(isWritten("")).toBe(false);
+    expect(isWritten(" \n\t\n")).toBe(false);
+    expect(isWritten('<Section name="context">x</Section>')).toBe(true);
+  });
+
+  test("are the case studies whose MDX is written, in collection order", () => {
+    const expected = caseStudyItems.filter((each) =>
+      isWritten(readFileSync(fileURLToPath(new URL(`../content/case-studies/${each.slug}.mdx`, import.meta.url)), "utf8")),
+    );
+    expect(writtenCaseStudyItems().map((each) => each.slug)).toEqual(expected.map((each) => each.slug));
+  });
+
+  test("the next case study is the following written one, wrapping to the first", () => {
+    const written = [item("a"), item("b"), item("c")];
+    expect(nextCaseStudy(written, "a")?.slug).toBe("b");
+    expect(nextCaseStudy(written, "b")?.slug).toBe("c");
+    expect(nextCaseStudy(written, "c")?.slug).toBe("a");
+  });
+
+  test("there is no next case study when only one is written, or the slug is not written", () => {
+    expect(nextCaseStudy([item("a")], "a")).toBeUndefined();
+    expect(nextCaseStudy([item("a"), item("b")], "nope")).toBeUndefined();
+    expect(nextCaseStudy([], "a")).toBeUndefined();
   });
 });
 
@@ -329,6 +405,35 @@ describe("the integrity checks", () => {
   test("an entry with no MDX file is named", () => {
     expect(mdxProblems("projects", [item(), item({ slug: "lonely" })], ["x.mdx", "index.ts"])).toEqual([
       'projects: "lonely" has no lonely.mdx',
+    ]);
+  });
+
+  const section = (name: string) => `<Section name="${name}">\n\nProse.\n\n</Section>`;
+  const fiveSections = ["context", "decisions", "actions", "outcome", "lessons"].map(section).join("\n\n");
+
+  test("a written case study with the five sections in order passes, and an empty one is not checked", () => {
+    expect(sectionProblems("x", fiveSections)).toEqual([]);
+    expect(sectionProblems("x", "")).toEqual([]);
+    expect(sectionProblems("x", "\n  \n")).toEqual([]);
+  });
+
+  test.each([
+    ["a missing section", ["context", "decisions", "actions", "outcome"]],
+    ["an extra section", ["context", "decisions", "actions", "outcome", "lessons", "appendix"]],
+    ["a repeated section", ["context", "decisions", "decisions", "actions", "outcome", "lessons"]],
+    ["sections out of order", ["context", "actions", "decisions", "outcome", "lessons"]],
+    ["prose with no section at all", []],
+  ])("%s is named, with the slug", (_label, names) => {
+    const source = names.length === 0 ? "Just prose." : names.map(section).join("\n\n");
+    const problems = sectionProblems("x", source);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain('"x" sections are');
+    expect(problems[0]).toContain("[context, decisions, actions, outcome, lessons]");
+  });
+
+  test("a section with no name is named", () => {
+    expect(sectionProblems("x", `<Section>\n\nProse.\n\n</Section>\n\n${fiveSections}`)).toEqual([
+      'case-studies: "x" has a <Section> with no name="..."',
     ]);
   });
 
