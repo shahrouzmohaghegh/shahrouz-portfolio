@@ -103,14 +103,7 @@
   text-align: var(--component-hero-explore-align);
 }
 
-/* {components.cta-link}. */
+/* {components.cta-link}, defined once in cta-link.module.css. */
 .exploreLink {
-  font-family: var(--type-data-row-family);
-  font-size: var(--type-data-row-size);
-  font-weight: var(--component-cta-link-weight);
-  line-height: var(--type-data-row-leading);
-  color: var(--color-accent);
-  text-decoration-line: underline;
-  text-decoration-thickness: var(--component-cta-link-underline-width);
-  text-decoration-color: var(--color-accent);
+  composes: ctaLink from "./cta-link.module.css";
 }

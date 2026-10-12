@@ -1,4 +1,5 @@
-// Home's own copy: the hero (Story 2.3) and its figure pair (Story 2.4). His
+// Home's own copy: the hero (Story 2.3), its figure pair (Story 2.4), the
+// evidence bands (Story 2.5) and the words around Selected work (Story 2.6). His
 // name and the availability line come from content/site.ts, the source the
 // header and footer share. It lives under content/ so the content review box
 // gates every word of it. Not evidence: AD-6 governs Case Studies and
@@ -48,4 +49,12 @@ export const home = {
         "Microsoft Defender for Cloud Secure Score across the production environment, reported to the Digital Governance Board.",
     },
   ],
+  // The Selected work section below the bands (Story 2.6). Its cards come
+  // from lib/evidence, never from here; only the words around them live
+  // here. Epic 4 adds the capability filter wording to the cross-link.
+  selectedWork: {
+    heading: "Selected work",
+    cta: "Read the case study",
+    crossLink: { label: "All case studies", href: "/experience" },
+  },
 } as const;

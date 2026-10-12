@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import {
   BREAKPOINTS_PATH,
   DESIGN_PATH,
+  FOCUS_PATH,
   ISLAND_PATH,
   LAYOUT_PATH,
   PRINT_PATH,
@@ -53,7 +54,7 @@ after(() => fixtures.forEach((dir) => rmSync(dir, { recursive: true, force: true
 function fixture(files: Record<string, string> = {}): string {
   const dir = mkdtempSync(join(tmpdir(), "check-tokens-"));
   fixtures.push(dir);
-  for (const path of [DESIGN_PATH, TOKENS_PATH, BREAKPOINTS_PATH, LAYOUT_PATH, REVEAL_PATH, ISLAND_PATH]) {
+  for (const path of [DESIGN_PATH, TOKENS_PATH, BREAKPOINTS_PATH, LAYOUT_PATH, REVEAL_PATH, FOCUS_PATH, ISLAND_PATH]) {
     mkdirSync(dirname(join(dir, path)), { recursive: true });
     cpSync(join(ROOT, path), join(dir, path));
   }
@@ -94,9 +95,9 @@ describe("the real repository", () => {
     // COMPONENT_REMAPS: nav padding block; the five Home hero pairs (padding,
     // stack gap, kicker display, plate position, Explore alignment); chip
     // padding, nav item gap, size and leading, footer columns; the two
-    // evidence band gaps (tag, figure)
-    const expected = typeRemaps + 7 + 13;
-    assert.equal(expected, 93);
+    // evidence band gaps (tag, figure); the card grid columns
+    const expected = typeRemaps + 7 + 14;
+    assert.equal(expected, 94);
     assert.equal(Object.keys(expectedRemaps(groups)).length, expected);
   });
 
@@ -427,6 +428,51 @@ describe("the reveal guard (AD-14)", () => {
   });
 });
 
+describe("the focus indicator (UX-DR29)", () => {
+  test("the real styles/focus.css passes", () => {
+    assert.deepEqual(scanStylesheet(FOCUS_PATH, read(FOCUS_PATH), defined), []);
+  });
+
+  test("styles/focus.css draws the ring on :focus-visible from the tokens, ground-selected", () => {
+    const css = read(FOCUS_PATH);
+    assert.match(css, /:root\s*\{\s*--focus-ring:\s*var\(--color-focus-ring\);\s*\}/);
+    assert.match(css, /:focus-visible\s*\{[^}]*outline:\s*var\(--component-focus-ring-width\) solid var\(--focus-ring\);/);
+    assert.match(css, /:focus-visible\s*\{[^}]*outline-offset:\s*var\(--component-focus-ring-offset\);/);
+    assert.equal(tokens["--component-focus-ring-width"], "2px");
+    assert.equal(tokens["--component-focus-ring-offset"], "2px");
+  });
+
+  test("the deep band sets the on-deep ring", () => {
+    assert.match(read("components/evidence-band.module.css"), /\.deep\s*\{[^}]*--focus-ring:\s*var\(--color-focus-ring-on-deep\);/);
+  });
+
+  test("outline: none and a zero outline or offset fail in any stylesheet", () => {
+    for (const decl of [
+      "outline: none", "outline: 0", "outline: hidden", "outline-offset: 0", "outline-offset: 0px", "outline-offset: 0 !important",
+      "outline-width: 0", "outline-style: none", "outline-style: none !important", "outline-style: hidden",
+    ]) {
+      const failures = scan(`a:focus {\n  ${decl};\n}`).filter((f) => !f.includes("literal length"));
+      assert.equal(failures.length, 1, decl);
+      assert.match(failures[0], /x\.module\.css:2: .*focus indicator/, decl);
+    }
+  });
+
+  test("a positive outline and offset from tokens pass", () => {
+    assert.deepEqual(scan("a:focus-visible {\n  outline: var(--component-focus-ring-width) solid var(--color-focus-ring);\n  outline-offset: var(--component-focus-ring-offset);\n}"), []);
+  });
+
+  test("app/layout.tsx must import styles/focus.css, after reveal.css", () => {
+    const missing = LAYOUT.replace('import "@/styles/focus.css";\n', "");
+    assert.notEqual(missing, LAYOUT);
+    assert.deepEqual(run(fixture({ [LAYOUT_PATH]: missing })).failures, [`${LAYOUT_PATH}: must import @/styles/focus.css`]);
+    const swapped = LAYOUT.replace('import "@/styles/reveal.css";\nimport "@/styles/focus.css";',
+      'import "@/styles/focus.css";\nimport "@/styles/reveal.css";');
+    assert.notEqual(swapped, LAYOUT);
+    assert.deepEqual(run(fixture({ [LAYOUT_PATH]: swapped })).failures,
+      [`${LAYOUT_PATH}: must import @/styles/reveal.css before @/styles/focus.css`]);
+  });
+});
+
 describe("the reveal restore rule", () => {
   const ISLAND = read(ISLAND_PATH);
   const REVEAL_CSS = read(REVEAL_PATH);
@@ -534,8 +580,8 @@ describe("run() over a fixture repository", () => {
     const dir = fixture({ "components/card.module.css": ".card { padding: var(--space-stack-md); }\n" });
     const { failures, summary } = run(dir);
     assert.deepEqual(failures, []);
-    // The module plus the fixture's copy of styles/reveal.css.
-    assert.match(summary ?? "", /2 other stylesheet/);
+    // The module plus the fixture's copies of styles/reveal.css and styles/focus.css.
+    assert.match(summary ?? "", /3 other stylesheet/);
   });
 
   test("a stylesheet under a nested docs/ directory is scanned", () => {
@@ -553,7 +599,7 @@ describe("run() over a fixture repository", () => {
   });
 
   test("a missing stylesheet import in app/layout.tsx fails", () => {
-    for (const path of ["tokens", "breakpoints", "reveal"]) {
+    for (const path of ["tokens", "breakpoints", "reveal", "focus"]) {
       const dir = fixture({ [LAYOUT_PATH]: LAYOUT.replace(`import "@/styles/${path}.css";\n`, "") });
       assert.deepEqual(run(dir).failures, [`${LAYOUT_PATH}: must import @/styles/${path}.css`]);
     }
