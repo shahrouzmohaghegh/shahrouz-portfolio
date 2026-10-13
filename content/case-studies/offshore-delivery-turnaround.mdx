@@ -1,0 +1,57 @@
+<Section name="context">
+
+<FactsStrip facts={[
+  { term: "Function", value: "38 people across Sydney and Vietnam" },
+  { term: "Vietnam team", value: "Hired and run directly, part of the 38" },
+  { term: "Management", value: "Six people-managers, each running six to seven people" },
+]} />
+
+The engineering function I ran was 38 people across Sydney and Vietnam, led through six people-managers, each running six to seven people. The Vietnam team was part of the 38, not on top of it. I selected and hired every one of its engineers myself. They worked on the company's own accounts and licences, in its own cloud and delivery tooling, on the same squads and to the same standards as Sydney. A local employer of record provided employment and HR, not delivery. Everything operational ran through me: devices, identity and access, security, tooling, project management, standards and delivery.
+
+The quality problem was measurable. On the Vietnam team, defects marked as fixed kept coming back, and fixes raised new issues of their own.
+
+</Section>
+
+<Section name="decisions">
+
+<TradeoffList>
+<TradeoffPair decision="Hire every engineer personally rather than accept an allocated team." buys="One hiring bar across both sites." costs="My own time on every hire." />
+<TradeoffPair decision="Run Vietnam as an extension of Sydney rather than as a separate offshore unit." buys="No handoff seam, one set of standards, one Definition of Done." costs="Every standard, ritual and tool had to work for both sites at once." />
+<TradeoffPair decision="Govern on measures rather than on presence." buys="A conversation about the work, not about who is visible." costs="The measures had to be defined, collected and trusted before they could govern anything.">The Fault Feedback Ratio, defect density and lead time, reviewed openly.</TradeoffPair>
+<TradeoffPair decision="Change the meeting format rather than ask people to behave differently." buys="The best idea wins, not the loudest voice or the one closest to the room." costs="Writing first asks more of everyone before a meeting than turning up does.">No more boardroom with a dial-in. Writing became the primary channel. Sprint planning was split across sessions, so people could read the specifications before estimating.</TradeoffPair>
+</TradeoffList>
+
+</Section>
+
+<Section name="actions">
+
+1. Made bad fixes visible with the Fault Feedback Ratio, which counts every reopening of a fixed bug, plus every new issue raised and linked back to it, for each bug fixed. It sat alongside defect density and lead time, so quality was measured rather than argued about.
+2. Applied one set of engineering standards identically at both sites.
+3. Redesigned the rituals as above, so the Vietnam team had the same voice as the people in the Sydney room.
+4. Set objectives with the team rather than handing them down, as part of the OKRs I introduced across the whole 38-person function, with fortnightly check-ins instead of annual reviews.
+
+</Section>
+
+<Section name="outcome">
+
+On the Vietnam team, measured by the Fault Feedback Ratio, bad fixes fell by more than 80%.
+
+<OutcomeBand tag="Fault Feedback Ratio" figure="Bad fixes cut by more than 80%" qualifier="on the Vietnam team I hired and ran, part of the 38-person function across Sydney and Vietnam, measured by the Fault Feedback Ratio." />
+
+<SourceNote instrument="The Fault Feedback Ratio counts every reopening of a fixed bug, plus every new issue raised and linked back to it, for each bug fixed." weakness="It depends on people linking a new issue back to the fix it came from, so a recurrence nobody linked is not counted." />
+
+<KeyValueList rows={[
+  { term: "Bad fixes", value: "Cut by more than 80% on the Vietnam team, measured by the Fault Feedback Ratio" },
+  { term: "Function", value: "38 people across Sydney and Vietnam, the Vietnam team included" },
+  { term: "Management span", value: "Six people-managers, each running six to seven people" },
+]} />
+
+</Section>
+
+<Section name="lessons">
+
+> Bad fixes at that level are a governance problem, not a testing problem.
+
+One thing I got wrong was a hire, and it changed my process. I selected a senior hire on background and a coding test, and did not weight behaviour anywhere near enough. Afterwards, behaviour became an explicit assessment criterion rather than an impression, and I widened the panel beyond myself, bringing in peers and, for lead roles, the engineers who would report to the hire.
+
+</Section>

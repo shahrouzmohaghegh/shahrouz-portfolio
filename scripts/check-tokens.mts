@@ -77,6 +77,8 @@ export const COMPONENT_REMAPS: TokenMap = {
   "--component-section-rail-background": "var(--component-section-rail-background-mobile)",
   "--component-section-rail-border": "var(--component-section-rail-border-mobile)",
   "--component-section-rail-padding": "var(--component-section-rail-padding-mobile)",
+  "--component-kv-list-columns": "var(--component-kv-list-columns-mobile)",
+  "--component-tradeoff-pair-columns": "var(--component-tradeoff-pair-columns-mobile)",
 };
 
 const KNOWN_TOP_LEVEL = new Set([

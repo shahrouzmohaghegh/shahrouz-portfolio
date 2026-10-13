@@ -17,11 +17,79 @@
   color: var(--color-ink);
 }
 
-.section > p {
+.section > p:not([class]) {
   margin: 0 0 var(--space-stack-sm);
   font-family: var(--type-body-family);
   font-size: var(--type-body-size);
   font-weight: var(--type-body-weight);
   line-height: var(--type-body-leading);
   color: var(--color-ink);
+}
+
+/* The prose beyond paragraphs (Story 3.3): lists, links, strong, emphasis
+   and blockquotes, as the MDX writes them in Markdown. Scoped to the
+   section's own Markdown prose, which carries no class, so a content
+   component's own elements (the source note's <p>, the trade-off list's
+   <ol>) and the outcome band's links keep their own styles. */
+.section > ul:not([class]),
+.section > ol:not([class]) {
+  margin: 0 0 var(--space-stack-sm);
+  padding-left: var(--space-stack-md);
+  font-family: var(--type-body-family);
+  font-size: var(--type-body-size);
+  font-weight: var(--type-body-weight);
+  line-height: var(--type-body-leading);
+  color: var(--color-ink);
+}
+
+.section > ul:not([class]) > li,
+.section > ol:not([class]) > li {
+  margin: 0 0 var(--space-stack-xs);
+  padding-left: var(--space-stack-xs);
+}
+
+.section > ol:not([class]) > li::marker {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-muted);
+}
+
+.section > blockquote:not([class]) {
+  margin: 0 0 var(--space-stack-sm);
+  padding-left: var(--space-stack-sm);
+  border-left: var(--space-rule-card) solid var(--color-rule);
+  font-family: var(--type-body-lead-family);
+  font-size: var(--type-body-lead-size);
+  font-weight: var(--type-body-lead-weight);
+  line-height: var(--type-body-lead-leading);
+  color: var(--color-ink);
+}
+
+.section > blockquote:not([class]) > p {
+  margin: 0;
+}
+
+/* Links in the prose are underlined, so they never rest on colour alone. */
+.section > p:not([class]) a,
+.section > ul:not([class]) a,
+.section > ol:not([class]) a,
+.section > blockquote:not([class]) a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-decoration-thickness: var(--component-cta-link-underline-width);
+  text-underline-offset: var(--component-cross-listing-link-underline-offset);
+}
+
+.section > p:not([class]) strong,
+.section > ul:not([class]) strong,
+.section > ol:not([class]) strong,
+.section > blockquote:not([class]) strong {
+  font-weight: var(--component-data-row-emphasis-weight);
+  color: var(--color-ink);
+}
+
+.section > p:not([class]) em,
+.section > ul:not([class]) em,
+.section > ol:not([class]) em,
+.section > blockquote:not([class]) em {
+  font-style: italic;
 }

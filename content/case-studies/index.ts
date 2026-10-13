@@ -22,7 +22,7 @@ export const caseStudies: readonly CaseStudy[] = [
     kind: "case-study",
     title: "AI-native engineering, measured",
     summary:
-      "Cycle time, throughput and adoption measured across pilot projects, and the governance pack that unblocked the capability, carried through the AI governance board review.",
+      "Cycle time, throughput and adoption measured across pilot projects, and the governance pack that unblocked the capability, carried through the governance board review.",
     capabilities: ["ai-native"],
     headlineMetric: {
       value: "Delivery throughput up 25 to 30%",
@@ -49,4 +49,8 @@ export const caseStudies: readonly CaseStudy[] = [
 // these get a page: proxy.ts answers every other /experience/<slug> with the
 // case-study not-found page and a 404. Add a slug here in the same change
 // that writes its MDX; lib/evidence.test.ts fails while the two disagree.
-export const writtenCaseStudySlugs: readonly string[] = [];
+export const writtenCaseStudySlugs: readonly string[] = [
+  "offshore-delivery-turnaround",
+  "ai-native-engineering",
+  "digital-governance-board",
+];

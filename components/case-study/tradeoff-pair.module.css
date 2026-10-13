@@ -1,0 +1,75 @@
+/* {components.tradeoff-pair}, from screen-project.html .trades: a hairline
+   above each item, the decision in {typography.card-title}, then the two
+   sides at {spacing.card-gap}, side by side from 768px and stacked below,
+   buys first (--component-tradeoff-pair-columns). Buys sits under a
+   {colors.tone-2} hairline, costs under a {spacing.rule-card} {colors.ink}
+   rule. Never the accent. */
+.list {
+  margin: var(--space-stack-md) 0 var(--space-stack-sm);
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  padding: var(--space-stack-md) 0;
+  border-top: var(--space-rule-hairline) solid var(--color-rule);
+}
+
+.heading {
+  margin: 0 0 var(--space-stack-sm);
+  font-family: var(--type-card-title-family);
+  font-size: var(--type-card-title-size);
+  font-weight: var(--type-card-title-weight);
+  line-height: var(--type-card-title-leading);
+  letter-spacing: var(--type-card-title-tracking);
+  color: var(--color-ink);
+}
+
+.why {
+  margin: 0 0 var(--space-stack-sm);
+  font-family: var(--type-body-family);
+  font-size: var(--type-body-size);
+  font-weight: var(--type-body-weight);
+  line-height: var(--type-body-leading);
+  color: var(--color-ink);
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: var(--component-tradeoff-pair-columns);
+  gap: var(--space-stack-sm) var(--space-card-gap);
+}
+
+.buys,
+.costs {
+  min-width: 0;
+  padding-top: var(--space-stack-sm);
+}
+
+.buys {
+  border-top: var(--space-rule-hairline) solid var(--color-tone-2);
+}
+
+.costs {
+  border-top: var(--space-rule-card) solid var(--color-ink);
+}
+
+.label {
+  margin: 0 0 var(--component-fact-gap);
+  font-family: var(--type-meta-label-family);
+  font-size: var(--type-meta-label-size);
+  font-weight: var(--type-meta-label-weight);
+  line-height: var(--type-meta-label-leading);
+  letter-spacing: var(--type-meta-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.text {
+  margin: 0;
+  font-family: var(--type-data-row-family);
+  font-size: var(--type-data-row-size);
+  font-weight: var(--type-data-row-weight);
+  line-height: var(--type-data-row-leading);
+  color: var(--color-muted);
+}

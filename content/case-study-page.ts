@@ -11,6 +11,9 @@ export const caseStudyPage = {
   railLabel: "On this page",
   railAriaLabel: "Sections of this case study",
   nextLabel: "Next case study",
+  // The trade-off pair's two caps labels (Story 3.3). They carry the
+  // distinction in words, so it never rests on the rule weight or position.
+  tradeoff: { buys: "What it buys", costs: "What it costs" },
   notFound: {
     // The browser tab title; the root template adds the site name once.
     title: "Case study not available",

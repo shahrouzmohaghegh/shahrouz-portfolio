@@ -58,6 +58,12 @@ describe("proxy", () => {
     expect(response.status).toBe(404);
   });
 
+  test.each(writtenCaseStudySlugs)("lets the written case study %s through", (slug) => {
+    const response = proxy(request(`/experience/${slug}`));
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+    expect(response.headers.get("x-middleware-rewrite")).toBeNull();
+  });
+
   test("lets anything else through", () => {
     const response = proxy(request("/experience"));
     expect(response.headers.get("x-middleware-rewrite")).toBeNull();
