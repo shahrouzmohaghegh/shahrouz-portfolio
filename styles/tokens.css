@@ -414,6 +414,25 @@
   --component-section-rail-item-padding: 8px 0;
   --component-section-rail-counter-gap: 12px;
   --component-section-rail-current-weight: 600;
+  /* The case-study content components (Story 3.3), from
+     screen-case-study.html and screen-project.html. Facts sit side by side
+     while each has at least 10em and wrap below that, so they stack at
+     375px and in the narrow body column beside the rail at 768px. Key-value
+     rows put the key beside the value from 768px and above it below (a pair
+     remapped in breakpoints.css). The trade-off pair sets buys beside costs
+     while each side has 14em, and stacks below that, buys first, which it
+     always does below 768px (also a remapped pair). */
+  --component-facts-strip-columns: repeat(auto-fit, minmax(min(100%, 10em), 1fr));
+  --component-kv-list-columns-mobile: minmax(0, 1fr);
+  --component-kv-list-columns: minmax(0, 2fr) minmax(0, 3fr);
+  --component-tradeoff-pair-columns-mobile: minmax(0, 1fr);
+  --component-tradeoff-pair-columns: repeat(auto-fit, minmax(min(100%, 14em), 1fr));
+  --component-fact-gap: 7px;
+  /* The facts-strip value, key-value value and prose strong: weight 600,
+     set by the component on {typography.data-row} or {typography.body}. */
+  --component-data-row-emphasis-weight: 600;
+  --component-kv-list-row-padding: 14px 0;
+  --component-outcome-band-padding: var(--space-stack-lg);
   /* The case-study eyebrow, from screen-case-study.html .csmeta:
      {typography.meta-label} in {colors.accent} at 600. */
   --component-case-study-eyebrow-weight: 600;

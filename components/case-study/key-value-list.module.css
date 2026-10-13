@@ -1,0 +1,35 @@
+/* {components.kv-list}: hairline rows, key in {typography.data-row} muted,
+   value in {typography.data-row} at 600 with tabular figures. The columns
+   come from the --component-kv-list-columns pair in breakpoints.css. */
+.list {
+  margin: var(--space-stack-md) 0 0;
+  border-bottom: var(--space-rule-hairline) solid var(--color-rule);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: var(--component-kv-list-columns);
+  column-gap: var(--space-stack-md);
+  padding: var(--component-kv-list-row-padding);
+  border-top: var(--space-rule-hairline) solid var(--color-rule);
+}
+
+.key,
+.value {
+  margin: 0;
+  min-width: 0;
+  font-family: var(--type-data-row-family);
+  font-size: var(--type-data-row-size);
+  font-weight: var(--type-data-row-weight);
+  line-height: var(--type-data-row-leading);
+}
+
+.key {
+  color: var(--color-muted);
+}
+
+.value {
+  font-weight: var(--component-data-row-emphasis-weight);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink);
+}

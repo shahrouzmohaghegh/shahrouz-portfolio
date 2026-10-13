@@ -97,9 +97,10 @@ describe("the real repository", () => {
     // padding, nav item gap, size and leading, footer columns; the two
     // evidence band gaps (tag, figure); the card grid columns; the case-study
     // columns and the four section rail pairs (position, background, border,
-    // padding)
-    const expected = typeRemaps + 7 + 19;
-    assert.equal(expected, 99);
+    // padding); the case-study content components' two pairs (key-value
+    // columns, trade-off pair columns)
+    const expected = typeRemaps + 7 + 21;
+    assert.equal(expected, 101);
     assert.equal(Object.keys(expectedRemaps(groups)).length, expected);
   });
 

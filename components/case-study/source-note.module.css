@@ -1,0 +1,13 @@
+/* {components.source-note}: {typography.small} in {colors.muted} with a
+   {spacing.rule-card} {colors.tone-2} left rule. */
+.note {
+  max-width: var(--space-measure-body);
+  margin: var(--space-stack-md) 0 var(--space-stack-sm);
+  padding-left: var(--space-stack-sm);
+  border-left: var(--space-rule-card) solid var(--color-tone-2);
+  font-family: var(--type-small-family);
+  font-size: var(--type-small-size);
+  font-weight: var(--type-small-weight);
+  line-height: var(--type-small-leading);
+  color: var(--color-muted);
+}

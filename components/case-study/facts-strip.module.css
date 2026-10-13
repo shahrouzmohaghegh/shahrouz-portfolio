@@ -1,0 +1,40 @@
+/* {components.facts-strip}: a hairline rule above each fact and one below
+   the strip, term in {typography.meta-label} muted, value in
+   {typography.data-row} at 600. The facts sit side by side while each has
+   room and wrap onto new rows below that (--component-facts-strip-columns),
+   so they stack at 375px; a rule above every fact keeps the rows bounded
+   however they wrap. */
+.strip {
+  display: grid;
+  grid-template-columns: var(--component-facts-strip-columns);
+  column-gap: var(--space-stack-md);
+  margin: 0 0 var(--space-stack-md);
+  border-bottom: var(--space-rule-hairline) solid var(--color-rule);
+}
+
+.fact {
+  min-width: 0;
+  padding: var(--space-stack-sm) 0;
+  border-top: var(--space-rule-hairline) solid var(--color-rule);
+}
+
+.term {
+  margin: 0 0 var(--component-fact-gap);
+  font-family: var(--type-meta-label-family);
+  font-size: var(--type-meta-label-size);
+  font-weight: var(--type-meta-label-weight);
+  line-height: var(--type-meta-label-leading);
+  letter-spacing: var(--type-meta-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.value {
+  margin: 0;
+  font-family: var(--type-data-row-family);
+  font-size: var(--type-data-row-size);
+  font-weight: var(--component-data-row-emphasis-weight);
+  line-height: var(--type-data-row-leading);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink);
+}
