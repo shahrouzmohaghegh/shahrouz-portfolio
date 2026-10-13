@@ -4,18 +4,18 @@ Across pilot projects, measured from the delivery workflow's own state transitio
 
 Those results are why this page exists, so they come first. The capability behind them was AI-native engineering: making AI a governed, repeatable part of how the team specified, built, reviewed and tested software, rather than scattered individual experiments, and being able to prove whether it worked.
 
-The team was established, and much of it came from a legacy on-premise background. The setting was a regulated clinical environment, where ungoverned AI use carries real compliance risk. [I'll supply: what triggered the work: executive pressure, engineers already using AI unsanctioned, a competitive threat, or my own initiative]
+The team was established, and much of it came from a legacy on-premise background. The setting was a regulated clinical environment, where ungoverned AI use carries real compliance risk.
 
 </Section>
 
 <Section name="decisions">
 
 <TradeoffList>
-<TradeoffPair decision="Measure it against the delivery workflow rather than assume it works." buys="Metrics defined on real workflow state transitions rather than vanity measures, reported to [I'll supply: which board the results were reported to, the AI governance board or the Digital Governance Board], so the result could be checked." costs="[I'll supply: what building and running the measurement cost]" />
-<TradeoffPair decision="Answer the AI governance board's concerns rather than argue them down." buys="Scrutiny that was justified in a regulated clinical setting became a pack the AI governance board could approve. Good governance should be protective and enabling, not just a brake." costs="[I'll supply: what this decision cost]" />
-<TradeoffPair decision="Win the sceptics through peer demonstration rather than a mandate." buys="Joining in felt safe, because people watched colleagues succeed rather than being told to." costs="[I'll supply: what this decision cost]" />
-<TradeoffPair decision="Let authority and expiry decide which source wins, not similarity alone." buys="The assistant is not handed guidance that is relevant but wrong: a binding exception wins while it applies, and stops winning when it expires." costs="[I'll supply: what this decision cost]" />
-<TradeoffPair decision="Pilot on a favourable sample first." buys="A fast, clear answer for the board the results were reported to on whether the approach worked at all." costs="The results are directional, not proven at scale." />
+<TradeoffPair decision="Measure it against the delivery workflow rather than assume it works." buys="Metrics defined on real workflow state transitions rather than vanity measures, so the result could be checked." costs="The measurement had to be built and kept running alongside the work it measured." />
+<TradeoffPair decision="Answer the AI governance board's concerns rather than argue them down." buys="Scrutiny that was justified in a regulated clinical setting became a pack the AI governance board could approve. Good governance should be protective and enabling, not just a brake." costs="The capability waited until the pack was approved." />
+<TradeoffPair decision="Win the sceptics through peer demonstration rather than a mandate." buys="Joining in felt safe, because people watched colleagues succeed rather than being told to." costs="Adoption spread at the pace of example, not of instruction." />
+<TradeoffPair decision="Let authority and expiry decide which source wins, not similarity alone." buys="The assistant is not handed guidance that is relevant but wrong: a binding exception wins while it applies, and stops winning when it expires." costs="Every source needs an owner and, where it applies, an expiry date, kept current." />
+<TradeoffPair decision="Pilot on a favourable sample first." buys="A fast, clear answer on whether the approach worked at all." costs="The results are directional, not proven at scale." />
 </TradeoffList>
 
 </Section>
@@ -25,18 +25,16 @@ The team was established, and much of it came from a legacy on-premise backgroun
 - **The governance pack.** An AI policy, risk profiles, a register of use cases, a register of approved tools, operational guidelines and training. It went through the AI governance board review, with every comment answered against a published traceability matrix, and it is what unblocked the capability.
 - **The engineering side.** Custom agent skills and reusable commands, engineering conventions, project memory, source-controlled standards, integrations and agentic workflows, shared across the team rather than reinvented by each engineer.
 - **Specification-driven development.** Requirements became version-controlled specifications that generate epics, features, user stories and implementation scaffolds. The same specifications give AI-assisted design, implementation, review and testing consistent context, and plan-then-apply guardrails keep every AI change under mandatory human review.
-- **The measurement framework.** Metrics for productivity, quality, adoption and throughput, defined on the delivery workflow's own state transitions. It is informed by DORA but adapted for AI-assisted delivery, with an adoption category DORA has no equivalent for, and it was reported to the same board as the results.
+- **The measurement framework.** Metrics for productivity, quality, adoption and throughput, defined on the delivery workflow's own state transitions. It is informed by DORA but adapted for AI-assisted delivery, with an adoption category DORA has no equivalent for.
 - **A governed retrieval layer, which I built and ran.** Vector search tells the assistant what is relevant. Authority tells it what wins when relevant sources conflict, and expiry tells it when something must stop winning. When a service was found not to be safe to retry, a temporary exception to the resilience standard went into the index with an expiry, until the team that owned the service fixed it. Once the fix landed, the exception expired and left the index, and the change that restored the retry passed the AI code review without objection. A plain similarity search would have kept ranking the dead exception near the top, because it named the service, the pattern and the reasoning, and the reviewer would have objected to the very change that put things right.
 
 </Section>
 
 <Section name="outcome">
 
-[I'll supply: the period the pilot figures were measured over]
-
 <OutcomeBand tag="Delivery throughput" figure="Throughput up 25 to 30%" qualifier="across pilot projects, measured from the delivery workflow's own state transitions." />
 
-<SourceNote instrument="Cycle time and throughput come from the delivery workflow's own state transitions. Adoption comes from a survey the team answered itself." weakness="The pilot projects were a deliberately favourable sample, chosen to show the board the results were reported to whether the approach worked at all, so the results are directional rather than proven at scale, and adoption is self-reported." />
+<SourceNote instrument="Cycle time and throughput come from the delivery workflow's own state transitions. Adoption comes from a survey the team answered itself." weakness="The pilot projects were a deliberately favourable sample, chosen to show whether the approach worked at all, so the results are directional rather than proven at scale, and adoption is self-reported." />
 
 Adoption varied in depth. Some engineers ran the full agentic lifecycle, orchestrating product, architecture, design and developer agents, including Ralph loops (an agent run again and again on the same task until its checks pass) for batch migration. Others used the custom skills more narrowly, for code review, architecture review, retrospectives and guides.
 
@@ -51,7 +49,5 @@ Adoption varied in depth. Some engineers ran the full agentic lifecycle, orchest
 <Section name="lessons">
 
 The evidence has a limit, and I name it before anyone asks. The sample was favourable, and adoption is an input measure, not business value: the adoption figure covered everything from engineers running the whole lifecycle through agents to engineers using one skill for code review. My view is that the results are achievable more broadly, but I have not proven that.
-
-[I'll supply: what I tried that did not stick, or what I would do differently]
 
 </Section>

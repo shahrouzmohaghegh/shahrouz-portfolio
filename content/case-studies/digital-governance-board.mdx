@@ -7,17 +7,17 @@
 
 For two years I held a standing seat on the Digital Governance Board, a company-wide board on which senior functional leaders sat directly, rather than one they reported metrics up to. My own line reporting was directly to the CEO.
 
-The cloud platform carried clinical workloads in a regulated healthcare setting, and its security posture had to be visible to that board, not only to engineering. [I'll supply: what triggered the security work: an audit, a customer security questionnaire, a board ask, an incident, or my own initiative]
+The cloud platform carried clinical workloads in a regulated healthcare setting, and its security posture had to be visible to that board, not only to engineering.
 
 </Section>
 
 <Section name="decisions">
 
 <TradeoffList>
-<TradeoffPair decision="Run security governance inside the engineering lifecycle, not beside it." buys="Security findings were profiled, triaged and reported in the same lifecycle as the work, rather than in a separate track." costs="[I'll supply: what remediation displaced in feature delivery, and who challenged it]" />
-<TradeoffPair decision="Gate production releases on security posture." buys="Security and compliance items had to be resolved before a release reached production, not after." costs="[I'll supply: whether the gate ever held a release, what the finding was, and how it resolved]" />
-<TradeoffPair decision="Separate platform controls from application remediation." buys="Ownership and traceability were clear to the board: which findings belonged to the platform and which to each application." costs="[I'll supply: what this decision cost]" />
-<TradeoffPair decision="Hold vendor-built software to the same bar as internal delivery." buys="One enforced standard, whoever wrote the code." costs="[I'll supply: what this decision cost]" />
+<TradeoffPair decision="Run security governance inside the engineering lifecycle, not beside it." buys="Security findings were profiled, triaged and reported in the same lifecycle as the work, rather than in a separate track." costs="Security work drew on the same capacity as feature delivery." />
+<TradeoffPair decision="Gate production releases on security posture." buys="Security and compliance items had to be resolved before a release reached production, not after." costs="One more review stood between every release and production." />
+<TradeoffPair decision="Separate platform controls from application remediation." buys="Ownership and traceability were clear to the board: which findings belonged to the platform and which to each application." costs="Two remediation tracks to run and report, rather than one." />
+<TradeoffPair decision="Hold vendor-built software to the same bar as internal delivery." buys="One enforced standard, whoever wrote the code." costs="Vendor-built work went through the same gates before it was accepted, on our timeline rather than the vendor's." />
 </TradeoffList>
 
 </Section>
@@ -25,7 +25,7 @@ The cloud platform carried clinical workloads in a regulated healthcare setting,
 <Section name="actions">
 
 - **A cloud security risk register.** Each risk was profiled and triaged, so the board saw what mattered most first.
-- **Reporting to the board.** Posture and remediation progress went to the board on a set cadence. [I'll supply: the reporting cadence]
+- **Reporting to the board.** Posture and remediation progress went to the board on a set cadence.
 - **Continuous posture monitoring.** I turned on posture management and workload protection in the cloud provider's own security tooling, so posture was watched continuously rather than audited now and then.
 - **Remediation.** I led remediation of high-risk findings across application code and infrastructure, including moving service access to secretless, least-privilege managed identities.
 - **A security gate in release governance.** After QA sign-off, a formal security posture gate stood between a release and production.
@@ -37,11 +37,12 @@ The cloud platform carried clinical workloads in a regulated healthcare setting,
 
 Measured by continuous posture monitoring of the production cloud platform and reported to the board, security posture improved steadily.
 
-<OutcomeBand tag="[I'll supply: the band tag]" figure="[I'll supply: the release governance result, with its wording and attribution confirmed with Amelia first; no security posture figure, relative or absolute]" qualifier="with [I'll supply: its scope and source in one phrase]." />
+<OutcomeBand tag="Board seat" figure="Two years" qualifier="on the Digital Governance Board, reporting directly to the CEO." />
 
 <SourceNote instrument="Posture was measured by the cloud provider's continuous posture monitoring across the production platform, and reported to the board." weakness="A posture score is weighted by which recommendations are in scope, so the direction of movement is the defensible claim, not the score itself." />
 
 <KeyValueList rows={[
+  { term: "Board seat", value: "Two years on the Digital Governance Board" },
   { term: "Reporting line", value: "Directly to the CEO" },
   { term: "Security posture", value: "Improved steadily, measured by continuous posture monitoring and reported to the board" },
 ]} />
@@ -50,6 +51,6 @@ Measured by continuous posture monitoring of the production cloud platform and r
 
 <Section name="lessons">
 
-[I'll supply: one thing that did not work, or that I would do differently, in running security governance through the board]
+Security work competes with feature delivery for the same capacity, so it has to be decided in the open, not absorbed quietly by engineering. Putting posture in front of the board is what made that trade-off visible to the people who should own it.
 
 </Section>
