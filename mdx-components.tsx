@@ -12,8 +12,8 @@ import { Section } from "@/components/mdx-section";
 // Section, then the content components of Story 3.3 (facts strip, outcome
 // band, key-value list, source note, and the trade-off pair with the list
 // that holds it), then Story 3.4's retrieval-layer diagram. All are server
-// components; none is an island. @next/mdx
-// requires this file at the root for the App Router.
+// components; none is an island. @next/mdx requires this file at the root
+// for the App Router.
 const components = {
   Section,
   FactsStrip,

@@ -1,13 +1,14 @@
 // The case-study content components (Story 3.3): facts strip, outcome band,
 // key-value list, source note and trade-off pair, and Story 3.4's retrieval
-// diagram. Each is rendered to static
-// markup, which is what a visitor with JavaScript off gets, and checked for
-// its structure and the rule it exists to enforce: the outcome band's figure
-// and qualifier are one sentence and a bare figure fails, the source note
-// states an instrument and a weakness, the trade-off pair labels both sides in
-// words. The CSS checks pin what markup cannot show: the on-deep focus ring,
-// the 2px ink rule on costs and no accent anywhere. Real MDX bodies are
-// rendered through these components in app/experience/[slug]/case-study.test.tsx.
+// diagram. Each is rendered to static markup, which is what a visitor with
+// JavaScript off gets, and checked for its structure and the rule it exists
+// to enforce: the outcome band's figure and qualifier are one sentence and a
+// bare figure fails, the source note states an instrument and a weakness,
+// the trade-off pair labels both sides in words, and the diagram carries
+// every distinction in words. The CSS checks pin what markup cannot show: the
+// on-deep focus ring, the 2px ink rule on costs and no accent anywhere. Real
+// MDX bodies are rendered through these components in
+// app/experience/[slug]/case-study.test.tsx.
 
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -15,7 +16,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
 
 import { caseStudyPage } from "@/content/case-study-page";
-import { retrievalDiagram } from "@/content/retrieval-diagram";
+import { retrievalDiagram, type Candidate } from "@/content/retrieval-diagram";
 import { figureRole } from "@/lib/figure-role";
 import { useMDXComponents } from "@/mdx-components";
 import { FactsStrip } from "./facts-strip";
@@ -198,36 +199,43 @@ describe("RetrievalDiagram", () => {
     const caption = text(html.match(/<figcaption[^>]*>([\s\S]*?)<\/figcaption>/)?.[1] ?? "");
     expect(caption).toBe(retrievalDiagram.caption);
     expect(caption.split(/(?<=\.)\s+(?=[A-Z])/).length).toBeGreaterThanOrEqual(3);
-    for (const word of ["Relevance", "authority", "expiry"]) expect(caption).toContain(word);
+    // The caption names each gate as its label does.
+    for (const word of ["Relevance", "authority", "in-force gate"]) expect(caption).toContain(word);
     expect(html).not.toMatch(/<figcaption[^>]*(hidden|sr-only|visually-hidden)/);
   });
 
-  test("each state is an h3 heading, then an ordered list of the two candidates, then its answer in words", () => {
+  test("each state is an h3 heading, then a list of the two candidates, then its answer in words", () => {
     expect(stateBlocks).toHaveLength(2);
     stateBlocks.forEach((block, i) => {
       expect(text(block.match(/<h3[^>]*>([\s\S]*?)<\/h3>/)?.[1] ?? "")).toBe(states[i].heading);
-      const list = block.match(/<ol[^>]*>([\s\S]*?)<\/ol>/)?.[1] ?? "";
+      // Unordered, because the candidates' order is not a ranking; role="list"
+      // keeps list semantics in Safari once list-style is none.
+      expect(block).not.toMatch(/<ol[\s>]/);
+      const list = block.match(/<ul role="list"[^>]*>([\s\S]*?)<\/ul>/)?.[1] ?? "";
       expect(list.match(/<li[\s>]/g)).toHaveLength(2);
-      expect(block.indexOf("<ol")).toBeLessThan(block.indexOf("Answer:"));
+      expect(block.indexOf("<ul")).toBeLessThan(block.indexOf("Answer:"));
       expect(answerOf(block)).toBe(states[i].answer);
     });
   });
 
   test("the answer inverts: the exception wins while it applies, the standard once it has expired", () => {
-    expect(answerOf(stateBlocks[0])).toMatch(/exception/);
-    expect(answerOf(stateBlocks[0])).toMatch(/^Do not retry/);
-    expect(answerOf(stateBlocks[1])).toMatch(/standard/);
-    expect(answerOf(stateBlocks[1])).toMatch(/^Retries are allowed/);
     for (const state of states) expect(state.candidates.filter((c) => c.wins)).toHaveLength(1);
-    const winner = (i: number) => states[i].candidates.find((c) => c.wins)?.name;
-    expect(winner(0)).not.toBe(winner(1));
+    const winner = (i: number) => states[i].candidates.find((c) => c.wins);
+    expect(winner(0)?.name).toMatch(/exception/);
+    expect(winner(1)?.name).toMatch(/standard/);
+    // Each state's Answer line gives its winner's guidance.
+    [0, 1].forEach((i) => {
+      expect(answerOf(stateBlocks[i])).toBe(states[i].answer);
+      expect(states[i].answer.startsWith((winner(i)?.guidance ?? "-").replace(/\.$/, ""))).toBe(true);
+    });
+    expect(states[0].answer).not.toBe(states[1].answer);
   });
 
-  test("only the calendar moves: the same two candidates, the same relevance and authority, and only in force changes", () => {
+  test("only the calendar moves: the same two candidates, the same relevance and ranking, and only in force changes", () => {
     const [before, after] = states;
     before.candidates.forEach((c, i) => {
       const d = after.candidates[i];
-      expect([d.name, d.guidance, d.relevant, d.authority]).toEqual([c.name, c.guidance, c.relevant, c.authority]);
+      expect([d.name, d.guidance, d.relevant, d.authority.mark]).toEqual([c.name, c.guidance, c.relevant, c.authority.mark]);
     });
     expect(before.candidates.map((c) => c.inForce.mark)).toEqual(["pass", "pass"]);
     expect(after.candidates.map((c) => c.inForce.mark)).toEqual(["pass", "fail"]);
@@ -247,8 +255,11 @@ describe("RetrievalDiagram", () => {
       }
     }
     // Authority says which source outranks which, in words.
-    const answers = states.flatMap((s) => s.candidates.map((c) => c.authority.answer));
-    expect(answers).toEqual(["Outranked by the exception", "Outranks the standard", "Outranked by the exception", "Outranks the standard"]);
+    for (const c of states.flatMap((s): readonly Candidate[] => s.candidates)) {
+      expect(c.authority.answer).toMatch(c.authority.mark === "outranks" ? /^Outranks the standard$/ : /^Outranked (only )?by the exception/);
+    }
+    // Once the exception has expired, the winning standard says why its outranker no longer counts.
+    expect(states[1].candidates[0].authority.answer).toBe("Outranked only by the exception, which is no longer in force");
   });
 
   test("each candidate says, in words, whether it is the answer", () => {
@@ -262,7 +273,7 @@ describe("RetrievalDiagram", () => {
 
   test("one line says what similarity alone would return, in both states", () => {
     expect(html.split(retrievalDiagram.similarityAlone).length - 1).toBe(1);
-    expect(retrievalDiagram.similarityAlone).toMatch(/^Similarity alone would return the temporary exception in both states/);
+    expect(retrievalDiagram.similarityAlone).toMatch(/^Similarity alone would rank the temporary exception near the top in both states/);
     expect(html.indexOf(retrievalDiagram.similarityAlone)).toBeGreaterThan(html.lastIndexOf("Answer:"));
   });
 

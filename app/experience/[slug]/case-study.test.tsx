@@ -462,13 +462,16 @@ describe("the written case studies, rendered", async () => {
     expect(figure, "the figure sits inside Actions").toBeGreaterThan(-1);
     const bullet = actions.search(/<li[^>]*><strong>A governed retrieval layer/);
     expect(bullet, "the retrieval-layer bullet").toBeGreaterThan(-1);
-    expect(figure, "after the bullet list").toBeGreaterThan(actions.indexOf("</ul>", bullet));
+    const listEnd = actions.indexOf("</ul>", bullet);
+    expect(listEnd, "the end of the bullet list").toBeGreaterThan(-1);
+    expect(figure, "after the bullet list").toBeGreaterThan(listEnd);
     const caption = text(actions.match(/<figcaption[^>]*>([\s\S]*?)<\/figcaption>/)?.[1] ?? "");
     expect(caption).toBe(retrievalDiagram.caption);
     const states = [...actions.matchAll(/<h3[^>]*>([\s\S]*?)<\/h3>/g)].map((m) => text(m[1]));
     expect(states).toEqual(retrievalDiagram.states.map((state) => state.heading));
     const answers = [...actions.matchAll(/<strong[^>]*>Answer:<\/strong>([\s\S]*?)<\/p>/g)].map((m) => text(m[1]));
-    expect(answers).toEqual(["Do not retry this service, from the temporary exception.", "Retries are allowed, from the resilience standard."]);
+    expect(answers).toEqual(retrievalDiagram.states.map((state) => state.answer));
+    expect(answers[0]).not.toBe(answers[1]);
   });
 
   test("the diagram is the only figure on any case study, and no case study uses table semantics", async () => {
