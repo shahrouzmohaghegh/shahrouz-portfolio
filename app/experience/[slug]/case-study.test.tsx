@@ -31,6 +31,7 @@ import kvStyles from "@/components/case-study/key-value-list.module.css";
 import noteStyles from "@/components/case-study/source-note.module.css";
 import { Section } from "@/components/mdx-section";
 import { caseStudyPage } from "@/content/case-study-page";
+import { retrievalDiagram } from "@/content/retrieval-diagram";
 import { useMDXComponents } from "@/mdx-components";
 import { CAPABILITY_NAME, CASE_STUDY_SECTIONS, caseStudyItems } from "@/lib/evidence";
 import { metadata as rootMetadata } from "../../layout";
@@ -417,9 +418,9 @@ describe("the written case studies, rendered", async () => {
     expect(open).toEqual([]);
   });
 
-  test("the metadata files carry no confidential term, em dash, Team Lead, CIO or board peer title", () => {
+  test("the metadata files and the diagram's words carry no confidential term, em dash, Team Lead, CIO or board peer title", () => {
     const hits: string[] = [];
-    for (const path of ["content/case-studies/index.ts", "content/case-study-page.ts"]) {
+    for (const path of ["content/case-studies/index.ts", "content/case-study-page.ts", "content/retrieval-diagram.ts"]) {
       source(path).split("\n").forEach((text, i) => {
         for (const { line, pattern } of confidentialTerms()) if (pattern.test(text)) hits.push(`${path}:${i + 1}: matches ${TERMS_FILE} line ${line}`);
         for (const [name, pattern] of EXTRA_BANNED) if (pattern.test(text)) hits.push(`${path}:${i + 1}: ${name}`);
@@ -450,6 +451,32 @@ describe("the written case studies, rendered", async () => {
     const dekVocabulary = dek.search(AI_VOCABULARY);
     const dekFigure = dek.search(MEASURED);
     expect(dekVocabulary === -1 || (dekFigure > -1 && dekFigure < dekVocabulary), `the dek uses AI vocabulary before a figure: "${dek}"`).toBe(true);
+  });
+
+  // Story 3.4 (FR-36): the retrieval-layer diagram, on the real page.
+  test("AI-native engineering carries one figure with a visible caption, in Actions, after the retrieval-layer bullet", async () => {
+    const main = mainOf(await renderWritten("ai-native-engineering"));
+    expect(main.match(/<figure[\s>]/g)).toHaveLength(1);
+    const actions = sectionOf(main, "actions");
+    const figure = actions.indexOf("<figure");
+    expect(figure, "the figure sits inside Actions").toBeGreaterThan(-1);
+    const bullet = actions.search(/<li[^>]*><strong>A governed retrieval layer/);
+    expect(bullet, "the retrieval-layer bullet").toBeGreaterThan(-1);
+    expect(figure, "after the bullet list").toBeGreaterThan(actions.indexOf("</ul>", bullet));
+    const caption = text(actions.match(/<figcaption[^>]*>([\s\S]*?)<\/figcaption>/)?.[1] ?? "");
+    expect(caption).toBe(retrievalDiagram.caption);
+    const states = [...actions.matchAll(/<h3[^>]*>([\s\S]*?)<\/h3>/g)].map((m) => text(m[1]));
+    expect(states).toEqual(retrievalDiagram.states.map((state) => state.heading));
+    const answers = [...actions.matchAll(/<strong[^>]*>Answer:<\/strong>([\s\S]*?)<\/p>/g)].map((m) => text(m[1]));
+    expect(answers).toEqual(["Do not retry this service, from the temporary exception.", "Retries are allowed, from the resilience standard."]);
+  });
+
+  test("the diagram is the only figure on any case study, and no case study uses table semantics", async () => {
+    for (const slug of slugs) {
+      const main = mainOf(await renderWritten(slug));
+      expect(main, slug).not.toMatch(/<table|role="(table|row|cell|grid|gridcell|rowheader|columnheader)"/);
+      if (slug !== "ai-native-engineering") expect(main, slug).not.toMatch(/<figure[\s>]/);
+    }
   });
 
   test("\"Ralph loop\" never appears without a plain-language gloss straight after it", async () => {

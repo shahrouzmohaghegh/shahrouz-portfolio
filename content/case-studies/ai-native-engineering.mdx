@@ -28,6 +28,8 @@ The team was established, and much of it came from a legacy on-premise backgroun
 - **The measurement framework.** Metrics for productivity, quality, adoption and throughput, defined on the delivery workflow's own state transitions. It is informed by DORA but adapted for AI-assisted delivery, with an adoption category DORA has no equivalent for.
 - **A governed retrieval layer, which I built and ran.** Vector search tells the assistant what is relevant. Authority tells it what wins when relevant sources conflict, and expiry tells it when something must stop winning. When a service was found not to be safe to retry, a temporary exception to the resilience standard went into the index with an expiry, until the team that owned the service fixed it. Once the fix landed, the exception expired and left the index, and the change that restored the retry passed the AI code review without objection. A plain similarity search would have kept ranking the dead exception near the top, because it named the service, the pattern and the reasoning, and the reviewer would have objected to the very change that put things right.
 
+<RetrievalDiagram />
+
 </Section>
 
 <Section name="outcome">

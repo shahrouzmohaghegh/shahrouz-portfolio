@@ -428,6 +428,13 @@
   --component-tradeoff-pair-columns-mobile: minmax(0, 1fr);
   --component-tradeoff-pair-columns: repeat(auto-fit, minmax(min(100%, 14em), 1fr));
   --component-fact-gap: 7px;
+  /* The retrieval-layer diagram (Story 3.4): its two states side by side
+     while each has 14em, stacked below that and always below 768px (a pair
+     remapped in breakpoints.css). Each gate's caps label holds a column
+     wide enough for "Authority", so the three answers line up. */
+  --component-retrieval-diagram-columns-mobile: minmax(0, 1fr);
+  --component-retrieval-diagram-columns: repeat(auto-fit, minmax(min(100%, 14em), 1fr));
+  --component-retrieval-diagram-gate-label-width: 8.5em;
   /* The facts-strip value, key-value value and prose strong: weight 600,
      set by the component on {typography.data-row} or {typography.body}. */
   --component-data-row-emphasis-weight: 600;
