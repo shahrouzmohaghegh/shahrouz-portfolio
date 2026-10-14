@@ -320,7 +320,7 @@ describe("SectionRail markup", () => {
 describe("SectionRail with groups", () => {
   const GROUPS = [
     { label: "The build", sections: [{ id: "problem", label: "Problem" }, { id: "approach", label: "Approach" }] },
-    { label: "What it cost", sections: [{ id: "tradeoffs", label: "Trade-offs" }] },
+    { label: "How it held up", sections: [{ id: "tradeoffs", label: "Trade-offs" }] },
     { label: "What came of it", sections: [{ id: "outcome", label: "Outcome" }] },
   ];
   const foot = createElement("a", { href: "https://example.com/repo" }, "Repository");
@@ -338,7 +338,7 @@ describe("SectionRail with groups", () => {
       "p On this page",
       "p The build",
       "ol problem,approach",
-      "p What it cost",
+      "p How it held up",
       "ol tradeoffs",
       "p What came of it",
       "ol outcome",

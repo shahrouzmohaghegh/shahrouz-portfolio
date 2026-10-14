@@ -264,7 +264,7 @@ describe("a written project", () => {
       `p ${projectPage.railLabel}`,
       ...PROJECT_SECTION_GROUPS.flatMap((group) => [`p ${group.label}`, ...group.sections.map(({ id, label }) => `#${id} ${label}`)]),
     ]);
-    expect(PROJECT_SECTION_GROUPS.map((group) => group.label)).toEqual(["The build", "What it cost", "What came of it"]);
+    expect(PROJECT_SECTION_GROUPS.map((group) => group.label)).toEqual(["The build", "How it held up", "What came of it"]);
   });
 
   test("renders the eight sections in order, each a focusable target labelled by its h2", async () => {

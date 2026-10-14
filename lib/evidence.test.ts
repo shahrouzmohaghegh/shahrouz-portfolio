@@ -385,10 +385,10 @@ describe("the project sections", () => {
     ]);
   });
 
-  test("fall under The build, What it cost and What came of it", () => {
+  test("fall under The build, How it held up and What came of it", () => {
     expect(PROJECT_SECTION_GROUPS.map((group) => [group.label, group.sections.map((section) => section.id)])).toEqual([
       ["The build", ["problem", "approach", "decisions", "technologies"]],
-      ["What it cost", ["tradeoffs", "testing"]],
+      ["How it held up", ["tradeoffs", "testing"]],
       ["What came of it", ["outcome", "lessons"]],
     ]);
   });

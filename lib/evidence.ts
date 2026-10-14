@@ -84,7 +84,7 @@ export const PROJECT_SECTION_GROUPS = [
     ],
   },
   {
-    label: "What it cost",
+    label: "How it held up",
     sections: [
       { id: "tradeoffs", label: "Trade-offs" },
       { id: "testing", label: "Testing" },
