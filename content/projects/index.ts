@@ -23,7 +23,7 @@ export const projects: readonly Project[] = [
     kind: "project",
     title: "This website",
     summary:
-      "Next.js, React and TypeScript, built with BMAD agents while he held the requirements, architecture, decisions and acceptance criteria.",
+      "Next.js, React and TypeScript, built with BMAD agents while he held the requirements, architecture, decisions and review.",
     capabilities: ["hands-on"],
     headlineMetric: {
       value: "Twelve automated checks run on every merge to main",

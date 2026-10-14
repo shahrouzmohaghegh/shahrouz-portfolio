@@ -10,7 +10,7 @@ So the problem was not only to automate the work. It was to automate it in a way
 
 I built a multi-agent system with four agents, fifteen workflow skills, nineteen knowledge files and a document toolchain, built and run by one person on one laptop. It is built on BMAD, where agents and workflows are Claude Code skills.
 
-- **Four agents, each owning a stage.** One scores a role and decides whether it is worth the effort. One writes the tailored documents. One handles recruiter conversations and public content. One prepares for interviews. The analysis hands off to the documents automatically only when the score clears a threshold; the later stages wait for a real event, such as an interview being booked.
+- **Four agents, each owning a stage.** The stages are drawn where the work fails differently, which is the first decision below. One scores a role and decides whether it is worth the effort. One writes the tailored documents. One handles recruiter conversations and public content. One prepares for interviews. The analysis hands off to the documents automatically only when the score clears a threshold; the later stages wait for a real event, such as an interview being booked.
 - **A knowledge layer the agents load on activation.** Facts, conventions and corrections live in files, one rule in exactly one file, so the system behaves consistently without being reminded.
 - **Guardrails written as scripts.** Every rule that can be checked mechanically is checked mechanically, by the toolchain rather than by the model.
 - **Markdown as the source of truth.** Nothing is authored in a binary format. The toolchain checks a draft for drift, renders it to Word and PDF, names it and publishes it.
@@ -24,10 +24,10 @@ The architecture is documented in C4 form, at context, container and component l
 
 <TradeoffList>
 <TradeoffPair decision="Split the agents by how their work fails, not by topic." buys="Each agent optimises for one way of failing: a document that is never read fails silently in an inbox, while an interview fails in ninety seconds in front of a person, and one persona cannot optimise for both." costs="Four agents to define and keep consistent rather than three, and a boundary that has to be argued: the recruiter phone screen stayed with outreach, because it is a conversation about motivation and level, not a test of capability.">
-I first recommended staying at three agents, on the grounds that the capability mostly existed already. That answered the wrong question. The right test was how the work fails, and by that test the split is correct.
+My first call was to stay at three agents, on the grounds that the capability mostly existed already. I changed my mind, because that answered the wrong question. The right test was how the work fails, and by that test the split is correct.
 </TradeoffPair>
 <TradeoffPair decision="Make guardrails scripts, not intentions." buys="Rules are enforced rather than remembered. The validator runs 281 checks, and a drift check fails a run when a tailored document reorganises its source instead of re-emphasising it." costs="Every rule has to be written as code, and each guardrail has to be proven by breaking it on purpose, which is work a prompt would not need." />
-<TradeoffPair decision="Write Word files directly with the docx library, rather than converting through pandoc." buys="No external binary, which a serverless backend could not easily use, and Markdown handled by the line-oriented parser these documents rely on, where each source line becomes one paragraph." costs="More code: pandoc with a reference document would have inherited the template's styles with almost none." />
+<TradeoffPair decision="Write Word files directly with the docx library, rather than converting through pandoc." buys="No external binary on the Word path, which a serverless backend could not easily use, and Markdown handled by the line-oriented parser these documents rely on, where each source line becomes one paragraph." costs="More code: pandoc with a reference document would have inherited the template's styles with almost no code of its own. And PDF still needs LibreOffice headless, an external process the Word path avoids." />
 <TradeoffPair decision="Keep the drift check asymmetric." buys="A tailored document may select less than its source, because the source is a library and selection is the point. Content that grows past the source is flagged, because it was either invented or imported from somewhere it should not have been." costs="A section that shrinks is never flagged, so the check cannot catch a document that selects too little; that judgement stays with the reader." />
 </TradeoffList>
 
@@ -70,14 +70,17 @@ The public repository holds the architecture documentation and the toolchain sou
 
 The system is not a demonstration: it is a working tool, and the documents it produces are the ones that get sent.
 
-<SourceNote instrument="The counts come from the public repository's own README and documentation, as published." weakness="They count checks and parts, not quality: the system has one user, so nothing here shows how it would hold up in anyone else's hands." />
+<SourceNote instrument="The counts come from the public repository's own README and documentation, as published." weakness="The skills and knowledge files are not in the public repository, and the validator's checks run against them, so a reader can read the validator but cannot rerun it to verify the counts. They also count checks and parts, not quality: the system has one user, so nothing here shows how it would hold up in anyone else's hands." />
 
 <KeyValueList rows={[
   { term: "Validator", value: "281 checks across the repository" },
-  { term: "Agents", value: "Four, split by how their work fails" },
+  { term: "Built and run by", value: "One person on one laptop" },
+  { term: "Agents", value: "Four, split by how their work fails, after a first call to stay at three" },
+  { term: "Why the split", value: "An unread document fails silently, while an interview fails in ninety seconds" },
   { term: "Workflow skills", value: "Fifteen" },
   { term: "Knowledge files", value: "Nineteen" },
   { term: "Architecture", value: "C4 views at context, container and component level, plus a dynamic view and a deployment view" },
+  { term: "What the drawing exposed", value: "Two structural facts: no application layer, and infrastructure bound concretely" },
 ]} />
 
 </Section>

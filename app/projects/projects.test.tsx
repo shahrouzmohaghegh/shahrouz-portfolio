@@ -595,6 +595,16 @@ function confidentialTerms(): Array<{ line: number; pattern: RegExp }> {
   expect(terms.length, `${TERMS_FILE} holds no terms, so confidential terms cannot be checked`).toBeGreaterThan(0);
   return terms;
 }
+// Number words, one to twenty, the tens and hundred, read as digits, so a
+// number stated in words is held to the key-value list like any other.
+const NUMBER_WORDS: Record<string, number> = Object.fromEntries([
+  ...["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty"].map((w, i) => [w, i + 1] as const),
+  ...["thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"].map((w, i) => [w, (i + 3) * 10] as const),
+  ["hundred", 100] as const,
+]);
+const digitsFor = (s: string): string =>
+  s.replace(new RegExp(`\\b(${Object.keys(NUMBER_WORDS).join("|")})\\b`, "gi"), (w) => String(NUMBER_WORDS[w.toLowerCase()]));
+
 const EM_DASH = new RegExp(String.fromCharCode(0x2014));
 
 function bannedLines(path: string, body: string): string[] {
@@ -668,7 +678,7 @@ describe("the written projects, rendered", async () => {
     expect(slugs).toEqual(projectItems.map((item) => item.slug));
   });
 
-  describe.each(projectItems.map((item) => item.slug))("%s", (slug) => {
+  describe.each(slugs)("%s", (slug) => {
     test("Decisions sets out at least one decision as a labelled trade-off pair", async () => {
       const decisions = sectionOf(mainOf(await renderWritten(slug)), "decisions");
       const pairs = [...decisions.matchAll(/<li[^>]*><h3[^>]*>/g)].length;
@@ -685,18 +695,20 @@ describe("the written projects, rendered", async () => {
       expect(kv, "a key-value list after the source note").toBeGreaterThan(note);
     });
 
-    test("the key-value list repeats every number the page states", async () => {
+    test("the key-value list repeats every number the page states, in digits or in words", async () => {
       const body = bodyOf(mainOf(await renderWritten(slug)));
       const kvAt = body.indexOf(`class="${kvStyles.list}"`);
       const kv = body.slice(kvAt, body.indexOf("</dl>", kvAt));
-      const numbers = (html: string) => new Set(text(html).match(/\d+(?:\.\d+)?/g) ?? []);
+      const numbers = (html: string) => new Set(digitsFor(text(html)).match(/\d+(?:\.\d+)?/g) ?? []);
       const listed = numbers(kv);
       expect([...numbers(body)].filter((n) => !listed.has(n))).toEqual([]);
     });
 
-    test("Lessons has something to say", async () => {
-      const lessons = sectionOf(mainOf(await renderWritten(slug)), "lessons");
-      expect(text(lessons.replace(/<h2[\s\S]*?<\/h2>/, "")).length).toBeGreaterThan(0);
+    test("every one of the eight sections has at least 40 characters of text", async () => {
+      const main = mainOf(await renderWritten(slug));
+      for (const { id } of PROJECT_SECTIONS) {
+        expect(text(sectionOf(main, id).replace(/<h2[\s\S]*?<\/h2>/, "")).length, id).toBeGreaterThanOrEqual(40);
+      }
     });
 
     test("\"Ralph loop\" never appears without a plain-language gloss straight after it", async () => {
@@ -734,7 +746,8 @@ describe("the written projects, rendered", async () => {
   });
 
   // PR-3 says plainly which work was driven through agentic loops and which was direct.
-  test("PR-3 states the agentic work, that he has not written Angular by hand, and the direct AKS, Azure and SQL work", async () => {
+  // Only while PR-3 is written: the spec's fallback drops it from the list.
+  test.runIf(slugs.includes(pr3.slug))("PR-3 states the agentic work, that he has not written Angular by hand, and the direct AKS, Azure and SQL work", async () => {
     const sentences = await sentencesOf(pr3.slug);
     const some = (label: string, ...patterns: RegExp[]) =>
       expect(sentences.some((s) => patterns.every((p) => p.test(s))), label).toBe(true);

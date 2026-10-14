@@ -14,8 +14,8 @@ type Props = { params: Promise<{ slug: string }> };
 
 // One page per written project (writtenProjectSlugs), generated at build.
 // Any other slug is answered by proxy.ts, with the static
-// app/project-not-available page and a 404, before this route is reached, because Next.js 16.3.8 renders a
-// segment not-found.tsx only on the client. notFound() below stays as the
+// app/project-not-available page and a 404, before this route is reached,
+// because Next.js 16.3.8 renders a segment not-found.tsx only on the client. notFound() below stays as the
 // fallback and serves this segment's not-found.tsx. dynamicParams stays at
 // its default: set to false, Next.js answers with the root not-found page.
 export function generateStaticParams(): Array<{ slug: string }> {
