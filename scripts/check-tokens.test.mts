@@ -98,9 +98,9 @@ describe("the real repository", () => {
     // evidence band gaps (tag, figure); the card grid columns; the case-study
     // columns and the four section rail pairs (position, background, border,
     // padding); the case-study content components' two pairs (key-value
-    // columns, trade-off pair columns)
-    const expected = typeRemaps + 7 + 21;
-    assert.equal(expected, 101);
+    // columns, trade-off pair columns); the retrieval diagram's state columns
+    const expected = typeRemaps + 7 + 22;
+    assert.equal(expected, 102);
     assert.equal(Object.keys(expectedRemaps(groups)).length, expected);
   });
 

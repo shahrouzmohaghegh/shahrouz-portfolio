@@ -1,0 +1,164 @@
+/* Story 3.4, the retrieval-layer diagram, in the visual language of
+   {components.sequence-stage}: labels in {typography.body} at 600 ink,
+   detail in {typography.small} muted, hairline {colors.rule} connectors.
+   The two states sit side by side while each has 14em and stack below
+   that, which they always do below 768px (the
+   --component-retrieval-diagram-columns pair in breakpoints.css). The
+   winning candidate sits under a {spacing.rule-card} ink rule, the other
+   under a hairline, and both say in words whether they are the answer.
+   Never the accent; no table display; nothing animates. */
+.figure {
+  max-width: var(--space-measure-body);
+  margin: var(--space-stack-md) 0 var(--space-stack-lg);
+  padding: var(--space-stack-md) 0 0;
+  border-top: var(--space-rule-hairline) solid var(--color-rule);
+}
+
+.caption {
+  margin: 0 0 var(--space-stack-sm);
+  font-family: var(--type-data-row-family);
+  font-size: var(--type-data-row-size);
+  font-weight: var(--type-data-row-weight);
+  line-height: var(--type-data-row-leading);
+  color: var(--color-muted);
+}
+
+.question {
+  margin: 0 0 var(--space-stack-md);
+  font-family: var(--type-body-family);
+  font-size: var(--type-body-size);
+  font-weight: var(--component-data-row-emphasis-weight);
+  line-height: var(--type-body-leading);
+  color: var(--color-ink);
+}
+
+.states {
+  display: grid;
+  grid-template-columns: var(--component-retrieval-diagram-columns);
+  gap: var(--space-stack-lg) var(--space-card-gap);
+}
+
+.state {
+  min-width: 0;
+}
+
+.heading {
+  margin: 0 0 var(--space-stack-sm);
+  font-family: var(--type-card-title-family);
+  font-size: var(--type-card-title-size);
+  font-weight: var(--type-card-title-weight);
+  line-height: var(--type-card-title-leading);
+  letter-spacing: var(--type-card-title-tracking);
+  color: var(--color-ink);
+}
+
+.candidates {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.candidate,
+.winner {
+  min-width: 0;
+  margin: 0 0 var(--space-stack-sm);
+  padding-top: var(--space-stack-sm);
+  overflow-wrap: break-word;
+}
+
+.candidate {
+  border-top: var(--space-rule-hairline) solid var(--color-tone-2);
+}
+
+.winner {
+  border-top: var(--space-rule-card) solid var(--color-ink);
+}
+
+.name {
+  margin: 0;
+  font-family: var(--type-body-family);
+  font-size: var(--type-body-size);
+  font-weight: var(--component-data-row-emphasis-weight);
+  line-height: var(--type-body-leading);
+  color: var(--color-ink);
+}
+
+.guidance,
+.verdict {
+  margin: 0 0 var(--space-stack-xs);
+  font-family: var(--type-small-family);
+  font-size: var(--type-small-size);
+  font-weight: var(--type-small-weight);
+  line-height: var(--type-small-leading);
+  color: var(--color-muted);
+}
+
+.verdict {
+  margin: var(--space-stack-xs) 0 0;
+  color: var(--color-ink);
+}
+
+.gates {
+  margin: 0;
+}
+
+.gate {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--space-stack-xs);
+  padding: var(--component-fact-gap) 0;
+  border-top: var(--space-rule-hairline) solid var(--color-rule);
+}
+
+.gateLabel {
+  flex: 0 0 auto;
+  min-width: var(--component-retrieval-diagram-gate-label-width);
+  font-family: var(--type-meta-label-family);
+  font-size: var(--type-meta-label-size);
+  font-weight: var(--type-meta-label-weight);
+  line-height: var(--type-meta-label-leading);
+  letter-spacing: var(--type-meta-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.gateAnswer {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--type-small-family);
+  font-size: var(--type-small-size);
+  font-weight: var(--type-small-weight);
+  line-height: var(--type-small-leading);
+  color: var(--color-ink);
+}
+
+.glyph {
+  color: var(--color-muted);
+}
+
+.answer {
+  margin: var(--space-stack-sm) 0 0;
+  padding-top: var(--space-stack-sm);
+  border-top: var(--space-rule-card) solid var(--color-ink);
+  font-family: var(--type-body-family);
+  font-size: var(--type-body-size);
+  font-weight: var(--type-body-weight);
+  line-height: var(--type-body-leading);
+  color: var(--color-ink);
+}
+
+.answerLabel {
+  font-weight: var(--component-data-row-emphasis-weight);
+}
+
+.similarity {
+  margin: var(--space-stack-lg) 0 0;
+  padding-left: var(--space-stack-sm);
+  border-left: var(--space-rule-card) solid var(--color-tone-2);
+  font-family: var(--type-small-family);
+  font-size: var(--type-small-size);
+  font-weight: var(--type-small-weight);
+  line-height: var(--type-small-leading);
+  color: var(--color-muted);
+}

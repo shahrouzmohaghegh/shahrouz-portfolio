@@ -1,12 +1,14 @@
 // The case-study content components (Story 3.3): facts strip, outcome band,
-// key-value list, source note and trade-off pair. Each is rendered to static
-// markup, which is what a visitor with JavaScript off gets, and checked for
-// its structure and the rule it exists to enforce: the outcome band's figure
-// and qualifier are one sentence and a bare figure fails, the source note
-// states an instrument and a weakness, the trade-off pair labels both sides in
-// words. The CSS checks pin what markup cannot show: the on-deep focus ring,
-// the 2px ink rule on costs and no accent anywhere. Real MDX bodies are
-// rendered through these components in app/experience/[slug]/case-study.test.tsx.
+// key-value list, source note and trade-off pair, and Story 3.4's retrieval
+// diagram. Each is rendered to static markup, which is what a visitor with
+// JavaScript off gets, and checked for its structure and the rule it exists
+// to enforce: the outcome band's figure and qualifier are one sentence and a
+// bare figure fails, the source note states an instrument and a weakness,
+// the trade-off pair labels both sides in words, and the diagram carries
+// every distinction in words. The CSS checks pin what markup cannot show: the
+// on-deep focus ring, the 2px ink rule on costs and no accent anywhere. Real
+// MDX bodies are rendered through these components in
+// app/experience/[slug]/case-study.test.tsx.
 
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -14,11 +16,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
 
 import { caseStudyPage } from "@/content/case-study-page";
+import { retrievalDiagram, type Candidate } from "@/content/retrieval-diagram";
 import { figureRole } from "@/lib/figure-role";
 import { useMDXComponents } from "@/mdx-components";
 import { FactsStrip } from "./facts-strip";
 import { KeyValueList } from "./key-value-list";
 import { OutcomeBand } from "./outcome-band";
+import { RetrievalDiagram } from "./retrieval-diagram";
 import { SourceNote } from "./source-note";
 import { TradeoffList, TradeoffPair } from "./tradeoff-pair";
 
@@ -178,18 +182,133 @@ describe("TradeoffPair", () => {
   });
 });
 
+// Story 3.4 (FR-36): the original diagram of how the retrieval layer decides.
+// One question in two states, both candidates through three gates in each,
+// and the answer inverts when only the calendar moves. Every distinction is
+// in words (NFR-2); glyphs are decorative; no table semantics anywhere.
+describe("RetrievalDiagram", () => {
+  const html = renderToStaticMarkup(<RetrievalDiagram />);
+  const { states, gates } = retrievalDiagram;
+  // Each state's markup: from its h3 to the next h3, or to the similarity line.
+  const stateBlocks = html.split(/(?=<h3[\s>])/).slice(1);
+  const answerOf = (block: string): string => text(block.match(/<p class="[^"]*"><strong[^>]*>Answer:<\/strong>([\s\S]*?)<\/p>/)?.[1] ?? "");
+
+  test("is one figure whose visible figcaption states the mechanism in full sentences", () => {
+    expect(html.match(/<figure[\s>]/g)).toHaveLength(1);
+    expect(html).toMatch(/^<figure[^>]*><figcaption[^>]*>/);
+    const caption = text(html.match(/<figcaption[^>]*>([\s\S]*?)<\/figcaption>/)?.[1] ?? "");
+    expect(caption).toBe(retrievalDiagram.caption);
+    expect(caption.split(/(?<=\.)\s+(?=[A-Z])/).length).toBeGreaterThanOrEqual(3);
+    // The caption names each gate as its label does.
+    for (const word of ["Relevance", "authority", "in-force gate"]) expect(caption).toContain(word);
+    expect(html).not.toMatch(/<figcaption[^>]*(hidden|sr-only|visually-hidden)/);
+  });
+
+  test("each state is an h3 heading, then a list of the two candidates, then its answer in words", () => {
+    expect(stateBlocks).toHaveLength(2);
+    stateBlocks.forEach((block, i) => {
+      expect(text(block.match(/<h3[^>]*>([\s\S]*?)<\/h3>/)?.[1] ?? "")).toBe(states[i].heading);
+      // Unordered, because the candidates' order is not a ranking; role="list"
+      // keeps list semantics in Safari once list-style is none.
+      expect(block).not.toMatch(/<ol[\s>]/);
+      const list = block.match(/<ul role="list"[^>]*>([\s\S]*?)<\/ul>/)?.[1] ?? "";
+      expect(list.match(/<li[\s>]/g)).toHaveLength(2);
+      expect(block.indexOf("<ul")).toBeLessThan(block.indexOf("Answer:"));
+      expect(answerOf(block)).toBe(states[i].answer);
+    });
+  });
+
+  test("the answer inverts: the exception wins while it applies, the standard once it has expired", () => {
+    for (const state of states) expect(state.candidates.filter((c) => c.wins)).toHaveLength(1);
+    const winner = (i: number) => states[i].candidates.find((c) => c.wins);
+    expect(winner(0)?.name).toMatch(/exception/);
+    expect(winner(1)?.name).toMatch(/standard/);
+    // Each state's Answer line gives its winner's guidance.
+    [0, 1].forEach((i) => {
+      expect(answerOf(stateBlocks[i])).toBe(states[i].answer);
+      expect(states[i].answer.startsWith((winner(i)?.guidance ?? "-").replace(/\.$/, ""))).toBe(true);
+    });
+    expect(states[0].answer).not.toBe(states[1].answer);
+  });
+
+  test("only the calendar moves: the same two candidates, the same relevance and ranking, and only in force changes", () => {
+    const [before, after] = states;
+    before.candidates.forEach((c, i) => {
+      const d = after.candidates[i];
+      expect([d.name, d.guidance, d.relevant, d.authority.mark]).toEqual([c.name, c.guidance, c.relevant, c.authority.mark]);
+    });
+    expect(before.candidates.map((c) => c.inForce.mark)).toEqual(["pass", "pass"]);
+    expect(after.candidates.map((c) => c.inForce.mark)).toEqual(["pass", "fail"]);
+  });
+
+  test("every candidate shows its three gates, each a visible word answer, with the glyph aria-hidden", () => {
+    const items = [...html.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/g)].map((m) => m[1]);
+    expect(items).toHaveLength(4);
+    for (const item of items) {
+      const rows = [...item.matchAll(/<dt[^>]*>([\s\S]*?)<\/dt><dd[^>]*>([\s\S]*?)<\/dd>/g)];
+      expect(rows.map((m) => text(m[1]))).toEqual([gates.relevant, gates.authority, gates.inForce]);
+      for (const [, , dd] of rows) {
+        const glyph = dd.match(/^<span ([^>]*)>([^<]*)<\/span>/);
+        expect(glyph?.[1]).toContain('aria-hidden="true"');
+        const answer = text(dd.replace(/^<span[^>]*>[^<]*<\/span>/, ""));
+        expect(answer).toMatch(/^(Yes|No|Outranks|Outranked)\b/);
+      }
+    }
+    // Authority says which source outranks which, in words.
+    for (const c of states.flatMap((s): readonly Candidate[] => s.candidates)) {
+      expect(c.authority.answer).toMatch(c.authority.mark === "outranks" ? /^Outranks the standard$/ : /^Outranked (only )?by the exception/);
+    }
+    // Once the exception has expired, the winning standard says why its outranker no longer counts.
+    expect(states[1].candidates[0].authority.answer).toBe("Outranked only by the exception, which is no longer in force");
+  });
+
+  test("each candidate says, in words, whether it is the answer", () => {
+    for (const state of states) {
+      for (const c of state.candidates) {
+        expect(c.verdict).toMatch(c.wins ? /^The answer\./ : /^Not the answer\./);
+        expect(html).toContain(`>${c.verdict}</p>`);
+      }
+    }
+  });
+
+  test("one line says what similarity alone would return, in both states", () => {
+    expect(html.split(retrievalDiagram.similarityAlone).length - 1).toBe(1);
+    expect(retrievalDiagram.similarityAlone).toMatch(/^Similarity alone would rank the temporary exception near the top in both states/);
+    expect(html.indexOf(retrievalDiagram.similarityAlone)).toBeGreaterThan(html.lastIndexOf("Answer:"));
+  });
+
+  test("no table semantics, no image, no SVG, no script", () => {
+    expect(html).not.toMatch(/<table|role="(table|row|cell|grid|gridcell|rowheader|columnheader)"|<svg|<img|<script/);
+    const sheet = css("retrieval-diagram");
+    expect(sheet).not.toMatch(/display:\s*(table|table-row|table-cell)/);
+    expect(sheet).not.toMatch(/animation|transition/);
+  });
+
+  test("the words carry no em dash, no figure and no digit", () => {
+    const words = JSON.stringify(retrievalDiagram);
+    expect(words).not.toMatch(/\u2014/);
+    expect(words).not.toMatch(/\d/);
+  });
+
+  test("the states stack below 768px and sit side by side when there is room, within the section's measure", () => {
+    const sheet = css("retrieval-diagram");
+    expect(rule(sheet, ".states")).toContain("grid-template-columns: var(--component-retrieval-diagram-columns);");
+    expect(rule(sheet, ".figure")).toContain("max-width: var(--space-measure-body);");
+  });
+});
+
 describe("how the components are built", () => {
   const sources = readdirSync(join(process.cwd(), DIR)).filter((f) => /\.tsx$/.test(f) && !/\.test\./.test(f));
 
-  test("all five are handed to every MDX file by mdx-components.tsx", () => {
+  test("all of them are handed to every MDX file by mdx-components.tsx", () => {
     const components = useMDXComponents();
-    for (const [name, component] of Object.entries({ FactsStrip, OutcomeBand, KeyValueList, SourceNote, TradeoffList, TradeoffPair })) {
+    for (const [name, component] of Object.entries({ FactsStrip, OutcomeBand, KeyValueList, SourceNote, TradeoffList, TradeoffPair, RetrievalDiagram })) {
       expect(components[name], name).toBe(component);
     }
   });
 
   test("each is a server component: no client directive, no island, no evidence collection", () => {
-    expect(sources.sort()).toEqual(["facts-strip.tsx", "key-value-list.tsx", "outcome-band.tsx", "source-note.tsx", "tradeoff-pair.tsx"]);
+    expect(sources.sort()).toEqual(["facts-strip.tsx", "key-value-list.tsx", "outcome-band.tsx", "retrieval-diagram.tsx", "source-note.tsx", "tradeoff-pair.tsx"]);
     for (const file of sources) {
       const code = readFileSync(join(process.cwd(), DIR, file), "utf8");
       expect(code, file).not.toMatch(/["']use client["']/);
