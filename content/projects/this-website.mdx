@@ -1,0 +1,86 @@
+<Section name="problem">
+
+A site that makes claims about engineering judgement has to let a reader check them. That makes the repository a deliverable, not a by-product: a technical reader should be able to open it, see how it is structured and find the decisions behind it.
+
+It also carries a constraint most personal sites do not. The evidence on it comes from real work for a former employer, and some of that is confidential. Nothing confidential may reach a page, the public repository or its history, and that cannot rest on care alone.
+
+</Section>
+
+<Section name="approach">
+
+The site was built with BMAD agents while Shahrouz held the requirements, architecture, decisions and review. That is the sentence the repository's README opens with, and it is the honest division of the work: agents planned and wrote code, story by story, against specifications I approved, and I decided, reviewed and accepted. The architecture sets the bound on what agents may produce: I must be able to explain any part of the implementation, and a pattern I cannot explain is a defect even if it works.
+
+- **Planning in the open, in part.** The brief, the design and experience documents, the architecture spine and the architecture drawn at context, container and component level are published in the repository. The product requirements, the epics and the reviews are not, because they name the very terms the site exists to keep out.
+- **Content as typed data.** Every case study and project is defined once and read through one contract by every page.
+- **One required gate.** Every change reaches the main branch through a pull request, and the pull request merges only when the gate passes.
+- **A human box an agent cannot tick.** A change to any content fails the gate until its description carries a ticked line saying I reviewed the wording at that commit.
+
+</Section>
+
+<Section name="decisions">
+
+<TradeoffList>
+<TradeoffPair decision="Render every page on the server, with client JavaScript only in named islands, closed at two." buys="Every page is full HTML with JavaScript off, and the site ships no script it does not need. The two islands, the scroll reveal and the section rail, each degrade to usable content without it." costs="Any new interactive behaviour needs a new architecture decision before it can be built, rather than a component marked for the client as a convenience." />
+<TradeoffPair decision="Keep metadata in TypeScript and prose in MDX." buys="An unknown capability, an empty capability list or a headline metric without its qualifier fails the type check, because MDX exports are not type-checked and frontmatter is not parsed by default." costs="Adding a case study or project takes three edits rather than one, a departure from the requirement it was written against, accepted on purpose." />
+<TradeoffPair decision="Check content and links against a running server, not the source." buys="The checks see what a visitor gets: the build is started, every route is crawled from the home page, and every page and external link must answer as it should." costs="The link check depends on other sites, so it runs after the deterministic checks, and LinkedIn answers automated requests with a non-standard status, which needed a narrow, named exemption rather than a pass." />
+<TradeoffPair decision="Answer an unwritten case study or project through a proxy, with a real not-found status and a static page." buys="With JavaScript off, a visitor following a broken link sees a full not-found page, where the pinned Next.js version would have sent an empty document that only the client renders." costs="A committed list of written pages has to stay in step with the prose, and a test fails the build while the two disagree." />
+</TradeoffList>
+
+</Section>
+
+<Section name="technologies">
+
+- **Framework:** Next.js with the App Router, React and MDX compiled at build, statically rendered and deployed on Vercel.
+- **Language:** TypeScript under `strict` throughout, including the repository's own scripts, which Node runs directly by stripping types, with no extra runner.
+- **Styling:** CSS Modules, with every design value in one token file. No component library, CSS framework or animation library.
+- **Testing:** Vitest for the application, `node:test` for the scripts, and ESLint with a rule that enforces the direction of imports.
+- **Delivery:** GitHub Actions for the gate, gitleaks for secrets, and local git hooks that run the fast checks before every commit.
+
+Every dependency has a one-line reason in the README, and a dependency without one fails a check.
+
+</Section>
+
+<Section name="tradeoffs">
+
+Publishing only part of the planning was a trade, not an oversight. The published documents show how the site was planned and governed. The private ones carry the deliberation, and some links inside the published documents do not resolve as a result.
+
+The content review box is procedural, not proof. Agents act through my login, so GitHub cannot tell who ticked it. What it does guarantee is that no content change merges without the box ticked at its latest commit, and a later push makes the tick stale.
+
+The confidential term list cannot live in the public repository, because it names what it keeps out. It is an untracked local file and a repository secret, and a script changes both together, after first scanning every branch and every commit for a match, so a term that already sits in history is found before it can turn every run red.
+
+</Section>
+
+<Section name="testing">
+
+Every pull request runs one required gate, in this order: lint, type check, the script tests, the unit tests, the build, a token drift check, a scan of the repository tree and every blob and commit message in its history, a secret scan, a README check, the content review check, a link check against the running build, and a check that the main branch is still protected.
+
+- **Content integrity.** An entry without its prose, prose without its entry, a slug used twice, a section missing or out of order, or a written list that disagrees with the prose each fails the unit tests, naming the item.
+- **Every written page rendered for real.** Each case study and project is compiled through the real components and fails on a confidential term, an em dash, or a Technologies section that lists Python beside C#, C++, SQL, KQL or TypeScript without saying it was AI-assisted.
+- **Every link followed.** The crawl fails on any page or external link that does not answer, and on anything pointing at a repository outside a public allowlist, in any form.
+- **Production watched.** A scheduled check confirms the live site answers with my name on the page and that the not-found pages still answer with a real not-found status, and opens an issue when it does not.
+
+</Section>
+
+<Section name="outcome">
+
+<OutcomeBand tag="The gate" figure="Twelve automated checks" qualifier="in one required gate, run on every pull request and every push to the main branch." />
+
+<SourceNote instrument="The count is the gate's own list of steps in the CI workflow, leaving out the four set-up steps that check nothing: check out, restore the term list, set up Node and install." weakness="A count of checks says what is checked, not how well, and the content review check proves only that a box was ticked, not who ticked it." />
+
+<KeyValueList rows={[
+  { term: "The gate", value: "Twelve automated checks, run on every pull request and every push to main" },
+  { term: "Client islands", value: "Two, the scroll reveal and the section rail" },
+  { term: "Built", value: "With BMAD agents, while Shahrouz held the requirements, architecture, decisions and review" },
+]} />
+
+</Section>
+
+<Section name="lessons">
+
+The framework had a gap I did not expect. A not-found page inside a route segment was sent as an empty document that only the client renders, so with JavaScript off a visitor following a broken case-study link saw a blank page, even though the status and title were right. It was reproduced on a clean main branch before it was fixed, and the fix, the proxy and the static not-found pages, became an architecture note rather than a workaround.
+
+An early draft of the architecture pinned the wrong patch release of Next.js, on a misread release schedule: the version it named was a bug fix carrying none of the security fixes. The lesson is to pin from the release notes, not from the calendar.
+
+The first repository scripts were written in plain JavaScript, because the architecture's own file tree said so. TypeScript throughout, tooling included, was added as a rule only after they shipped, and they were converted. A rule that comes after the code is a rule you pay for twice.
+
+</Section>
