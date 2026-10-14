@@ -109,6 +109,37 @@ jobs:
       - name: Content review check
         run: npm run check:content-review
 
+      # Starts the build with next start on a local port, waits until it
+      # answers, then crawls it: every internal page answers 200 (404 for the
+      # not-found pages and unwritten detail slugs), every external link
+      # answers 200 (LinkedIn's bot block of 999 or 429 is reported, not
+      # failed), each project's repository link is the expected public one,
+      # and no link or page points at a repository off the public allowlist
+      # of repositories.
+      # Launch-blocking. It runs last but one, because it is the only step
+      # that depends on other sites: a network hiccup there never stops the
+      # deterministic checks above from running.
+      - name: Link check (next start, every page and external link)
+        run: |
+          ./node_modules/.bin/next start --port 3000 > "$RUNNER_TEMP/next-start.log" 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          deadline=$((SECONDS + 60))
+          until curl -s -o /dev/null --max-time 1 http://localhost:3000/; do
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::next start did not answer on http://localhost:3000 within 60 seconds."
+              cat "$RUNNER_TEMP/next-start.log"
+              exit 1
+            fi
+            sleep 1
+          done
+          if ! kill -0 "$server" 2>/dev/null; then
+            echo "::error::the next start process has exited, so whatever answered on port 3000 is not this build."
+            cat "$RUNNER_TEMP/next-start.log"
+            exit 1
+          fi
+          npm run check:links -- http://localhost:3000
+
       # Branch protection is what keeps a red gate out of production, so the
       # gate checks the part of it the public branch endpoint shows: main
       # protected, required checks enforced for admins too, and gate among

@@ -52,6 +52,7 @@ const CHECK_STEPS = [
   "Script tests",
   "Unit tests",
   "Build",
+  "Link check (next start, every page and external link)",
   "Token drift check",
   "Repository scan (tree, every blob and commit message in history)",
   "Secret scan (gitleaks, full history)",
