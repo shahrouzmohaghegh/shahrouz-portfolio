@@ -10,7 +10,7 @@
 // Issues are touched only when GITHUB_ACTIONS is "true"; anywhere else the
 // script behaves as --print, so a local run can never open or close one.
 //
-// One pass runs seven checks:
+// One pass runs nine checks:
 //   - apex: https://shahrouzmohaghegh.com/ answers 200 and its HTML
 //     contains "Shahrouz Mohaghegh";
 //   - www, http: https://www.shahrouzmohaghegh.com/ and
@@ -23,6 +23,10 @@
 //     not-found page reaches visitors through proxy.ts as full HTML (AD-23
 //     note of 2026-10-12); a Next.js change could bring back a blank or 200
 //     page with every test green, so the live server is checked;
+//   - missing-project, project-not-found-page: the same for projects (Story
+//     3.5): a project URL that will never exist and
+//     https://shahrouzmohaghegh.com/project-not-available each answer 404
+//     with the HTML h1 "This project is not available.";
 //   - deployment: the newest GitHub deployment in environment Production
 //     (Vercel creates them) has success, in_progress, queued or pending as
 //     its latest status, and has not sat in one of the last three for over
@@ -76,6 +80,10 @@ export const NOT_FOUND_PAGE = "https://shahrouzmohaghegh.com/case-study-not-avai
 // The h1 of the case-study not-found page, as content/case-study-page.ts
 // words it (the test pins the two together).
 export const NOT_FOUND_HEADING = "This case study is not available.";
+export const MISSING_PROJECT = "https://shahrouzmohaghegh.com/projects/production-watch-no-such-project";
+export const PROJECT_NOT_FOUND_PAGE = "https://shahrouzmohaghegh.com/project-not-available";
+// The h1 of the project not-found page, as content/project-page.ts words it.
+export const PROJECT_NOT_FOUND_HEADING = "This project is not available.";
 export const ENVIRONMENT = "Production";
 export const HEALTHY_STATES = ["success", "in_progress", "queued", "pending"];
 export const PASSES = 3;
@@ -100,7 +108,17 @@ export const emergencyUrl = (repo: string): string => `https://github.com/${repo
 
 // ---------------------------------------------------------------- checks
 
-export const CHECK_IDS = ["apex", "www", "http", "http-www", "missing-case-study", "not-found-page", "deployment"] as const;
+export const CHECK_IDS = [
+  "apex",
+  "www",
+  "http",
+  "http-www",
+  "missing-case-study",
+  "not-found-page",
+  "missing-project",
+  "project-not-found-page",
+  "deployment",
+] as const;
 export type CheckId = (typeof CHECK_IDS)[number];
 export type Problem = { check: CheckId; detail: string };
 
@@ -111,6 +129,8 @@ export const CHECK_LABELS: Record<CheckId, string> = {
   "http-www": `${HTTP_WWW} answers 308 to ${APEX} or ${WWW}`,
   "missing-case-study": `${MISSING_CASE_STUDY} answers 404 with the h1 "${NOT_FOUND_HEADING}"`,
   "not-found-page": `${NOT_FOUND_PAGE} answers 404 with the h1 "${NOT_FOUND_HEADING}"`,
+  "missing-project": `${MISSING_PROJECT} answers 404 with the h1 "${PROJECT_NOT_FOUND_HEADING}"`,
+  "project-not-found-page": `${PROJECT_NOT_FOUND_PAGE} answers 404 with the h1 "${PROJECT_NOT_FOUND_HEADING}"`,
   deployment: `the latest ${ENVIRONMENT} deployment is success, or in_progress, queued or pending for under ${STUCK_MS / 60_000} minutes`,
 };
 
@@ -135,8 +155,16 @@ export async function checkApex(http: Http): Promise<Problem | null> {
   return null;
 }
 
-// The case-study not-found page, served as full HTML with a real 404.
-export async function checkNotFound(http: Http, check: "missing-case-study" | "not-found-page", url: string): Promise<Problem | null> {
+export type NotFoundCheck = "missing-case-study" | "not-found-page" | "missing-project" | "project-not-found-page";
+
+// A detail route's not-found page, served as full HTML with a real 404 and
+// its h1: the case-study one unless another heading is given.
+export async function checkNotFound(
+  http: Http,
+  check: NotFoundCheck,
+  url: string,
+  expected: string = NOT_FOUND_HEADING,
+): Promise<Problem | null> {
   let response: HttpResponse;
   try {
     response = await http(url);
@@ -144,9 +172,9 @@ export async function checkNotFound(http: Http, check: "missing-case-study" | "n
     return { check, detail: `${url} did not answer: ${errorText(error)}` };
   }
   if (response.status !== 404) return { check, detail: `${url} answered HTTP ${response.status}, not 404` };
-  const heading = new RegExp(`<h1[^>]*>${NOT_FOUND_HEADING.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}</h1>`);
+  const heading = new RegExp(`<h1[^>]*>${expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}</h1>`);
   if (!heading.test(response.body)) {
-    return { check, detail: `${url} answered 404, but the HTML has no h1 "${NOT_FOUND_HEADING}"` };
+    return { check, detail: `${url} answered 404, but the HTML has no h1 "${expected}"` };
   }
   return null;
 }
@@ -227,6 +255,8 @@ export async function checkOnce(http: Http, repo: string | null, now: Date): Pro
     checkRedirect(http, "http-www", HTTP_WWW, [APEX, WWW]),
     checkNotFound(http, "missing-case-study", MISSING_CASE_STUDY),
     checkNotFound(http, "not-found-page", NOT_FOUND_PAGE),
+    checkNotFound(http, "missing-project", MISSING_PROJECT, PROJECT_NOT_FOUND_HEADING),
+    checkNotFound(http, "project-not-found-page", PROJECT_NOT_FOUND_PAGE, PROJECT_NOT_FOUND_HEADING),
     checkDeployment(http, repo, now),
   ]);
   return results.filter((result): result is Problem => result !== null);

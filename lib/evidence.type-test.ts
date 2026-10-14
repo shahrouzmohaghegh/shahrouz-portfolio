@@ -4,6 +4,7 @@
 // type check fails. Nothing here runs.
 
 import type { EvidenceItem, HeadlineMetric } from "@/lib/evidence";
+import type { CaseStudy } from "@/lib/evidence-types";
 
 const metric: HeadlineMetric = { value: "1 to 2", qualifier: "in one place" };
 
@@ -50,3 +51,22 @@ export const bothKeys: HeadlineMetric = { value: "95%", qualifier: "somewhere", 
 
 // @ts-expect-error The flag is only ever true.
 export const flagFalse: HeadlineMetric = { value: "95%", qualifierNotRequired: false };
+
+// A case study has no repository (Story 3.5).
+export const caseStudyRepository: CaseStudy = {
+  slug: "with-repository",
+  kind: "case-study",
+  title: "With repository",
+  summary: "With repository.",
+  capabilities: ["leadership"],
+  headlineMetric: metric,
+  href: "/experience/with-repository",
+  // @ts-expect-error Only a Project carries a repository.
+  repository: "https://github.com/x/y",
+};
+
+export const plainRepository: EvidenceItem = {
+  ...valid,
+  // @ts-expect-error A repository is an https URL.
+  repository: "github.com/x/y",
+};

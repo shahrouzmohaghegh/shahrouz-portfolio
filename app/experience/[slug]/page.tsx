@@ -5,13 +5,7 @@ import { notFound } from "next/navigation";
 import { SectionRail } from "@/components/islands/section-rail";
 import { SiteFrame } from "@/components/site-frame";
 import { caseStudyPage } from "@/content/case-study-page";
-import {
-  CAPABILITY_NAME,
-  CASE_STUDY_SECTIONS,
-  caseStudyBody,
-  nextCaseStudy,
-  writtenCaseStudyItems,
-} from "@/lib/evidence";
+import { CAPABILITY_NAME, CASE_STUDY_SECTIONS, evidenceBody, nextWrittenItem, writtenItems } from "@/lib/evidence";
 import styles from "./case-study.module.css";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -24,11 +18,11 @@ type Props = { params: Promise<{ slug: string }> };
 // and serves this segment's not-found.tsx. dynamicParams stays at its
 // default: set to false, Next.js answers with the root not-found page.
 export function generateStaticParams(): Array<{ slug: string }> {
-  return writtenCaseStudyItems().map(({ slug }) => ({ slug }));
+  return writtenItems("case-study").map(({ slug }) => ({ slug }));
 }
 
 function writtenItem(slug: string) {
-  return writtenCaseStudyItems().find((item) => item.slug === slug);
+  return writtenItems("case-study").find((item) => item.slug === slug);
 }
 
 // The title is the bare item title; the root template adds the site name once.
@@ -44,11 +38,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 // Story 3.3 writes the prose and the content components it uses.
 export default async function CaseStudyPage({ params }: Props) {
   const { slug } = await params;
-  const written = writtenCaseStudyItems();
+  const written = writtenItems("case-study");
   const item = written.find((each) => each.slug === slug);
   if (item === undefined) notFound();
-  const Body = await caseStudyBody(slug);
-  const next = nextCaseStudy(written, slug);
+  const Body = await evidenceBody("case-study", slug);
+  const next = nextWrittenItem(written, slug);
 
   return (
     <SiteFrame current="/experience">

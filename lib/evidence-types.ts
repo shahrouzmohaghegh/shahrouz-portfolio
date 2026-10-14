@@ -45,11 +45,17 @@ export interface EvidenceItem {
   readonly capabilities: Capabilities;
   readonly headlineMetric: HeadlineMetric;
   readonly href: string;
+  // A project's public source (Story 3.5): the detail page's repository call
+  // to action links here, and a project without one renders none. Only a
+  // Project may carry it; Story 3.6 checks every one answers and none is
+  // private.
+  readonly repository?: `https://${string}`;
 }
 
 export interface CaseStudy extends EvidenceItem {
   readonly kind: "case-study";
   readonly href: `${(typeof EVIDENCE_ROUTE)["case-study"]}/${string}`;
+  readonly repository?: never;
 }
 
 export interface Project extends EvidenceItem {

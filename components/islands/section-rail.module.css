@@ -1,6 +1,7 @@
 /* {components.section-rail}: the label, then the in-page anchors, each with
    a hairline rule on top and numbered 01 onward by a CSS counter in
-   {typography.stage-number}. Items in {typography.ui}, muted; the current
+   {typography.stage-number}. The counter is reset once on the nav, so it
+   runs on through every list: a project's three groups number 01 to 08. Items in {typography.ui}, muted; the current
    one in {colors.accent} at 600. Sticky beside the body from 768px; below
    it a static {colors.panel} box above the body. Every switch is a
    --component-section-rail-* pair remapped in breakpoints.css. */
@@ -12,6 +13,7 @@
   padding: var(--component-section-rail-padding);
   border: var(--component-section-rail-border);
   background: var(--component-section-rail-background);
+  counter-reset: rail;
 }
 
 .label {
@@ -29,11 +31,29 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  counter-reset: rail;
 }
 
 .item {
   counter-increment: rail;
+}
+
+/* {components.rail-group-header}: a caps label above a run of items, in
+   ink at 600 rather than oxide, so it reads as a divider and spends no
+   accent mark. A <p>, never a heading. The first sits straight under the
+   rail label; the counter is never reset by one. */
+.groupLabel {
+  margin: var(--space-stack-md) 0 var(--space-stack-xs);
+  font-family: var(--type-meta-label-family);
+  font-size: var(--type-meta-label-size);
+  font-weight: var(--component-rail-group-header-weight);
+  line-height: var(--type-meta-label-leading);
+  letter-spacing: var(--component-rail-group-header-tracking);
+  text-transform: uppercase;
+  color: var(--color-ink);
+}
+
+.label + .groupLabel {
+  margin-top: 0;
 }
 
 /* Inside a nav, so no underline is required (EXPERIENCE.md link

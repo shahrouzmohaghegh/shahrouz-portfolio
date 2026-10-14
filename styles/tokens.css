@@ -414,6 +414,20 @@
   --component-section-rail-item-padding: 8px 0;
   --component-section-rail-counter-gap: 12px;
   --component-section-rail-current-weight: 600;
+  /* {components.rail-group-header} (Story 3.5): {typography.meta-label} in
+     ink at 600, tracked 0.18em. */
+  --component-rail-group-header-weight: 600;
+  --component-rail-group-header-tracking: 0.18em;
+  /* {components.repo-cta} and {components.repo-cta-rail} (Story 3.5), from
+     DESIGN.md and screen-project.html: the panel's padding and measure, the
+     tighter padding below 768px (a pair remapped in breakpoints.css), the
+     rail repeat's padding and the gap above it at the rail's foot. */
+  --component-repo-cta-padding-mobile: 18px 18px 20px;
+  --component-repo-cta-padding: 26px 30px 28px;
+  --component-repo-cta-max-width: 660px;
+  --component-repo-cta-title-weight: 600;
+  --component-repo-cta-underline-offset: 3px;
+  --component-repo-cta-rail-padding: 14px 15px 15px;
   /* The case-study content components (Story 3.3), from
      screen-case-study.html and screen-project.html. Facts sit side by side
      while each has at least 10em and wrap below that, so they stack at
