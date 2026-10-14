@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 
 import { writtenCaseStudySlugs } from "@/content/case-studies";
+import { writtenProjectSlugs } from "@/content/projects";
 import { CI_PATH, gateStepNames } from "@/scripts/check-readme.mts";
 
 import {
@@ -18,16 +19,20 @@ import {
   CAPABILITY_NAME,
   CASE_STUDY_SECTIONS,
   EVIDENCE_ROUTE,
+  PROJECT_SECTION_GROUPS,
+  PROJECT_SECTIONS,
   caseStudyItems,
   evidenceItems,
   inCanonicalOrder,
   isWritten,
   listingTitle,
-  nextCaseStudy,
+  nextWrittenItem,
   projectItems,
-  writtenCaseStudyItems,
+  sectionsOf,
+  writtenItems,
   type Capabilities,
   type EvidenceItem,
+  type EvidenceKind,
 } from "@/lib/evidence";
 
 // The this-website Headline Metric states how many checks run on every
@@ -85,47 +90,60 @@ function mdxProblems(collection: string, items: readonly EvidenceItem[], files: 
   ];
 }
 
-// A written case study (non-empty MDX) holds exactly the five sections, in
-// CASE_STUDY_SECTIONS order, each as one <Section name="..."> (the name in
-// double or single quotes, or a braced string), and nothing else: no text
-// outside a Section, and no Markdown heading anywhere, since each section's
-// only heading is the h2 Section renders. An empty file is unwritten and is
-// not checked here; it gets no page.
+// Each kind's collection directory, the noun its problems use and the name
+// of its committed written list.
+const COLLECTION = {
+  "case-study": { dir: "case-studies", noun: "case study", list: "writtenCaseStudySlugs" },
+  project: { dir: "projects", noun: "project", list: "writtenProjectSlugs" },
+} as const satisfies Record<EvidenceKind, { dir: string; noun: string; list: string }>;
+
+// A written item (non-empty MDX) holds exactly its kind's sections, in
+// sectionsOf(kind) order (five for a case study, eight for a project), each
+// as one <Section name="..."> (the name in double or single quotes, or a
+// braced string), and nothing else: no text outside a Section, and no
+// Markdown heading anywhere, since each section's only heading is the h2
+// Section renders. An empty file is unwritten and is not checked here; it
+// gets no page.
 const SECTION_NAME = /\bname=(?:"([^"]*)"|'([^']*)'|\{\s*"([^"]*)"\s*\}|\{\s*'([^']*)'\s*\})/;
 
-function sectionProblems(slug: string, source: string): string[] {
+function sectionProblems(slug: string, source: string, kind: EvidenceKind = "case-study"): string[] {
   if (!isWritten(source)) return [];
-  const expected = CASE_STUDY_SECTIONS.map((section) => section.id);
+  const { dir, noun } = COLLECTION[kind];
+  const expected = sectionsOf(kind).map((section) => section.id);
   const tags = [...source.matchAll(/<Section\b[^>]*>/g)].map(([tag]) => tag);
   const names = tags.map((tag) => {
     const match = tag.match(SECTION_NAME);
     return match ? (match[1] ?? match[2] ?? match[3] ?? match[4]) : undefined;
   });
   const problems: string[] = [];
-  if (names.includes(undefined)) problems.push(`case-studies: "${slug}" has a <Section> with no name="..."`);
+  if (names.includes(undefined)) problems.push(`${dir}: "${slug}" has a <Section> with no name="..."`);
   const outside = source.replace(/<Section\b[^>]*>[\s\S]*?<\/Section>/g, "").trim();
-  if (outside !== "") problems.push(`case-studies: "${slug}" has content outside a <Section>: "${outside.slice(0, 40)}"`);
+  if (outside !== "") problems.push(`${dir}: "${slug}" has content outside a <Section>: "${outside.slice(0, 40)}"`);
   const headings = source.split("\n").filter((line) => /^ {0,3}#{1,6}(\s|$)/.test(line));
-  if (headings.length > 0) problems.push(`case-studies: "${slug}" has a Markdown heading ("${headings[0].trim()}"); Section renders each section's only heading`);
+  if (headings.length > 0) problems.push(`${dir}: "${slug}" has a Markdown heading ("${headings[0].trim()}"); Section renders each section's only heading`);
   const found = names.filter((name): name is string => name !== undefined);
   if (found.join(",") !== expected.join(",")) {
-    problems.push(
-      `case-studies: "${slug}" sections are [${found.join(", ")}]; a written case study needs exactly [${expected.join(", ")}], in that order`,
-    );
+    problems.push(`${dir}: "${slug}" sections are [${found.join(", ")}]; a written ${noun} needs exactly [${expected.join(", ")}], in that order`);
   }
   return problems;
 }
 
-// The committed list of written case studies (the proxy and the page both
-// read it) against the MDX files that are actually written.
-function writtenListProblems(listed: readonly string[], written: readonly string[], order: readonly string[]): string[] {
+// A kind's committed written list (the proxy and the page both read it)
+// against the MDX files that are actually written.
+function writtenListProblems(
+  listed: readonly string[],
+  written: readonly string[],
+  order: readonly string[],
+  kind: EvidenceKind = "case-study",
+): string[] {
+  const { dir, list } = COLLECTION[kind];
   const problems = [
-    ...written.filter((slug) => !listed.includes(slug)).map((slug) => `case-studies: ${slug}.mdx is written but "${slug}" is not in writtenCaseStudySlugs`),
-    ...listed.filter((slug) => !written.includes(slug)).map((slug) => `case-studies: "${slug}" is in writtenCaseStudySlugs but ${slug}.mdx is empty`),
-    ...[...new Set(listed.filter((slug, i) => listed.indexOf(slug) !== i))].map((slug) => `case-studies: "${slug}" is in writtenCaseStudySlugs more than once`),
+    ...written.filter((slug) => !listed.includes(slug)).map((slug) => `${dir}: ${slug}.mdx is written but "${slug}" is not in ${list}`),
+    ...listed.filter((slug) => !written.includes(slug)).map((slug) => `${dir}: "${slug}" is in ${list} but ${slug}.mdx is empty`),
+    ...[...new Set(listed.filter((slug, i) => listed.indexOf(slug) !== i))].map((slug) => `${dir}: "${slug}" is in ${list} more than once`),
   ];
   if (problems.length === 0 && listed.join(",") !== order.filter((slug) => listed.includes(slug)).join(",")) {
-    problems.push("case-studies: writtenCaseStudySlugs is not in collection order");
+    problems.push(`${dir}: ${list} is not in collection order`);
   }
   return problems;
 }
@@ -248,6 +266,29 @@ describe("the content collections", () => {
     expect(problems).toEqual([]);
   });
 
+  test("every written project holds the eight sections in order", () => {
+    const problems = projectItems.flatMap((item) =>
+      sectionProblems(item.slug, readFileSync(fileURLToPath(new URL(`../content/projects/${item.slug}.mdx`, import.meta.url)), "utf8"), "project"),
+    );
+    expect(problems).toEqual([]);
+  });
+
+  test("only a project carries a repository, and each is a public GitHub URL", () => {
+    expect(caseStudyItems.filter((item) => item.repository !== undefined).map((item) => item.slug)).toEqual([]);
+    for (const item of projectItems) {
+      if (item.repository === undefined) continue;
+      expect(item.repository, item.slug).toMatch(/^https:\/\/github\.com\/shahrouzmohaghegh\/[a-z0-9-]+$/);
+    }
+  });
+
+  test("the reviewed repositories: PR-1 and PR-2 have one, PR-3 has none", () => {
+    expect(Object.fromEntries(projectItems.map((item) => [item.slug, item.repository]))).toEqual({
+      "career-application-system": "https://github.com/shahrouzmohaghegh/career-application-system",
+      "this-website": "https://github.com/shahrouzmohaghegh/shahrouz-portfolio",
+      "platform-modernisation": undefined,
+    });
+  });
+
   test("case studies are case studies and projects are projects", () => {
     expect(caseStudyItems.filter((item) => item.kind !== "case-study").map((item) => item.slug)).toEqual([]);
     expect(projectItems.filter((item) => item.kind !== "project").map((item) => item.slug)).toEqual([]);
@@ -327,6 +368,44 @@ describe("the case-study sections", () => {
   });
 });
 
+// The eight project sections (Story 3.5), under the three rail group
+// headers: one list, read by the Section component, the rail and the
+// integrity check.
+describe("the project sections", () => {
+  test("are the eight sections in order, each with its label", () => {
+    expect(PROJECT_SECTIONS).toEqual([
+      { id: "problem", label: "Problem" },
+      { id: "approach", label: "Approach" },
+      { id: "decisions", label: "Decisions" },
+      { id: "technologies", label: "Technologies" },
+      { id: "tradeoffs", label: "Trade-offs" },
+      { id: "testing", label: "Testing" },
+      { id: "outcome", label: "Outcome" },
+      { id: "lessons", label: "Lessons" },
+    ]);
+  });
+
+  test("fall under The build, How it held up and What came of it", () => {
+    expect(PROJECT_SECTION_GROUPS.map((group) => [group.label, group.sections.map((section) => section.id)])).toEqual([
+      ["The build", ["problem", "approach", "decisions", "technologies"]],
+      ["How it held up", ["tradeoffs", "testing"]],
+      ["What came of it", ["outcome", "lessons"]],
+    ]);
+  });
+
+  test("sectionsOf gives each kind its own list", () => {
+    expect(sectionsOf("case-study")).toBe(CASE_STUDY_SECTIONS);
+    expect(sectionsOf("project")).toEqual(PROJECT_SECTIONS);
+  });
+
+  test("a section both kinds use has the same label in each, so the one Section component serves both", () => {
+    for (const section of PROJECT_SECTIONS) {
+      const shared = CASE_STUDY_SECTIONS.find((each) => each.id === section.id);
+      if (shared !== undefined) expect(shared.label, section.id).toBe(section.label);
+    }
+  });
+});
+
 // A case study gets a page only once its MDX is written (Story 3.2).
 describe("written case studies", () => {
   const item = (slug: string): EvidenceItem =>
@@ -349,8 +428,8 @@ describe("written case studies", () => {
     ).toEqual([]);
   });
 
-  test("writtenCaseStudyItems reads the committed list, in collection order", () => {
-    expect(writtenCaseStudyItems().map((each) => each.slug)).toEqual(
+  test("writtenItems reads the committed list, in collection order", () => {
+    expect(writtenItems("case-study").map((each) => each.slug)).toEqual(
       caseStudyItems.filter((each) => writtenCaseStudySlugs.includes(each.slug)).map((each) => each.slug),
     );
   });
@@ -366,15 +445,43 @@ describe("written case studies", () => {
 
   test("the next case study is the following written one, wrapping to the first", () => {
     const written = [item("a"), item("b"), item("c")];
-    expect(nextCaseStudy(written, "a")?.slug).toBe("b");
-    expect(nextCaseStudy(written, "b")?.slug).toBe("c");
-    expect(nextCaseStudy(written, "c")?.slug).toBe("a");
+    expect(nextWrittenItem(written, "a")?.slug).toBe("b");
+    expect(nextWrittenItem(written, "b")?.slug).toBe("c");
+    expect(nextWrittenItem(written, "c")?.slug).toBe("a");
   });
 
   test("there is no next case study when only one is written, or the slug is not written", () => {
-    expect(nextCaseStudy([item("a")], "a")).toBeUndefined();
-    expect(nextCaseStudy([item("a"), item("b")], "nope")).toBeUndefined();
-    expect(nextCaseStudy([], "a")).toBeUndefined();
+    expect(nextWrittenItem([item("a")], "a")).toBeUndefined();
+    expect(nextWrittenItem([item("a"), item("b")], "nope")).toBeUndefined();
+    expect(nextWrittenItem([], "a")).toBeUndefined();
+  });
+});
+
+// A project gets a page only once its MDX is written (Story 3.5); the prose
+// is Story 3.7, so until then none is.
+describe("written projects", () => {
+  test("the committed written list names exactly the projects whose MDX is written, in collection order", () => {
+    const written = mdxFiles("projects")
+      .filter((file) => file.endsWith(".mdx"))
+      .filter((file) => isWritten(readFileSync(fileURLToPath(new URL(`../content/projects/${file}`, import.meta.url)), "utf8")))
+      .map((file) => file.slice(0, -".mdx".length));
+    expect(
+      writtenListProblems(writtenProjectSlugs, written, projectItems.map((each) => each.slug), "project"),
+      "Update writtenProjectSlugs in content/projects/index.ts in the same change as the MDX: the proxy 404s every slug not on it.",
+    ).toEqual([]);
+  });
+
+  test("writtenItems reads the committed list, projects only, in collection order", () => {
+    expect(writtenItems("project").map((each) => each.slug)).toEqual(
+      projectItems.filter((each) => writtenProjectSlugs.includes(each.slug)).map((each) => each.slug),
+    );
+    expect(writtenItems("project").every((each) => each.kind === "project")).toBe(true);
+    expect(writtenItems("case-study").every((each) => each.kind === "case-study")).toBe(true);
+  });
+
+  test("a drifting project list is named with the project list's name", () => {
+    expect(writtenListProblems([], ["b"], ["a", "b"], "project")).toEqual(['projects: b.mdx is written but "b" is not in writtenProjectSlugs']);
+    expect(writtenListProblems(["b", "a"], ["a", "b"], ["a", "b"], "project")).toEqual(["projects: writtenProjectSlugs is not in collection order"]);
   });
 });
 
@@ -519,6 +626,29 @@ describe("the integrity checks", () => {
     expect(sectionProblems("x", `<Section>\n\nProse.\n\n</Section>\n\n${fiveSections}`)).toEqual([
       'case-studies: "x" has a <Section> with no name="..."',
     ]);
+  });
+
+  const eightSections = ["problem", "approach", "decisions", "technologies", "tradeoffs", "testing", "outcome", "lessons"];
+
+  test("a written project with the eight sections in order passes, and an empty one is not checked", () => {
+    expect(sectionProblems("x", eightSections.map(section).join("\n\n"), "project")).toEqual([]);
+    expect(sectionProblems("x", "", "project")).toEqual([]);
+  });
+
+  test.each([
+    ["a missing section", eightSections.filter((name) => name !== "testing")],
+    ["an extra section", [...eightSections, "appendix"]],
+    ["sections out of order", ["approach", "problem", ...eightSections.slice(2)]],
+    ["the case-study sections", ["context", "decisions", "actions", "outcome", "lessons"]],
+  ])("a project with %s is named, with the slug", (_label, names) => {
+    const problems = sectionProblems("x", names.map(section).join("\n\n"), "project");
+    expect(problems).toEqual([
+      `projects: "x" sections are [${names.join(", ")}]; a written project needs exactly [${eightSections.join(", ")}], in that order`,
+    ]);
+  });
+
+  test("a case study with the project sections is named", () => {
+    expect(sectionProblems("x", eightSections.map(section).join("\n\n"))).toHaveLength(1);
   });
 
   test("a duplicate slug is named, within or across collections", () => {

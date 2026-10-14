@@ -33,7 +33,7 @@ import { Section } from "@/components/mdx-section";
 import { caseStudyPage } from "@/content/case-study-page";
 import { retrievalDiagram } from "@/content/retrieval-diagram";
 import { useMDXComponents } from "@/mdx-components";
-import { CAPABILITY_NAME, CASE_STUDY_SECTIONS, caseStudyItems } from "@/lib/evidence";
+import { CAPABILITY_NAME, CASE_STUDY_SECTIONS, caseStudyItems, type EvidenceKind } from "@/lib/evidence";
 import { metadata as rootMetadata } from "../../layout";
 
 // Which real case studies the mock treats as written; each test sets it.
@@ -44,11 +44,13 @@ vi.mock("@/lib/evidence", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/evidence")>();
   return {
     ...actual,
-    writtenCaseStudyItems: () => actual.caseStudyItems.filter((item) => state.written.includes(item.slug)),
+    writtenItems: (kind: EvidenceKind) =>
+      kind === "case-study" ? actual.caseStudyItems.filter((item) => state.written.includes(item.slug)) : actual.writtenItems(kind),
     // The fixture body: the five sections in order, as a written MDX holds
     // them. Section is imported on call, not in this factory, because it
     // imports this mocked module itself.
-    caseStudyBody: async (slug: string) => {
+    evidenceBody: async (kind: EvidenceKind, slug: string) => {
+      if (kind !== "case-study") return actual.evidenceBody(kind, slug);
       if (slug in state.bodies) return state.bodies[slug];
       const { Section: FixtureSection } = await import("@/components/mdx-section");
       const { createElement } = await import("react");
@@ -298,7 +300,7 @@ describe("how the route is built", () => {
 // `next start`.
 describe("the written case studies, rendered", async () => {
   const actual = await vi.importActual<typeof import("@/lib/evidence")>("@/lib/evidence");
-  const written = actual.writtenCaseStudyItems();
+  const written = actual.writtenItems("case-study");
   const slugs = written.map((item) => item.slug);
   const mdxPath = (slug: string) => `content/case-studies/${slug}.mdx`;
   const compile = async (slug: string): Promise<MDXContent> =>

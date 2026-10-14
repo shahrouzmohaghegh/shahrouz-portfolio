@@ -21,6 +21,9 @@ import {
   NAME,
   NOT_FOUND_HEADING,
   NOT_FOUND_PAGE,
+  MISSING_PROJECT,
+  PROJECT_NOT_FOUND_HEADING,
+  PROJECT_NOT_FOUND_PAGE,
   PASSES,
   RETRY_MS,
   STUCK_MS,
@@ -58,6 +61,7 @@ import {
   type Spawn,
 } from "./production-watch.mts";
 import { caseStudyPage } from "../content/case-study-page.ts";
+import { projectPage } from "../content/project-page.ts";
 
 const REPO = "owner/site";
 const NOW = new Date("2026-10-09T12:00:00Z");
@@ -73,6 +77,8 @@ type Site = {
   httpWww?: Answer;
   missing?: Answer;
   notFoundPage?: Answer;
+  missingProject?: Answer;
+  projectNotFoundPage?: Answer;
   deployments?: Answer;
   statuses?: Answer;
 };
@@ -92,6 +98,8 @@ const HEALTHY: Required<Site> = {
   httpWww: redirect(308, WWW),
   missing: notFound(),
   notFoundPage: notFound(),
+  missingProject: notFound(`<main><h1 class="x">${PROJECT_NOT_FOUND_HEADING}</h1></main>`),
+  projectNotFoundPage: notFound(`<main><h1 class="x">${PROJECT_NOT_FOUND_HEADING}</h1></main>`),
   deployments: json([{ id: DEPLOY_ID, sha: "abcdef1234567" }]),
   statuses: deployState("success"),
 };
@@ -105,6 +113,8 @@ function fakeHttp(site: Site): Http {
     [HTTP_WWW]: merged.httpWww,
     [MISSING_CASE_STUDY]: merged.missing,
     [NOT_FOUND_PAGE]: merged.notFoundPage,
+    [MISSING_PROJECT]: merged.missingProject,
+    [PROJECT_NOT_FOUND_PAGE]: merged.projectNotFoundPage,
     [deploymentsUrl(REPO)]: merged.deployments,
     [statusesUrl(REPO, DEPLOY_ID)]: merged.statuses,
   };
@@ -233,6 +243,38 @@ describe("checkNotFound", () => {
   test("checkOnce reports both, in CHECK_IDS order", async () => {
     const problems = await checkOnce(fakeHttp({ missing: ok(""), notFoundPage: ok("") }), REPO, NOW);
     assert.deepEqual(problems.map((p) => p.check), ["missing-case-study", "not-found-page"]);
+  });
+});
+
+describe("checkNotFound, projects", () => {
+  const cases = [
+    ["missing-project", MISSING_PROJECT, "missingProject"],
+    ["project-not-found-page", PROJECT_NOT_FOUND_PAGE, "projectNotFoundPage"],
+  ] as const;
+
+  test("the heading is the one content/project-page.ts renders", () => {
+    assert.equal(PROJECT_NOT_FOUND_HEADING, projectPage.notFound.heading);
+    assert.match(MISSING_PROJECT, /^https:\/\/shahrouzmohaghegh\.com\/projects\/[a-z-]+$/);
+    assert.equal(PROJECT_NOT_FOUND_PAGE, "https://shahrouzmohaghegh.com/project-not-available");
+  });
+
+  for (const [check, url, key] of cases) {
+    test(`${check}: a 404 with the project h1 passes`, async () => {
+      assert.equal(await checkNotFound(fakeHttp({}), check, url, PROJECT_NOT_FOUND_HEADING), null);
+    });
+    test(`${check}: a 404 with the case-study h1 instead is named`, async () => {
+      const problem = await checkNotFound(fakeHttp({ [key]: notFound() }), check, url, PROJECT_NOT_FOUND_HEADING);
+      assert.deepEqual(problem, { check, detail: `${url} answered 404, but the HTML has no h1 "${PROJECT_NOT_FOUND_HEADING}"` });
+    });
+    test(`${check}: a 200 is named`, async () => {
+      const problem = await checkNotFound(fakeHttp({ [key]: ok(`<h1>${PROJECT_NOT_FOUND_HEADING}</h1>`) }), check, url, PROJECT_NOT_FOUND_HEADING);
+      assert.deepEqual(problem, { check, detail: `${url} answered HTTP 200, not 404` });
+    });
+  }
+
+  test("checkOnce reports both, in CHECK_IDS order", async () => {
+    const problems = await checkOnce(fakeHttp({ missingProject: ok(""), projectNotFoundPage: notFound() }), REPO, NOW);
+    assert.deepEqual(problems.map((p) => p.check), ["missing-project", "project-not-found-page"]);
   });
 });
 
@@ -487,7 +529,17 @@ describe("planIssues", () => {
 describe("keyOf", () => {
   test("lists failing checks in a fixed order", () => {
     assert.equal(keyOf([deployProblem, apexProblem]), "apex,deployment");
-    assert.deepEqual([...CHECK_IDS], ["apex", "www", "http", "http-www", "missing-case-study", "not-found-page", "deployment"]);
+    assert.deepEqual([...CHECK_IDS], [
+      "apex",
+      "www",
+      "http",
+      "http-www",
+      "missing-case-study",
+      "not-found-page",
+      "missing-project",
+      "project-not-found-page",
+      "deployment",
+    ]);
   });
 });
 

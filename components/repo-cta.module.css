@@ -1,0 +1,92 @@
+/* {components.repo-cta} and {components.repo-cta-rail}: a solid
+   {colors.accent} fill with {colors.on-accent} text, the only text colour
+   permitted on it. The named accent exemption in DESIGN.md scopes both to
+   /projects/[slug]. Each is one anchor; its parts are spans set as blocks.
+   Both sit on paper (or the panel of the mobile rail box), so the ring is
+   {colors.focus-ring}, set here so no ancestor can swap it, at the 2px
+   offset styles/focus.css draws (never 0: a flush oxide ring on an oxide
+   fill would vanish). */
+.panel,
+.rail {
+  --focus-ring: var(--color-focus-ring);
+  display: block;
+  border-radius: var(--radius-default);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  text-decoration: none;
+}
+
+.panel {
+  max-width: var(--component-repo-cta-max-width);
+  margin: var(--space-stack-lg) 0 0;
+  padding: var(--component-repo-cta-padding);
+}
+
+.kicker {
+  display: block;
+  margin: 0 0 var(--space-stack-sm);
+  font-family: var(--type-meta-label-family);
+  font-size: var(--type-meta-label-size);
+  font-weight: var(--type-meta-label-weight);
+  line-height: var(--type-meta-label-leading);
+  letter-spacing: var(--type-meta-label-tracking);
+  text-transform: uppercase;
+}
+
+/* {typography.route-link} at 600, underlined 2px in on-accent, so the link
+   is never signalled by the fill alone. */
+.title {
+  display: block;
+  margin: 0 0 var(--space-stack-sm);
+  font-family: var(--type-route-link-family);
+  font-size: var(--type-route-link-size);
+  font-weight: var(--component-repo-cta-title-weight);
+  line-height: var(--type-route-link-leading);
+  letter-spacing: var(--type-route-link-tracking);
+  text-decoration-line: underline;
+  text-decoration-thickness: var(--space-rule-card);
+  text-decoration-color: var(--color-on-accent);
+  text-underline-offset: var(--component-repo-cta-underline-offset);
+}
+
+.url {
+  display: block;
+  font-family: var(--type-ui-family);
+  font-size: var(--type-ui-size);
+  font-weight: var(--type-ui-weight);
+  line-height: var(--type-ui-leading);
+  overflow-wrap: anywhere;
+}
+
+/* The rail repeat, pinned at the foot of the rail's lists. Below 768px the
+   rail is a box straight under the header, so the repeat would put the same
+   link twice in a row: a pair in breakpoints.css hides it there. */
+.rail {
+  display: var(--component-repo-cta-rail-display);
+  margin: var(--space-stack-md) 0 0;
+  padding: var(--component-repo-cta-rail-padding);
+}
+
+.railKicker {
+  display: block;
+  margin: 0 0 var(--space-stack-xs);
+  font-family: var(--type-stage-number-family);
+  font-size: var(--type-stage-number-size);
+  font-weight: var(--type-stage-number-weight);
+  line-height: var(--type-stage-number-leading);
+  letter-spacing: var(--type-stage-number-tracking);
+  text-transform: uppercase;
+}
+
+.railTitle {
+  display: block;
+  font-family: var(--type-ui-family);
+  font-size: var(--type-ui-size);
+  font-weight: var(--component-repo-cta-title-weight);
+  line-height: var(--type-ui-leading);
+  text-decoration-line: underline;
+  text-decoration-thickness: var(--space-rule-hairline);
+  text-decoration-color: var(--color-on-accent);
+  text-underline-offset: var(--component-repo-cta-underline-offset);
+  overflow-wrap: anywhere;
+}

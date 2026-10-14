@@ -7,9 +7,9 @@
 //
 // Rendered with react-dom/server under the node environment, so the checks
 // read the static markup. A dynamic route ([slug]) is rendered for a real
-// slug, with lib/evidence mocked to treat that case study as written and to
-// give it an empty body, since every MDX is empty until Story 3.3 and an
-// unwritten slug renders the not-found page instead. A header or footer
+// slug, with lib/evidence mocked to treat the first item of the route's kind
+// as written and to give it an empty body, since an unwritten slug renders
+// the not-found page instead. A header or footer
 // inside <main> (an article's own header, say) is not a landmark and is not
 // counted.
 
@@ -21,15 +21,15 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test, vi } from "vitest";
 
 import { site } from "@/content/site";
-import { caseStudyItems } from "@/lib/evidence";
+import { caseStudyItems, projectItems } from "@/lib/evidence";
 import { SiteFooter } from "./site-footer";
 
 vi.mock("@/lib/evidence", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/evidence")>();
   return {
     ...actual,
-    writtenCaseStudyItems: () => actual.caseStudyItems.slice(0, 1),
-    caseStudyBody: async () => () => null,
+    writtenItems: (kind: "case-study" | "project") => (kind === "case-study" ? actual.caseStudyItems : actual.projectItems).slice(0, 1),
+    evidenceBody: async () => () => null,
   };
 });
 
@@ -59,9 +59,12 @@ function routeOf(file: string): string {
   return `/${segments.join("/")}`;
 }
 
-// The params a dynamic route is rendered with: a written case study's slug.
+// The params a dynamic route is rendered with: the slug of the first item of
+// the route's kind, which the mock treats as written.
 function paramsOf(file: string): Record<string, string> {
-  return relative(APP_DIR, file).split(sep).includes("[slug]") ? { slug: caseStudyItems[0].slug } : {};
+  const segments = relative(APP_DIR, file).split(sep);
+  if (!segments.includes("[slug]")) return {};
+  return { slug: (segments[0] === "projects" ? projectItems : caseStudyItems)[0].slug };
 }
 
 // Calls the component itself first, so an async server component resolves.

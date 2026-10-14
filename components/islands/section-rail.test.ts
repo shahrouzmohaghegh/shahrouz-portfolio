@@ -4,6 +4,8 @@
 // fakes, as the RevealOnScroll suite does. The markup itself (a plain anchor
 // list with no aria-current) is checked by rendering the component.
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
@@ -308,5 +310,78 @@ describe("SectionRail markup", () => {
 
   test("with JavaScript off no anchor is marked current", () => {
     expect(html).not.toContain("aria-current");
+  });
+});
+
+// A project's rail (Story 3.5): eight sections under three group headers,
+// each a <p> before the list it names, never a heading, and the repository
+// link passed as children at the foot. The numbering is a CSS counter reset
+// once on the nav, so it runs 01 to 08 through the groups.
+describe("SectionRail with groups", () => {
+  const GROUPS = [
+    { label: "The build", sections: [{ id: "problem", label: "Problem" }, { id: "approach", label: "Approach" }] },
+    { label: "How it held up", sections: [{ id: "tradeoffs", label: "Trade-offs" }] },
+    { label: "What came of it", sections: [{ id: "outcome", label: "Outcome" }] },
+  ];
+  const foot = createElement("a", { href: "https://example.com/repo" }, "Repository");
+  const html = renderToStaticMarkup(
+    createElement(SectionRail, { groups: GROUPS, label: "On this page", ariaLabel: "Sections of this project" }, foot),
+  );
+  const css = readFileSync(join(process.cwd(), "components/islands/section-rail.module.css"), "utf8");
+  const rule = (selector: string): string => css.match(new RegExp(`(?:^|\\n)${selector.replace(".", "\\.")} \\{([^}]*)\\}`))?.[1] ?? "";
+
+  test("each group is a <p> label then its own ordered list, in order, after the rail label", () => {
+    const parts = [...html.matchAll(/<p [^>]*>([^<]*)<\/p>|<ol[^>]*>([\s\S]*?)<\/ol>/g)].map((m) =>
+      m[1] !== undefined ? `p ${m[1]}` : `ol ${[...m[2].matchAll(/href="#([^"]*)"/g)].map((a) => a[1]).join(",")}`,
+    );
+    expect(parts).toEqual([
+      "p On this page",
+      "p The build",
+      "ol problem,approach",
+      "p How it held up",
+      "ol tradeoffs",
+      "p What came of it",
+      "ol outcome",
+    ]);
+  });
+
+  test("a group header is not a heading, a link or a tab stop", () => {
+    expect(html).not.toMatch(/<h[1-6][\s>]/);
+    expect(html).not.toMatch(/tabindex/);
+    expect([...html.matchAll(/<a [^>]*href="#/g)]).toHaveLength(4);
+  });
+
+  test("the children sit at the foot of the nav, after every list", () => {
+    expect(html.indexOf('href="https://example.com/repo"')).toBeGreaterThan(html.lastIndexOf("</ol>"));
+    expect(html.indexOf('href="https://example.com/repo"')).toBeLessThan(html.indexOf("</nav>"));
+  });
+
+  test("the counter is reset once, on the nav, so the numbering runs on through the groups", () => {
+    expect(rule(".rail")).toMatch(/counter-reset:\s*rail;/);
+    expect(rule(".list")).not.toMatch(/counter-reset/);
+    expect(rule(".item")).toMatch(/counter-increment:\s*rail;/);
+    expect(css.match(/counter-reset/g)).toHaveLength(1);
+  });
+
+  test("the script marks only in-page anchors, never the link at the foot", () => {
+    const external = new FakeLink("https://example.com/repo");
+    const { current, environment, links } = setup();
+    const all = [...links, external];
+    (environment.nav as { querySelectorAll: (s: string) => unknown }).querySelectorAll = (selector: string) =>
+      selector === 'a[href^="#"]' ? all.filter((link) => (link.getAttribute("href") ?? "").startsWith("#")) : [];
+    startSectionRail(environment);
+    expect(current()).toEqual(["#context"]);
+    expect(external.getAttribute("aria-current")).toBeNull();
+  });
+});
+
+describe("SectionRail without groups (a case study)", () => {
+  test("renders no group label, and nothing at the foot when given no children", () => {
+    const html = renderToStaticMarkup(
+      createElement(SectionRail, { sections: SECTIONS, label: "On this page", ariaLabel: "Sections of this case study" }),
+    );
+    expect(html.match(/<p[\s>]/g)).toHaveLength(1);
+    expect(html.match(/<ol[\s>]/g)).toHaveLength(1);
+    expect(html).toMatch(/<\/ol><\/nav>$/);
   });
 });

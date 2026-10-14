@@ -16,6 +16,7 @@ export const projects: readonly Project[] = [
       qualifierNotRequired: true,
     },
     href: "/projects/career-application-system",
+    repository: "https://github.com/shahrouzmohaghegh/career-application-system",
   },
   {
     slug: "this-website",
@@ -29,6 +30,7 @@ export const projects: readonly Project[] = [
       qualifierNotRequired: true,
     },
     href: "/projects/this-website",
+    repository: "https://github.com/shahrouzmohaghegh/shahrouz-portfolio",
   },
   {
     slug: "platform-modernisation",
@@ -45,3 +47,9 @@ export const projects: readonly Project[] = [
     href: "/projects/platform-modernisation",
   },
 ];
+
+// The projects whose <slug>.mdx is written, in collection order. Only these
+// get a page: proxy.ts answers every other /projects/<slug> with the project
+// not-found page and a 404. Add a slug here in the same change that writes
+// its MDX (Story 3.7); lib/evidence.test.ts fails while the two disagree.
+export const writtenProjectSlugs: readonly string[] = [];
