@@ -1,8 +1,9 @@
 /* {components.section-rail}: the label, then the in-page anchors, each with
    a hairline rule on top and numbered 01 onward by a CSS counter in
    {typography.stage-number}. The counter is reset once on the nav, so it
-   runs on through every list: a project's three groups number 01 to 08. Items in {typography.ui}, muted; the current
-   one in {colors.accent} at 600. Sticky beside the body from 768px; below
+   runs on through every list: a project's three groups number 01 to 08.
+   Items in {typography.ui}, muted; the current one in {colors.accent} at
+   600. Sticky beside the body from 768px; below
    it a static {colors.panel} box above the body. Every switch is a
    --component-section-rail-* pair remapped in breakpoints.css. */
 .rail {

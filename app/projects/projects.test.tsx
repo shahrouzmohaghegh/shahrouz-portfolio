@@ -43,6 +43,7 @@ import {
   CAPABILITY_NAME,
   PROJECT_SECTION_GROUPS,
   PROJECT_SECTIONS,
+  caseStudyItems,
   listingTitle,
   projectItems,
   type EvidenceItem,
@@ -340,8 +341,10 @@ describe("an unwritten or unknown project that reaches the route", () => {
     await expectNotFound(() => renderPage("nope"));
   });
 
-  test("a case study's slug is not a project", async () => {
-    await expectNotFound(() => renderPage("offshore-delivery-turnaround"));
+  test("a case study's slug is not a project, even on the written list", async () => {
+    state.written = [caseStudyItems[0].slug, pr1.slug];
+    await expectNotFound(() => renderPage(caseStudyItems[0].slug));
+    await expectNotFound(() => route.generateMetadata(params(caseStudyItems[0].slug)));
   });
 
   test("the fallback keeps dynamicParams at its default, so notFound() serves this segment's not-found page", () => {
@@ -405,11 +408,13 @@ describe("how the routes are built", () => {
     expect(Object.keys(useMDXComponents())).not.toContain("RepoCta");
   });
 
+  // The committed list is empty until Story 3.7 writes the prose; that
+  // story updates this test in the same change that adds a slug.
   test("with the committed written list empty, no project page is generated", async () => {
     const actual = await vi.importActual<typeof import("@/lib/evidence")>("@/lib/evidence");
-    const written = actual.writtenItems("project").map((item) => ({ slug: item.slug }));
-    state.written = written.map(({ slug }) => slug);
-    expect(route.generateStaticParams()).toEqual(written);
+    expect(actual.writtenItems("project")).toEqual([]);
+    state.written = [];
+    expect(route.generateStaticParams()).toEqual([]);
   });
 });
 
@@ -435,7 +440,7 @@ describe("accent scope", () => {
   async function render(file: string): Promise<string> {
     const { default: Page } = (await import(join(APP_DIR, file))) as { default: ComponentType<Record<string, unknown>> };
     const segments = file.split(sep);
-    const slug = segments.includes("[slug]") ? (segments[0] === "projects" ? pr1.slug : "offshore-delivery-turnaround") : undefined;
+    const slug = segments.includes("[slug]") ? (segments[0] === "projects" ? pr1.slug : caseStudyItems[0].slug) : undefined;
     const props = { params: Promise.resolve(slug === undefined ? {} : { slug }), searchParams: Promise.resolve({}) };
     const element = (await (Page as (p: typeof props) => ReactNode | Promise<ReactNode>)(props)) as ReactNode;
     return renderToStaticMarkup(<>{element}</>);
@@ -462,11 +467,31 @@ describe("accent scope", () => {
   });
 
   test("only the project detail page imports the repository call to action", () => {
-    const users = [...routes, ...readdirSync(join(process.cwd(), "components"), { recursive: true, encoding: "utf8" }).map((f) => join("..", "components", f))]
-      .filter((file) => /\.tsx?$/.test(file) && !/\.test\./.test(file))
-      .filter((file) => specifiers(source(join("app", file))).some((s) => /(^|\/)repo-cta$/.test(s)))
+    // Every source file under app/ (pages, layouts, templates, not-found
+    // pages) and components/, and mdx-components.tsx, which would hand it to
+    // every MDX file.
+    const under = (dir: string): string[] =>
+      readdirSync(join(process.cwd(), dir), { recursive: true, encoding: "utf8" }).map((file) => join(dir, file));
+    const sources = [...under("app"), ...under("components"), "mdx-components.tsx"].filter(
+      (file) => /\.tsx?$/.test(file) && !/\.test\./.test(file),
+    );
+    expect(sources).toEqual(expect.arrayContaining([join("app", "layout.tsx"), "mdx-components.tsx"]));
+    const users = sources
+      .filter((file) => specifiers(source(file)).some((s) => /(^|\/)repo-cta$/.test(s)))
       .map((file) => file.split(sep).join("/"));
-    expect(users).toEqual(["projects/[slug]/page.tsx"]);
+    expect(users).toEqual(["app/projects/[slug]/page.tsx"]);
+  });
+
+  test("below 768px the rail repeat is hidden, so the link does not appear twice in a row", () => {
+    const css = source("components/repo-cta.module.css");
+    // The rail variant's own rule (after the rule it shares with the panel) sets its display from the pair.
+    const rules = [...css.matchAll(/(?:^|\n)\.rail \{([^}]*)\}/g)].map((m) => m[1]);
+    expect(rules.at(-1)).toMatch(/display:\s*var\(--component-repo-cta-rail-display\);/);
+    expect(source("styles/tokens.css")).toMatch(/--component-repo-cta-rail-display-mobile:\s*none;/);
+    expect(source("styles/tokens.css")).toMatch(/--component-repo-cta-rail-display:\s*block;/);
+    expect(source("styles/breakpoints.css")).toMatch(
+      /--component-repo-cta-rail-display:\s*var\(--component-repo-cta-rail-display-mobile\);/,
+    );
   });
 
   test("both variants keep the paper focus ring, set on themselves", () => {
@@ -480,44 +505,63 @@ describe("accent scope", () => {
 
 // Python is never listed as peer depth with C#, C++, SQL, KQL or TypeScript
 // (Epic 3, projects). Story 3.7 writes the Technologies sections; this is the
-// check that guards them. A list (ul or ol) counts as one listing; a
-// key-value row and a paragraph count each on their own. Python may appear,
-// but never in the same one as a peer language. The summary and the
-// headline metric are checked the same way.
-const PEERS = /(?<!\w)(C#|C\+\+|SQL|KQL|TypeScript)(?!\w)/;
-const PYTHON = /\bPython\b/;
+// check that guards them. The rule is section-wide: when a Technologies
+// section names Python (Python3 included) anywhere and a peer language
+// anywhere, every sentence or list item that names Python must also say
+// "AI-assisted". The summary and the headline metric are checked the same
+// way.
+const PEERS = /(?<!\w)(C#|C\+\+|SQL|KQL|TypeScript)(?!\w)/i;
+const PYTHON = /\bPython(?:\d|\b)/i;
+const AI_ASSISTED = /\bAI-assisted\b/i;
+
+// Each block's own text (list items, rows, cells, headings, paragraphs and
+// divs, nested lists split from their parent item), then each sentence.
+function units(html: string): string[] {
+  return decode(html.replace(/<\/?(li|ul|ol|dl|dt|dd|p|div|h[1-6]|td|th|tr|table|section|blockquote|br)\b[^>]*>/g, "\n").replace(/<[^>]*>/g, " "))
+    .split("\n")
+    .flatMap((block) => block.split(/(?<=[.!?])\s+/))
+    .map((unit) => unit.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+}
 
 function pythonPeerProblems(slug: string, html: string): string[] {
-  const lists = [...html.matchAll(/<(ul|ol)\b[^>]*>[\s\S]*?<\/\1>/g)].map((m) => m[0]);
-  const rest = html.replace(/<(ul|ol)\b[^>]*>[\s\S]*?<\/\1>/g, "");
-  const rows = [...rest.matchAll(/<dt\b[\s\S]*?<\/dd>/g)].map((m) => m[0]);
-  const paragraphs = [...rest.replace(/<dl\b[\s\S]*?<\/dl>/g, "").matchAll(/<p\b[\s\S]*?<\/p>/g)].map((m) => m[0]);
-  return [...lists, ...rows, ...paragraphs]
-    .map(text)
-    .filter((block) => PYTHON.test(block) && PEERS.test(block))
-    .map((block) => `projects: "${slug}" lists Python beside ${block.match(PEERS)?.[1]}: "${block.slice(0, 60)}"; Python is never peer depth with C#, C++, SQL, KQL or TypeScript`);
+  const all = units(html);
+  const peer = all.join(" ").match(PEERS)?.[1];
+  if (peer === undefined) return [];
+  return all
+    .filter((unit) => PYTHON.test(unit) && !AI_ASSISTED.test(unit))
+    .map(
+      (unit) =>
+        `projects: "${slug}" names Python beside ${peer} in Technologies: "${unit.slice(0, 60)}"; Python is never peer depth with C#, C++, SQL, KQL or TypeScript unless it says AI-assisted`,
+    );
 }
 
 describe("the Python rule", () => {
   test.each([
     ["one list", "<ul><li>C#</li><li>TypeScript</li><li>Python</li></ul>"],
-    ["one row", "<dl><div><dt>Languages</dt><dd>C#, Python and SQL</dd></div></dl>"],
+    ["a nested list", "<ul><li>Languages<ul><li>C#</li><li>Python</li></ul></li></ul>"],
+    ["a row with several values", "<dl><div><dt>Languages</dt><dd>C#</dd><dd>Python</dd></div></dl>"],
+    ["Python3 in its own row", "<dl><div><dt>Languages</dt><dd>SQL</dd></div><div><dt>Scripting</dt><dd>Python3</dd></div></dl>"],
+    ["a paragraph apart from the list", "<ul><li>C#</li><li>TypeScript</li></ul><p>Some Python for glue scripts.</p>"],
+    ["a div, a heading or a cell", "<h3>Python</h3><div>KQL</div><table><tr><td>C++</td></tr></table>"],
     ["one paragraph", "<p>Built in TypeScript and Python.</p>"],
-    ["C++", "<ul><li>C++</li><li>Python</li></ul>"],
-    ["KQL", "<p>KQL, Python</p>"],
   ])("Python beside a peer in %s fails, naming the slug", (_label, html) => {
     const problems = pythonPeerProblems("x", html);
-    expect(problems).toHaveLength(1);
-    expect(problems[0]).toMatch(/^projects: "x" lists Python beside /);
+    expect(problems.length).toBeGreaterThan(0);
+    for (const problem of problems) expect(problem).toMatch(/^projects: "x" names Python beside /);
   });
 
   test.each([
-    ["a list without Python", "<ul><li>C#</li><li>TypeScript</li><li>SQL</li></ul>"],
-    ["Python in its own row", "<dl><div><dt>Languages</dt><dd>C#, TypeScript</dd></div><div><dt>Scripting</dt><dd>Python, occasionally</dd></div></dl>"],
-    ["Python in its own paragraph after the list", "<ul><li>C#</li><li>TypeScript</li></ul><p>Some Python for glue scripts.</p>"],
-    ["a word that only contains a peer", "<p>Python and MySQLish notes</p>"],
+    ["a section without Python", "<ul><li>C#</li><li>TypeScript</li><li>SQL</li></ul>"],
+    ["Python with no peer in the section", "<p>Python and MySQLish notes</p>"],
+    ["Python marked AI-assisted in its list item", "<ul><li>C#</li><li>TypeScript</li><li>Python, AI-assisted only</li></ul>"],
+    ["Python marked AI-assisted in its sentence", "<ul><li>C#</li></ul><p>Python3 scripts were AI-assisted. C# is the core.</p>"],
   ])("%s passes", (_label, html) => {
     expect(pythonPeerProblems("x", html)).toEqual([]);
+  });
+
+  test("an AI-assisted note on one sentence does not cover another", () => {
+    expect(pythonPeerProblems("x", "<p>C# throughout. Python was AI-assisted. Python also ran the jobs.</p>")).toHaveLength(1);
   });
 
   test("no project's summary or headline metric lists Python beside a peer", () => {

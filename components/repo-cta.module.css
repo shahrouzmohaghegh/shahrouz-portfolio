@@ -58,8 +58,11 @@
   overflow-wrap: anywhere;
 }
 
-/* The rail repeat, pinned at the foot of the rail's lists. */
+/* The rail repeat, pinned at the foot of the rail's lists. Below 768px the
+   rail is a box straight under the header, so the repeat would put the same
+   link twice in a row: a pair in breakpoints.css hides it there. */
 .rail {
+  display: var(--component-repo-cta-rail-display);
   margin: var(--space-stack-md) 0 0;
   padding: var(--component-repo-cta-rail-padding);
 }

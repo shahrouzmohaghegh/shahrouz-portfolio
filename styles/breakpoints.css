@@ -121,6 +121,7 @@
     --component-section-rail-border: var(--component-section-rail-border-mobile);
     --component-section-rail-padding: var(--component-section-rail-padding-mobile);
     --component-repo-cta-padding: var(--component-repo-cta-padding-mobile);
+    --component-repo-cta-rail-display: var(--component-repo-cta-rail-display-mobile);
     --component-kv-list-columns: var(--component-kv-list-columns-mobile);
     --component-tradeoff-pair-columns: var(--component-tradeoff-pair-columns-mobile);
     --component-retrieval-diagram-columns: var(--component-retrieval-diagram-columns-mobile);

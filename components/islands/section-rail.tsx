@@ -17,10 +17,10 @@ import styles from "./section-rail.module.css";
 // the foot of the nav, after the lists; it is not an in-page anchor, so the
 // script below never marks it. With JavaScript off the nav is a working
 // contents list and no anchor claims to be current. With script,
-// startSectionRail keeps aria-current="true" on exactly one anchor, following the sections through
-// an IntersectionObserver, and an activated anchor moves focus to its
-// section (each section is tabindex="-1"). Without IntersectionObserver it
-// does nothing at all.
+// startSectionRail keeps aria-current="true" on exactly one anchor,
+// following the sections through an IntersectionObserver, and an activated
+// anchor moves focus to its section (each section is tabindex="-1").
+// Without IntersectionObserver it does nothing at all.
 
 export const RAIL_CURRENT = { name: "aria-current", value: "true" } as const;
 // A section counts as in view while it overlaps the top 40 percent of the
