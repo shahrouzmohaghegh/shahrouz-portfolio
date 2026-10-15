@@ -458,8 +458,8 @@ describe("written case studies", () => {
   });
 });
 
-// A project gets a page only once its MDX is written (Story 3.5); the prose
-// is Story 3.7, so until then none is.
+// A project gets a page only once its MDX is written (Story 3.5); Story 3.7
+// wrote all three.
 describe("written projects", () => {
   test("the committed written list names exactly the projects whose MDX is written, in collection order", () => {
     const written = mdxFiles("projects")
