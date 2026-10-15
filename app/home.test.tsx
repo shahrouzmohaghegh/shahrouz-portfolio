@@ -3,9 +3,9 @@
 // one h1, the kicker, the positioning statement word for word, the availability line from
 // site.availability, then each figure-pair row: number, words, scope. Also
 // checks the statement stays inside FR-4's 40 to 45 words, that no banned
-// word reaches the rendered Home, and that the root layout no longer asks for
-// noindex while the empty route shell still does (/experience and
-// /projects have their content now, so they no longer do).
+// word reaches the rendered Home, and that neither the root layout nor any
+// route asks for noindex (/experience, /projects and, from Story 3.8,
+// /contact have their content now).
 //
 // Below the hero (Story 2.5): exactly two evidence bands, Cloud delivery on
 // deep then Release discipline on paper, each one tag, one figure and one
@@ -475,11 +475,8 @@ describe("indexing", () => {
   test.each([
     ["/experience", experienceMetadata],
     ["/projects", projectsMetadata],
+    ["/contact", contactMetadata],
   ])("%s has its content, so it asks for no noindex", (_route, routeMetadata) => {
     expect(routeMetadata.robots).toBeUndefined();
-  });
-
-  test.each([["/contact", contactMetadata]])("the empty shell %s asks for noindex, nofollow", (_route, routeMetadata) => {
-    expect(routeMetadata.robots).toEqual({ index: false, follow: false });
   });
 });

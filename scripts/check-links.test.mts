@@ -14,6 +14,11 @@ import {
   ATTEMPTS,
   BOT_BLOCK_EXEMPTION,
   CANONICAL_ORIGINS,
+  CV_DOCUMENT,
+  CV_WORDS,
+  DOCUMENT_EXTENSIONS,
+  DOCUMENT_HOSTS,
+  OWNER_WORDS,
   CONCURRENCY,
   MAX_PAGES,
   EXPECTED_REPOSITORIES,
@@ -24,6 +29,7 @@ import {
   NOT_ALLOWED,
   bodyPointsAtUnlistedRepository,
   classify,
+  cvDocumentProblem,
   decodeEntities,
   expectedStatus,
   extractHrefs,
@@ -585,6 +591,118 @@ describe("I/O matrix", () => {
     const result = await checkLinks(BASE, d);
     assert.equal(result.failures.length, 1);
     assert.match(result.failures[0].detail, /query/);
+  });
+});
+
+// ---------------------------------------------------------------- CV documents (FR-23)
+
+describe("cvDocumentProblem", () => {
+  test("the rule is the five document extensions, the two words, the owner's names and the document hosts", () => {
+    assert.deepEqual([...DOCUMENT_EXTENSIONS], ["pdf", "doc", "docx", "rtf", "odt"]);
+    assert.deepEqual([...CV_WORDS], ["cv", "resume"]);
+    assert.deepEqual([...OWNER_WORDS], ["shahrouz", "mohaghegh"]);
+    assert.deepEqual(
+      DOCUMENT_HOSTS.map((h) => h.host),
+      ["docs.google.com", "drive.google.com", "dropbox.com", "dropboxusercontent.com"],
+    );
+  });
+
+  const positives: Array<[string, string]> = [
+    // cv or resume as a word, any host, path or query value
+    ["/cv", "the word cv"],
+    ["/CV/", "the word in capitals"],
+    ["/downloads/cv-2026", "cv between separators"],
+    ["/shahrouz_cv", "cv after an underscore"],
+    ["/resume", "the word resume"],
+    ["/my-resume.html", "resume in a filename"],
+    ["/r%C3%A9sum%C3%A9", "résumé percent-encoded"],
+    ["/résumé", "résumé with accents"],
+    ["https://shahrouzmohaghegh.com/cv", "the canonical origin"],
+    ["https://example.org/people/cv", "cv on another host"],
+    ["/?file=cv.pdf", "cv in a query value"],
+    ["/download?id=resume", "resume as a query value"],
+    ["https://example.org/get?name=Resume%20final", "resume encoded in a query value"],
+    // a document extension on this site
+    ["/files/profile.pdf", "a same-origin pdf"],
+    ["/shahrouz.PDF", "a same-origin PDF in capitals"],
+    ["/x.rtf#page=2", "a same-origin rtf with a fragment"],
+    ["/x.odt", "a same-origin odt"],
+    ["/x.pdf/", "a trailing slash"],
+    ["/x.pdf.", "a trailing dot"],
+    ["/x.pdf%20", "a trailing encoded space"],
+    ["/x.pdf ", "a trailing space"],
+    ["/x.pdf;v=1", "a ;parameter"],
+    ["/x%2Epdf", "an encoded dot"],
+    ["/?f=profile.docx", "a same-origin docx in a query value"],
+    ["https://www.shahrouzmohaghegh.com/a.doc", "a doc on the www canonical origin"],
+    // a document extension elsewhere that names the owner
+    ["https://example.org/files/shahrouz-mohaghegh.pdf", "the owner's name in a cross-site pdf"],
+    ["https://cdn.example.org/Mohaghegh_2026.docx", "the surname in a cross-site docx"],
+    ["https://example.org/get?f=shahrouz.pdf", "the owner's name in a cross-site query value"],
+    // document hosts
+    ["https://docs.google.com/document/d/abc/edit", "a Google Docs document"],
+    ["https://drive.google.com/file/d/abc/view", "Google Drive"],
+    ["https://www.dropbox.com/s/abc/file", "Dropbox"],
+    ["https://dl.dropboxusercontent.com/s/abc", "Dropbox content"],
+  ];
+  for (const [href, why] of positives) test(`fails ${href} (${why})`, () => assert.equal(cvDocumentProblem(href, BASE), CV_DOCUMENT));
+
+  const negatives = [
+    "/",
+    "/contact",
+    "/experience/offshore-delivery-turnaround",
+    "/projects/career-application-system",
+    LINKEDIN,
+    PR1,
+    PR2,
+    `${PR2}/blob/main/README.md`,
+    "mailto:me@example.com",
+    "mailto:cv@example.com",
+    "/cvs-are-written-per-job",
+    "/curve",
+    "/resumes-later",
+    "/pdf-guide",
+    "/docs/intro",
+    "/#cv",
+    "https://example.org/papers/attention.pdf",
+    "https://www.rfc-editor.org/rfc/rfc9110.pdf",
+    "https://example.org/standard.docx?lang=en",
+    "https://docs.google.com/spreadsheets/d/abc",
+  ];
+  for (const href of negatives) test(`allows ${href}`, () => assert.equal(cvDocumentProblem(href, BASE), null));
+
+  test("relative links resolve against the given origin, so a same-origin pdf there fails", () => {
+    assert.equal(cvDocumentProblem("http://localhost:3000/a.pdf", BASE), CV_DOCUMENT);
+    assert.equal(cvDocumentProblem("http://localhost:3000/a.pdf", "http://other.test"), null);
+  });
+});
+
+describe("CV document links", () => {
+  test("a CV document link on any page fails, names the page, and is never fetched", async () => {
+    for (const href of ["/cv.pdf", "https://example.org/resume", "/files/shahrouz-cv.docx", "/files/profile.pdf", "https://drive.google.com/file/d/x"]) {
+      const { deps: d, calls } = deps(goodSite({ [`${BASE}/contact`]: page(FOOTER + links(href)) }));
+      const result = await checkLinks(BASE, d);
+      assert.equal(result.failures.length, 1, href);
+      assert.equal(result.failures[0].subject, href);
+      assert.equal(result.failures[0].detail, CV_DOCUMENT);
+      assert.deepEqual(result.failures[0].foundOn, ["/contact"]);
+      assert.ok(!calls.some((c) => c.url.endsWith(href.replace(/^\//, ""))), `${href} not fetched`);
+    }
+  });
+
+  test("a cross-site paper PDF is not a CV document link", async () => {
+    const paper = "https://example.org/papers/attention.pdf";
+    const { deps: d } = deps(goodSite({ [`${BASE}/contact`]: page(FOOTER + links(paper)), [paper]: page("") }));
+    const result = await checkLinks(BASE, d);
+    assert.deepEqual(result.failures, []);
+  });
+
+  test("main exits 1 on a CV document link", async () => {
+    const { deps: d } = deps(goodSite({ [`${BASE}/`]: page(FOOTER + links("/cv")) }));
+    const out: string[] = [];
+    const code = await main([BASE], { ...d, out: (t) => out.push(t), err: () => {} });
+    assert.equal(code, 1);
+    assert.match(out.join(""), /\/cv: links to a CV/);
   });
 });
 

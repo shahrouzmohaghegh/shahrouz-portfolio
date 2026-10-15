@@ -64,6 +64,8 @@ export const COMPONENT_REMAPS: TokenMap = {
   "--component-hero-kicker-display": "var(--component-hero-kicker-display-mobile)",
   "--component-hero-plate-position": "var(--component-hero-plate-position-mobile)",
   "--component-hero-explore-align": "var(--component-hero-explore-align-mobile)",
+  "--component-contact-hero-padding": "var(--component-contact-hero-padding-mobile)",
+  "--component-contact-hero-plate-position": "var(--component-contact-hero-plate-position-mobile)",
   "--component-capability-chip-padding": "var(--component-capability-chip-padding-mobile)",
   "--component-nav-item-gap": "var(--component-nav-item-gap-mobile)",
   "--component-nav-item-size": "var(--component-nav-item-size-mobile)",
