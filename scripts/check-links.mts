@@ -40,11 +40,12 @@
 //    repository, is allowed. The failure names no repository.
 // 5. mailto: links must name one address and carry no query. Any other
 //    scheme fails.
-// 6. No CV document (FR-23). Any href on a crawled page whose path ends in
-//    a document extension (DOCUMENT_EXTENSIONS: .pdf, .doc, .docx, .rtf,
-//    .odt) or names cv or resume as a word (CV_WORDS) fails and is never
-//    fetched. The site offers no CV, generic or otherwise: every CV is
-//    written for one job and sent by email.
+// 6. No CV document (FR-23). Any href on a crawled page that
+//    cvDocumentProblem flags fails and is never fetched: cv or resume as a
+//    word in the path or a query value, a .pdf, .doc, .docx, .rtf or .odt
+//    file on this site or naming the owner anywhere, or a Google Docs
+//    document, Google Drive or Dropbox link. The site offers no CV, generic
+//    or otherwise: every CV is written for one job and sent by email.
 //
 // Exit 1 names each failure: the page or link, the status, and the pages it
 // was found on. Built-ins only; the HTTP layer is injected, so the tests
@@ -133,35 +134,76 @@ export function bodyPointsAtUnlistedRepository(html: string): boolean {
 
 // ---------------------------------------------------------------- CV documents
 
-// FR-23: no route links a CV, resume or profile document.
+// FR-23: no route links a CV, resume or profile document. Exactly what fails
+// (cvDocumentProblem), judged on the decoded path and on every query value:
+//   - cv or resume (or résumé) as a whole word, on any host;
+//   - a DOCUMENT_EXTENSIONS file on this site (a relative link, the base
+//     URL's origin or a canonical origin);
+//   - a DOCUMENT_EXTENSIONS file anywhere whose path or query names the
+//     owner (OWNER_WORDS);
+//   - any link to a document host (DOCUMENT_HOSTS): Google Docs documents,
+//     Google Drive and Dropbox.
+// A cross-site PDF that names neither the owner nor cv or resume (a paper,
+// a standard) passes.
 export const DOCUMENT_EXTENSIONS = ["pdf", "doc", "docx", "rtf", "odt"] as const;
 export const CV_WORDS = ["cv", "resume"] as const;
+export const OWNER_WORDS = ["shahrouz", "mohaghegh"] as const;
+// A host, or any subdomain of it, and the path prefix that marks a document there.
+export const DOCUMENT_HOSTS = [
+  { host: "docs.google.com", pathPrefix: "/document/" },
+  { host: "drive.google.com", pathPrefix: "/" },
+  { host: "dropbox.com", pathPrefix: "/" },
+  { host: "dropboxusercontent.com", pathPrefix: "/" },
+] as const;
 export const CV_DOCUMENT = "links to a CV, resume or document file; the site offers none (FR-23)";
 
-// Why an href is a CV or document link, or null. Only the path counts, as
-// written and percent-decoded, lower-cased and with accents dropped (so
-// résumé is resume): a final extension from DOCUMENT_EXTENSIONS, or cv or
-// resume as a whole word between non-alphanumerics. mailto: and other
-// non-http schemes have no path to judge and pass.
-export function cvDocumentProblem(href: string): string | null {
-  let url: URL;
+// Decoded, accents dropped, lower case, ;parameters removed from each
+// segment, and trailing dots, spaces and slashes trimmed.
+function normaliseDocumentText(text: string): string {
+  let out = text;
   try {
-    url = new URL(href, "http://site.invalid/");
+    out = decodeURIComponent(out);
+  } catch {
+    // keep the encoded form
+  }
+  return out
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/;[^/]*/g, "")
+    .replace(/[\s./]+$/, "");
+}
+
+function namesDocument(text: string, sameOrigin: boolean): boolean {
+  const value = normaliseDocumentText(text);
+  if (value.split(/[^a-z0-9]+/).some((word) => (CV_WORDS as readonly string[]).includes(word))) return true;
+  const extension = /\.([a-z0-9]+)$/.exec(value)?.[1];
+  if (extension === undefined || !(DOCUMENT_EXTENSIONS as readonly string[]).includes(extension)) return false;
+  return sameOrigin || OWNER_WORDS.some((word) => value.includes(word));
+}
+
+// Why an href is a CV or document link, or null. Relative hrefs resolve
+// against origin (the site under test). mailto: and other non-http schemes
+// have no path to judge and pass.
+export function cvDocumentProblem(href: string, origin = "http://site.invalid"): string | null {
+  let url: URL;
+  let site: string;
+  try {
+    site = new URL(origin).origin;
+    url = new URL(href.trim(), `${site}/`);
   } catch {
     return null;
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") return null;
-  let path = url.pathname;
-  try {
-    path = decodeURIComponent(path);
-  } catch {
-    // keep the encoded form
-  }
-  path = path.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-  const extension = /\.([a-z0-9]+)\/*$/.exec(path)?.[1];
-  if (extension !== undefined && (DOCUMENT_EXTENSIONS as readonly string[]).includes(extension)) return CV_DOCUMENT;
-  const words = path.split(/[^a-z0-9]+/);
-  return words.some((word) => (CV_WORDS as readonly string[]).includes(word)) ? CV_DOCUMENT : null;
+  const host = url.hostname.toLowerCase().replace(/\.+$/, "");
+  const path = normaliseDocumentText(url.pathname) || "/";
+  const onDocumentHost = DOCUMENT_HOSTS.some(
+    (entry) => (host === entry.host || host.endsWith(`.${entry.host}`)) && (path + "/").startsWith(entry.pathPrefix),
+  );
+  if (onDocumentHost) return CV_DOCUMENT;
+  const sameOrigin = url.origin === site || (CANONICAL_ORIGINS as readonly string[]).includes(url.origin);
+  const parts = [url.pathname, ...[...url.searchParams.values()]];
+  return parts.some((part) => namesDocument(part, sameOrigin)) ? CV_DOCUMENT : null;
 }
 
 // ---------------------------------------------------------------- extraction
@@ -444,7 +486,7 @@ export async function checkLinks(baseUrl: string, deps: Deps): Promise<Result> {
         fail("a link", NOT_ALLOWED, [path]);
         continue;
       }
-      if (cvDocumentProblem(href) !== null) {
+      if (cvDocumentProblem(href, origin) !== null) {
         fail(href, CV_DOCUMENT, [path]);
         continue;
       }

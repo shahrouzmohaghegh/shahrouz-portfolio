@@ -6,6 +6,15 @@
 // AD-6 governs Case Studies and Projects only, so components may import this
 // file directly. No reply-time promise: nothing in the sources supports one.
 
+import { site } from "./site";
+
+// A URL as a visitor reads it: the host without www., then the path with no
+// trailing slash, so the LinkedIn profile reads linkedin.com/in/ and the handle.
+export const displayUrl = (href: string): string => {
+  const url = new URL(href);
+  return `${url.hostname.replace(/^www\./, "")}${url.pathname.replace(/\/+$/, "")}`;
+};
+
 export const contact = {
   // The meta description for /contact: what search results and link previews show.
   description:
@@ -15,16 +24,20 @@ export const contact = {
   // Email first, then LinkedIn, each with the one sentence on what it suits.
   email: {
     label: "Email",
-    when: "Best for a specific role, a question about something on this site, or a CV written for the job you are hiring for.",
+    when: "Best for a specific role, or a question about something on this site.",
   },
   linkedin: {
     label: "LinkedIn",
-    text: "linkedin.com/in/shahrouz-mohaghegh",
+    // Derived from the one LinkedIn URL in content/site.ts, never retyped.
+    text: displayUrl(site.linkedin.href),
     when: "Best if you want the full history before a conversation.",
   },
   noCv: {
     heading: "There is no CV on this site, and that is deliberate.",
-    body: "Every CV I send is written for one job description. Ask by email and I will send the version written for your role.",
+    // One paragraph: the lead, then "Ask by email" as a mailto: link, then the rest.
+    lead: "Every CV I send is written for one job description.",
+    ask: "Ask by email",
+    rest: " and I will send the version written for your role.",
   },
   // The black studio frame (UX-DR42 interim): rendered inside a fixed plate,
   // never above its natural 1311 x 1200.

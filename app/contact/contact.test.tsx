@@ -24,8 +24,10 @@ import { describe, expect, test } from "vitest";
 
 import { contact } from "@/content/contact";
 import { site } from "@/content/site";
-import { cvDocumentProblem } from "@/scripts/check-links.mts";
+import { EmailAddress } from "@/components/email-address";
+import { cvDocumentProblem, extractHrefs } from "@/scripts/check-links.mts";
 import * as contactModule from "./page";
+import { PORTRAIT_SIZES } from "./page";
 import styles from "./contact.module.css";
 
 const ContactPage = contactModule.default;
@@ -46,7 +48,13 @@ const main = html.slice(html.search(/<main[\s>]/), html.lastIndexOf("</main>"));
 // What a visitor reads in main: text nodes plus alt, with the visually
 // hidden "@" dropped so the address reads as it is drawn.
 const visibleText = decode(main.replace(/<span class="[^"]*visuallyHidden[^"]*">@<\/span>/g, "").replace(/<[^>]*>/g, "")).replace(/\s+/g, " ");
-const anchors = [...main.matchAll(/<a\s([^>]*)>([\s\S]*?)<\/a>/g)].map(([, attrs, inner]) => ({
+// The hero section alone: from its opening tag to its </section> (it nests none).
+const heroStart = main.search(/<section[^>]*aria-labelledby="contact-heading"/);
+const hero = main.slice(heroStart, main.indexOf("</section>", heroStart) + "</section>".length);
+const noCvStart = main.search(/<section[^>]*aria-labelledby="no-cv-heading"/);
+const noCv = main.slice(noCvStart, main.indexOf("</section>", noCvStart) + "</section>".length);
+// The hero's links: exactly the two routes.
+const anchors = [...hero.matchAll(/<a\s([^>]*)>([\s\S]*?)<\/a>/g)].map(([, attrs, inner]) => ({
   attrs,
   href: decode(attrs.match(/href="([^"]*)"/)?.[1] ?? ""),
   inner,
@@ -75,20 +83,20 @@ describe("the Contact hero", () => {
 
   test("the copy reads as decided on 2026-10-15", () => {
     expect(contact.lede).toBe("Both go to me directly.");
-    expect(contact.email.when).toBe(
-      "Best for a specific role, a question about something on this site, or a CV written for the job you are hiring for.",
-    );
+    expect(contact.email.when).toBe("Best for a specific role, or a question about something on this site.");
     expect(contact.linkedin.when).toBe("Best if you want the full history before a conversation.");
     expect(contact.noCv.heading).toBe("There is no CV on this site, and that is deliberate.");
-    expect(contact.noCv.body).toBe("Every CV I send is written for one job description. Ask by email and I will send the version written for your role.");
+    expect(`${contact.noCv.lead} ${contact.noCv.ask}${contact.noCv.rest}`).toBe(
+      "Every CV I send is written for one job description. Ask by email and I will send the version written for your role.",
+    );
   });
 
   test("the hero is the deep ground and sets the on-deep focus ring for both links", () => {
     expect(main).toMatch(new RegExp(`<section[^>]*class="${escapeRegExp(styles.hero)}"`));
-    const hero = rule(".hero");
-    expect(hero).toMatch(/--focus-ring:\s*var\(--color-focus-ring-on-deep\)/);
-    expect(hero).toMatch(/background:\s*var\(--color-deep\)/);
-    expect(hero).toMatch(/color:\s*var\(--color-on-deep\)/);
+    const heroRule = rule(".hero");
+    expect(heroRule).toMatch(/--focus-ring:\s*var\(--color-focus-ring-on-deep\)/);
+    expect(heroRule).toMatch(/background:\s*var\(--color-deep\)/);
+    expect(heroRule).toMatch(/color:\s*var\(--color-on-deep\)/);
   });
 
   test("the route links are route-link type, on-deep, with a 1.5px deep-accent underline; rows split by deep-rule", () => {
@@ -111,16 +119,30 @@ describe("the Contact hero", () => {
       positionOf(`href="${site.linkedin.href}"`, "the LinkedIn link"),
       positionOf(contact.linkedin.when, "the LinkedIn sentence"),
       positionOf(site.availability, "the availability line"),
+      positionOf(`<div class="${styles.plate}">`, "the portrait plate"),
       positionOf(contact.noCv.heading, "the no-CV heading"),
-      positionOf(contact.noCv.body, "the no-CV statement"),
+      positionOf(contact.noCv.lead, "the no-CV statement"),
     ];
     expect(order).toEqual([...order].sort((a, b) => a - b));
   });
 
-  test("main has exactly the two routes, each with its caps label", () => {
+  test("the text comes first in the source, and row-reverse draws the plate to its left on wide screens", () => {
+    expect(hero.indexOf(`class="${styles.text}"`)).toBeLessThan(hero.indexOf(`class="${styles.plate}"`));
+    expect(rule(".hero")).toMatch(/flex-direction:\s*row-reverse/);
+    // Visual and DOM order differ on purpose: the plate holds nothing focusable.
+    const plate = hero.slice(hero.indexOf(`class="${styles.plate}"`));
+    expect(plate).not.toMatch(/<a[\s>]|<button[\s>]|tabindex=/);
+  });
+
+  test("the hero has exactly the two routes, each with its caps label", () => {
     expect(anchors.map((a) => a.href)).toEqual([`mailto:${site.email}`, site.linkedin.href]);
-    expect(main).toContain(`>${contact.email.label}</p>`);
-    expect(main).toContain(`>${contact.linkedin.label}</p>`);
+    expect(hero).toContain(`>${contact.email.label}</p>`);
+    expect(hero).toContain(`>${contact.linkedin.label}</p>`);
+  });
+
+  test('the no-CV statement makes "Ask by email" a plain mailto: link', () => {
+    const links = [...noCv.matchAll(/<a\s[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g)].map((m) => [decode(m[1]), m[2]]);
+    expect(links).toEqual([[`mailto:${site.email}`, "Ask by email"]]);
   });
 
   test("the email link is lightly obfuscated without impeding a screen reader", () => {
@@ -130,8 +152,9 @@ describe("the Contact hero", () => {
     expect(visibleText).toContain(site.email);
   });
 
-  test("the LinkedIn link reads linkedin.com/in/shahrouz-mohaghegh", () => {
+  test("the LinkedIn link reads linkedin.com/in/shahrouz-mohaghegh, derived from site.linkedin.href", () => {
     expect(contact.linkedin.text).toBe("linkedin.com/in/shahrouz-mohaghegh");
+    expect(source("content/contact.ts")).not.toContain('"linkedin.com/in/');
     expect(anchors[1].inner).toBe(contact.linkedin.text);
     expect(site.linkedin.href).toBe("https://www.linkedin.com/in/shahrouz-mohaghegh/");
   });
@@ -148,6 +171,20 @@ describe("the Contact hero", () => {
 
 describe("the portrait plate", () => {
   const imgs = [...main.matchAll(/<img\s[^>]*>/g)].map((m) => m[0]);
+
+  test("sizes matches the plate widths at the 768px switch, so a 1x screen fetches near 420px", () => {
+    const tokens = source("styles/tokens.css");
+    const mobile = tokens.match(/--space-contact-plate-mobile-width:\s*(\d+px)/)?.[1];
+    const desktop = tokens.match(/--space-contact-plate-desktop-width:\s*(\d+px)/)?.[1];
+    expect(source("styles/breakpoints.css")).toContain("@media (max-width: 767px)");
+    expect(PORTRAIT_SIZES).toBe(`(max-width: 767px) ${mobile}, ${desktop}`);
+    expect(imgs[0]).toContain(`sizes="${PORTRAIT_SIZES}"`);
+  });
+
+  test("lazy, with no priority, as on Home (AD-12): the plate is not the 375px LCP", () => {
+    expect(imgs[0]).toContain('loading="lazy"');
+    expect(imgs[0]).not.toMatch(/fetchpriority/i);
+  });
 
   test("one image, its alt, explicit natural size, no priority, inside the studio-ground plate", () => {
     expect(imgs).toHaveLength(1);
@@ -192,13 +229,18 @@ describe("the portrait plate", () => {
 describe("what Contact never carries", () => {
   test("no form, no download, no CV document link", () => {
     expect(html).not.toMatch(/<form[\s>]|<input[\s>]|<textarea[\s>]/);
-    expect(html).not.toMatch(/\sdownload(?:[\s=>])/);
-    const hrefs = [...html.matchAll(/href="([^"]*)"/g)].map((m) => decode(m[1]));
-    expect(hrefs.filter((href) => cvDocumentProblem(href) !== null)).toEqual([]);
+    // Tags only, values blanked, so the footer's "No CV download" prose never matches.
+    const download = [...html.matchAll(/<(?:a|area)\b[^>]*>/gi)].some((tag) =>
+      /\sdownload(?=[\s=/>])/i.test(tag[0].replace(/"[^"]*"|'[^']*'/g, '""')),
+    );
+    expect(download).toBe(false);
+    expect(extractHrefs(html).filter((href) => cvDocumentProblem(href) !== null)).toEqual([]);
   });
 
   test("no reply-time promise", () => {
-    expect(visibleText).not.toMatch(/working day|same day|within \d|hours?\b|reply within|respond within/i);
+    const promise =
+      /working day|same day|within (?:a|one|\d+) (?:day|hour|week)|within \d|\b24 ?h|hours?\b|promptly|quickly|as soon as|this week|usually (?:reply|respond|answer)|reply within|respond within/i;
+    for (const text of [visibleText, contact.description, contact.portrait.alt]) expect(text).not.toMatch(promise);
   });
 
   test("no em dash in the page or its copy", () => {
@@ -212,7 +254,7 @@ describe("what Contact never carries", () => {
     const file = ".forbidden-terms";
     expect(existsSync(file), `${file} is missing, so banned words cannot be checked`).toBe(true);
     const lines = readFileSync(file, "utf8").split("\n");
-    const page = `${visibleText} ${contact.description}`;
+    const page = `${visibleText} ${contact.description} ${contact.portrait.alt}`;
     lines.forEach((raw, i) => {
       const term = raw.trim();
       if (!term || term.startsWith("#")) return;
@@ -224,6 +266,17 @@ describe("what Contact never carries", () => {
       }
       expect(pattern.test(page), `Contact contains the banned term on ${file} line ${i + 1}`).toBe(false);
     });
+  });
+});
+
+describe("EmailAddress", () => {
+  test("splits an address at its @ and hides the visible one from assistive technology", () => {
+    const out = renderToStaticMarkup(<EmailAddress address="me@example.com" />);
+    expect(out).toMatch(/^me<span aria-hidden="true">@<\/span><span class="[^"]*">@<\/span>example\.com$/);
+  });
+
+  test("renders a string with no @ as it is", () => {
+    expect(renderToStaticMarkup(<EmailAddress address="not-an-address" />)).toBe("not-an-address");
   });
 });
 

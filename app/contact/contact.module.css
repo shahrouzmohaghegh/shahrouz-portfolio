@@ -136,7 +136,8 @@
   object-position: var(--component-contact-hero-plate-position);
 }
 
-/* The statement that there is no CV, on paper below the hero. */
+/* The statement that there is no CV, on paper below the hero; its "Ask by
+   email" is an accent link with an accent underline, as links are on paper. */
 .noCv {
   padding: var(--space-section) var(--space-margin);
 }
@@ -159,4 +160,11 @@
   font-weight: var(--type-body-weight);
   line-height: var(--type-body-leading);
   color: var(--color-muted);
+}
+
+.noCvLink {
+  color: var(--color-accent);
+  text-decoration-line: underline;
+  text-decoration-thickness: var(--component-cta-link-underline-width);
+  text-decoration-color: var(--color-accent);
 }

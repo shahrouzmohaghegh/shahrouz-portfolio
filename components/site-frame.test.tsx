@@ -28,7 +28,7 @@ import { describe, expect, test, vi } from "vitest";
 
 import { site } from "@/content/site";
 import { caseStudyItems, projectItems } from "@/lib/evidence";
-import { cvDocumentProblem } from "@/scripts/check-links.mts";
+import { cvDocumentProblem, extractHrefs } from "@/scripts/check-links.mts";
 import { SiteFooter } from "./site-footer";
 
 vi.mock("@/lib/evidence", async (importOriginal) => {
@@ -112,7 +112,7 @@ function readFrame(html: string): Frame {
     // 1 only when the one Primary nav sits inside the landmark header.
     nav: navs.length === 1 ? (navInHeader === 1 ? 1 : 0) : navs.length,
     links,
-    footerHrefs: [...footer.matchAll(/<a\s[^>]*href="([^"]*)"/g)].map((m) => m[1]),
+    footerHrefs: extractHrefs(footer),
   };
 }
 
@@ -132,10 +132,20 @@ function expectContactReachable(route: string, frame: Frame): void {
   );
 }
 
+// Whether any <a> or <area> tag carries a download attribute, in any
+// position. Attribute values are blanked first, so prose and an href that
+// merely contains the word never match.
+function hasDownloadAttribute(html: string): boolean {
+  return [...html.matchAll(/<(?:a|area)\b[^>]*>/gi)].some((tag) =>
+    /\sdownload(?=[\s=/>])/i.test(tag[0].replace(/"[^"]*"|'[^']*'/g, '""')),
+  );
+}
+
 // FR-23: no download and no CV or document link anywhere on this route.
+// The hrefs come from the link check's own extraction (entity-decoded).
 function expectNoCvDocument(route: string, html: string): void {
-  expect(html, `${route}: no download attribute`).not.toMatch(/<a\s[^>]*\sdownload(?:[\s=>])/);
-  const hrefs = [...html.matchAll(/\shref="([^"]*)"/g)].map((m) => m[1].replace(/&amp;/g, "&"));
+  expect(hasDownloadAttribute(html), `${route}: no download attribute`).toBe(false);
+  const hrefs = extractHrefs(html);
   expect(hrefs.filter((href) => cvDocumentProblem(href) !== null), `${route}: no CV or document link`).toEqual([]);
 }
 
@@ -198,6 +208,13 @@ describe("the frame checks themselves", () => {
   test("a CV document link or a download fails FR-23", () => {
     expect(() => expectNoCvDocument("/cv-link", '<a href="/files/cv.pdf">CV</a>')).toThrow(/\/cv-link: no CV or document link/);
     expect(() => expectNoCvDocument("/dl", '<a href="/x" download>x</a>')).toThrow(/\/dl: no download attribute/);
+    expect(() => expectNoCvDocument("/dl-first", '<a download href="/x">x</a>')).toThrow(/\/dl-first: no download attribute/);
+    expect(() => expectNoCvDocument("/dl-named", '<a href="/x" download="file">x</a>')).toThrow(/no download attribute/);
+    expect(() => expectNoCvDocument("/entity", '<a href="/files/cv&#46;pdf">x</a>')).toThrow(/\/entity: no CV or document link/);
+  });
+
+  test("the word download in prose or in an href is not a download attribute", () => {
+    expect(hasDownloadAttribute('<p>No CV download.</p><a href="/download-notes" title="a download">x</a>')).toBe(false);
   });
 
   test("a header inside main is not a landmark", () => {
