@@ -1,0 +1,80 @@
+<Section name="problem">
+
+This is a pattern piece rather than the story of a single system. The setting was a long-established healthcare platform in a regulated clinical environment, built over decades on on-premise systems, with three kinds of work to move it forward.
+
+- **A reporting service** ran in the on-premise data centre on .NET Framework WCF, and other legacy systems depended on it. It had to reach Azure without those systems changing and without disrupting the people who relied on its reports.
+- **A set of microservices** on .NET 8 had to reach .NET 10.
+- **An enterprise Angular application** sat eight major versions behind, on Angular 13 with Angular 21 then current, with unit test coverage near zero.
+
+</Section>
+
+<Section name="approach">
+
+The work ran in two modes, and I keep them apart because they are different evidence.
+
+**Direct hands-on engineering.** The AKS, Azure and SQL work was direct hands-on engineering. I reshaped the reporting service from .NET Framework WCF onto containerised .NET Core on AKS: packaged with Docker containers and Helm charts, its images pushed through Azure Container Registry into AKS, with no changes required to the legacy systems around it. The same packaging carried other back-end services onto Azure.
+
+**Agentic loops.** The Angular coverage and upgrade work was driven through agentic loops, and I have not written Angular by hand. The microservices upgrade from .NET 8 to .NET 10 was also driven through agentic loops. In each loop an agent runs against a specification until the tests pass, in the style known as a Ralph loop (an agent run again and again on the same task until its checks pass). My part was to set the target, the guardrails and the acceptance criteria, and to review the output.
+
+</Section>
+
+<Section name="decisions">
+
+<TradeoffList>
+<TradeoffPair decision="Lift and reshape the reporting service onto containers, without changing the legacy systems that depend on it." buys="The move fitted in a single 8-week sprint and caused no disruption, because nothing upstream or downstream had to change with it." costs="The new service had to keep behaving exactly as the legacy systems expected, so their interfaces bounded its design." />
+<TradeoffPair decision="Drive the version upgrades and the test coverage through agentic loops, not by hand." buys="An enterprise Angular application went from near zero to 95% unit test coverage across eight major versions, and the microservices moved from .NET 8 to .NET 10." costs="The result is only as good as the target, guardrails and acceptance criteria I set, every change still needed review, and it is not evidence that I can write Angular by hand." />
+<TradeoffPair decision="Load-test the reporting service before tuning how it scales." buys="The AKS Horizontal Pod Autoscaler thresholds were tuned after the service was load-tested with a Grafana k6 performance suite, rather than guessed." costs="A performance suite to build and keep in step with the service, on top of the service itself." />
+</TradeoffList>
+
+</Section>
+
+<Section name="technologies">
+
+- **Hands-on:** C#, .NET Core, Docker, Helm, Azure Container Registry, AKS with the Horizontal Pod Autoscaler, Azure, SQL, YAML pipelines and infrastructure as code, and Grafana k6 for load testing.
+- **Driven through agentic loops:** the Angular application's tests and its upgrades from Angular 13 to 21, and the microservices' upgrade from .NET 8 to .NET 10.
+
+The split in this list is the point of the page. The first line is work I did with my own hands. The second is work I directed, specified and reviewed while agents wrote the code.
+
+</Section>
+
+<Section name="tradeoffs">
+
+Agentic loops and hands-on engineering are not the same evidence, and I would rather say so than be asked. For a reader who values directing AI well, the Angular work is the stronger version of the claim. For a test of whether I can write Angular, it is not the same thing, and claiming otherwise would not survive the first question.
+
+This page gives no system or service names, no customers, and no team size, user numbers or service counts. That keeps it within what I can publish about a former employer's platform, and it costs the scale a named account would carry. What is left is the pattern, which is the part that transfers.
+
+</Section>
+
+<Section name="testing">
+
+- **Coverage as the loops' target.** The Angular work raised unit test coverage from near zero to 95%, and each upgrade loop ran until the tests passed.
+- **Load before tuning.** A Grafana k6 performance test suite load-tested the reporting service, and its results set the autoscaler thresholds on AKS.
+- **No disruption as the bar for the move.** The reporting service reached Azure with no changes to the legacy systems around it and no disruption to the people who rely on it.
+
+</Section>
+
+<Section name="outcome">
+
+<OutcomeBand tag="Test coverage" figure="Unit test coverage from near zero to 95%" qualifier="on an enterprise Angular application across eight major versions, Angular 13 to 21, driven through agentic loops." />
+
+The reporting service was reshaped onto containerised .NET Core on AKS in a single 8-week sprint, with no disruption, and the microservices moved from .NET 8 to .NET 10 through agentic loops.
+
+<SourceNote instrument="Coverage is the unit test coverage the Angular application's own tests reported; the sprint length and the absence of disruption are as recorded in my own account of the move." weakness="Coverage measures how much code the tests exercise, not whether they check the right things, and tests written through agentic loops need the same review as any other code. The 8-week duration and the absence of disruption rest on my own account." />
+
+<KeyValueList rows={[
+  { term: "Kinds of work", value: "Three: a reporting service, a set of microservices and an enterprise Angular application" },
+  { term: "Modes of work", value: "Two: direct hands-on engineering and agentic loops" },
+  { term: "Unit test coverage", value: "From near zero to 95%, on the enterprise Angular application, driven through agentic loops" },
+  { term: "Angular upgrades", value: "Eight major versions, Angular 13 to 21, driven through agentic loops" },
+  { term: "Microservices", value: "Upgraded from .NET 8 to .NET 10, driven through agentic loops" },
+  { term: "Reporting service", value: "Reshaped onto containerised .NET Core on AKS in a single 8-week sprint, with no disruption, hands-on" },
+  { term: "Load testing", value: "A Grafana k6 performance suite, load-testing the reporting service before the AKS autoscaler thresholds were tuned" },
+]} />
+
+</Section>
+
+<Section name="lessons">
+
+Say which work was agentic before anyone asks. The honest answer to "how much of that was you and how much was the AI?" is that I set the target, the guardrails and the acceptance criteria, and reviewed the output, which is the same skill as building AI-native engineering for a team, applied to my own work. Left unsaid, the same facts read as an overclaim.
+
+</Section>

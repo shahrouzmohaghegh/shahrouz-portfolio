@@ -31,11 +31,14 @@ import * as runtime from "react/jsx-runtime";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
+import kvStyles from "@/components/case-study/key-value-list.module.css";
+import noteStyles from "@/components/case-study/source-note.module.css";
 import gridStyles from "@/components/card-grid.module.css";
 import cardStyles from "@/components/evidence-card.module.css";
 import { metricSentence } from "@/components/evidence-card";
 import repoStyles from "@/components/repo-cta.module.css";
 import { repoCtaName } from "@/components/repo-cta";
+import { caseStudyPage } from "@/content/case-study-page";
 import { projectPage } from "@/content/project-page";
 import { projectsPage } from "@/content/projects-page";
 import { useMDXComponents } from "@/mdx-components";
@@ -408,13 +411,14 @@ describe("how the routes are built", () => {
     expect(Object.keys(useMDXComponents())).not.toContain("RepoCta");
   });
 
-  // The committed list is empty until Story 3.7 writes the prose; that
-  // story updates this test in the same change that adds a slug.
-  test("with the committed written list empty, no project page is generated", async () => {
+  // Story 3.7 wrote all three projects: the committed list names each, in
+  // collection order, and the route generates exactly those three pages.
+  test("with all three projects on the committed written list, exactly their three pages are generated", async () => {
     const actual = await vi.importActual<typeof import("@/lib/evidence")>("@/lib/evidence");
-    expect(actual.writtenItems("project")).toEqual([]);
-    state.written = [];
-    expect(route.generateStaticParams()).toEqual([]);
+    const committed = actual.writtenItems("project").map((item) => item.slug);
+    expect(committed).toEqual([pr1.slug, pr2.slug, pr3.slug]);
+    state.written = committed;
+    expect(route.generateStaticParams()).toEqual(committed.map((slug) => ({ slug })));
   });
 });
 
@@ -591,6 +595,16 @@ function confidentialTerms(): Array<{ line: number; pattern: RegExp }> {
   expect(terms.length, `${TERMS_FILE} holds no terms, so confidential terms cannot be checked`).toBeGreaterThan(0);
   return terms;
 }
+// Number words, one to twenty, the tens and hundred, read as digits, so a
+// number stated in words is held to the key-value list like any other.
+const NUMBER_WORDS: Record<string, number> = Object.fromEntries([
+  ...["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty"].map((w, i) => [w, i + 1] as const),
+  ...["thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"].map((w, i) => [w, (i + 3) * 10] as const),
+  ["hundred", 100] as const,
+]);
+const digitsFor = (s: string): string =>
+  s.replace(new RegExp(`\\b(${Object.keys(NUMBER_WORDS).join("|")})\\b`, "gi"), (w) => String(NUMBER_WORDS[w.toLowerCase()]));
+
 const EM_DASH = new RegExp(String.fromCharCode(0x2014));
 
 function bannedLines(path: string, body: string): string[] {
@@ -609,9 +623,14 @@ describe("the project copy", () => {
   });
 });
 
-// Any project written for real (Story 3.7) is compiled and rendered inside
-// the real page. None is written yet, so these loops run over nothing; they
-// start checking as each slug joins writtenProjectSlugs.
+// Every project written for real (Story 3.7) is compiled and rendered inside
+// the real page and checked: the eight sections, at least one labelled
+// trade-off pair in Decisions, an Outcome ending in a source note then a
+// key-value list that repeats every number the page states, Lessons with
+// something to say, "Ralph loop" glossed wherever it appears, the repository
+// call to action on PR-1 and PR-2 only, PR-2's build account as the README
+// opening words it, and PR-3's plain statement of which work was agentic and
+// which was direct.
 describe("the written projects, rendered", async () => {
   const actual = await vi.importActual<typeof import("@/lib/evidence")>("@/lib/evidence");
   const slugs = actual.writtenItems("project").map((item) => item.slug);
@@ -650,5 +669,91 @@ describe("the written projects, rendered", async () => {
       hits.push(...bannedLines(mdxPath(slug), source(mdxPath(slug))));
     }
     expect(hits).toEqual([]);
+  });
+
+  const bodyOf = (main: string): string => main.slice(main.indexOf("<section"), main.lastIndexOf("</section>") + "</section>".length);
+  const sentencesOf = async (slug: string): Promise<string[]> => units(bodyOf(mainOf(await renderWritten(slug))));
+
+  test("all three projects are written, in collection order", () => {
+    expect(slugs).toEqual(projectItems.map((item) => item.slug));
+  });
+
+  describe.each(slugs)("%s", (slug) => {
+    test("Decisions sets out at least one decision as a labelled trade-off pair", async () => {
+      const decisions = sectionOf(mainOf(await renderWritten(slug)), "decisions");
+      const pairs = [...decisions.matchAll(/<li[^>]*><h3[^>]*>/g)].length;
+      expect(pairs).toBeGreaterThan(0);
+      expect(decisions.split(`>${caseStudyPage.tradeoff.buys}<`).length - 1).toBe(pairs);
+      expect(decisions.split(`>${caseStudyPage.tradeoff.costs}<`).length - 1).toBe(pairs);
+    });
+
+    test("Outcome closes with a source note, then a key-value list", async () => {
+      const outcome = sectionOf(mainOf(await renderWritten(slug)), "outcome");
+      const note = outcome.indexOf(`class="${noteStyles.note}"`);
+      const kv = outcome.indexOf(`class="${kvStyles.list}"`);
+      expect(note, "a source note").toBeGreaterThan(-1);
+      expect(kv, "a key-value list after the source note").toBeGreaterThan(note);
+    });
+
+    test("the key-value list repeats every number the page states, in digits or in words", async () => {
+      const body = bodyOf(mainOf(await renderWritten(slug)));
+      const kvAt = body.indexOf(`class="${kvStyles.list}"`);
+      const kv = body.slice(kvAt, body.indexOf("</dl>", kvAt));
+      const numbers = (html: string) => new Set(digitsFor(text(html)).match(/\d+(?:\.\d+)?/g) ?? []);
+      const listed = numbers(kv);
+      expect([...numbers(body)].filter((n) => !listed.has(n))).toEqual([]);
+    });
+
+    test("every one of the eight sections has at least 40 characters of text", async () => {
+      const main = mainOf(await renderWritten(slug));
+      for (const { id } of PROJECT_SECTIONS) {
+        expect(text(sectionOf(main, id).replace(/<h2[\s\S]*?<\/h2>/, "")).length, id).toBeGreaterThanOrEqual(40);
+      }
+    });
+
+    test("\"Ralph loop\" never appears without a plain-language gloss straight after it", async () => {
+      const body = text(bodyOf(mainOf(await renderWritten(slug))));
+      for (const match of body.matchAll(/Ralph loops?/gi)) {
+        expect(body.slice((match.index ?? 0) + match[0].length)).toMatch(/^ \([^)]{12,}\)/);
+      }
+    });
+
+    test("the repository call to action renders when the project has a repository, and never otherwise", async () => {
+      const main = mainOf(await renderWritten(slug));
+      const repository = byslug(slug).repository;
+      const classes = anchors(main)
+        .filter(({ attrs }) => /github\.com/.test(attr(attrs, "href") ?? ""))
+        .map(({ attrs }) => [attr(attrs, "class"), attr(attrs, "href")]);
+      if (repository === undefined) expect(classes).toEqual([]);
+      else expect(classes).toEqual([[repoStyles.panel, repository], [repoStyles.rail, repository]]);
+    });
+  });
+
+  test("PR-1 and PR-2 have a repository and PR-3 has none", () => {
+    expect([pr1.repository, pr2.repository, pr3.repository]).toEqual([
+      "https://github.com/shahrouzmohaghegh/career-application-system",
+      "https://github.com/shahrouzmohaghegh/shahrouz-portfolio",
+      undefined,
+    ]);
+  });
+
+  // PR-2's account of how the site was built is the README's own opening, word for word.
+  test("PR-2 carries the build account the README opens with", async () => {
+    const account = "built with BMAD agents while Shahrouz held the requirements, architecture, decisions and review";
+    const opening = source("README.md").split("\n\n")[1];
+    expect(opening, "the README opening still says it").toContain(account);
+    expect(text(mainOf(await renderWritten(pr2.slug)))).toContain(account);
+  });
+
+  // PR-3 says plainly which work was driven through agentic loops and which was direct.
+  // Only while PR-3 is written: the spec's fallback drops it from the list.
+  test.runIf(slugs.includes(pr3.slug))("PR-3 states the agentic work, that he has not written Angular by hand, and the direct AKS, Azure and SQL work", async () => {
+    const sentences = await sentencesOf(pr3.slug);
+    const some = (label: string, ...patterns: RegExp[]) =>
+      expect(sentences.some((s) => patterns.every((p) => p.test(s))), label).toBe(true);
+    some("the Angular coverage and upgrade work was driven through agentic loops", /Angular/, /coverage/, /upgrade/, /driven through agentic loops/);
+    some("the .NET upgrade was driven through agentic loops", /\.NET 8 to \.NET 10/, /driven through agentic loops/);
+    some("he has not written Angular by hand", /\bnot written Angular by hand\b/);
+    some("the AKS, Azure and SQL work was direct hands-on engineering", /\bAKS\b/, /\bAzure\b/, /\bSQL\b/, /\bdirect hands-on engineering\b/);
   });
 });
