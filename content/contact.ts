@@ -35,9 +35,9 @@ export const contact = {
   noCv: {
     heading: "There is no CV on this site, and that is deliberate.",
     // One paragraph: the lead, then "Ask by email" as a mailto: link, then the rest.
-    lead: "Every CV I send is written for one job description.",
+    lead: "I tailor my CV to each role.",
     ask: "Ask by email",
-    rest: " and I will send the version written for your role.",
+    rest: " and I will send the version written for yours.",
   },
   // The black studio frame (UX-DR42 interim): rendered inside a fixed plate,
   // never above its natural 1311 x 1200.

@@ -87,7 +87,7 @@ describe("the Contact hero", () => {
     expect(contact.linkedin.when).toBe("Best if you want the full history before a conversation.");
     expect(contact.noCv.heading).toBe("There is no CV on this site, and that is deliberate.");
     expect(`${contact.noCv.lead} ${contact.noCv.ask}${contact.noCv.rest}`).toBe(
-      "Every CV I send is written for one job description. Ask by email and I will send the version written for your role.",
+      "I tailor my CV to each role. Ask by email and I will send the version written for yours.",
     );
   });
 
