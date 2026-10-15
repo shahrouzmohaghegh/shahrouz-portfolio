@@ -1,0 +1,162 @@
+/* {components.contact-hero} (Story 3.8): the whole hero on the deep ground,
+   so the black studio portrait meets it edge to edge. Text then plate in the
+   source, wrapping intrinsically with no media query: row-reverse puts the
+   plate on the left when both fit, and when they do not the text keeps the
+   first line and the plate drops below it, at the left edge. Every value
+   that switches at the breakpoint is a --component-contact-hero-* pair
+   remapped in breakpoints.css. */
+.hero {
+  --focus-ring: var(--color-focus-ring-on-deep);
+  display: flex;
+  flex-direction: row-reverse;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  column-gap: var(--space-column-gap-desktop);
+  row-gap: var(--space-stack-xl);
+  padding: var(--component-contact-hero-padding);
+  background: var(--color-deep);
+  color: var(--color-on-deep);
+}
+
+.text {
+  flex: 1 1 var(--component-contact-hero-text-min-width);
+  min-width: 0;
+}
+
+.title {
+  margin: 0 0 var(--space-stack-md);
+  font-family: var(--type-page-title-family);
+  font-size: var(--type-page-title-size);
+  font-weight: var(--type-page-title-weight);
+  line-height: var(--type-page-title-leading);
+  letter-spacing: var(--type-page-title-tracking);
+  color: var(--color-on-deep);
+}
+
+.lede {
+  margin: 0 0 var(--space-stack-xl);
+  max-width: var(--space-measure-caption);
+  font-family: var(--type-support-family);
+  font-size: var(--type-support-size);
+  font-weight: var(--type-support-weight);
+  line-height: var(--type-support-leading);
+  color: var(--color-deep-muted);
+}
+
+.routes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.route {
+  border-top: var(--space-rule-hairline) solid var(--color-deep-rule);
+  padding: var(--space-stack-md) 0;
+}
+
+.label {
+  margin: 0 0 var(--space-stack-xs);
+  font-family: var(--type-meta-label-family);
+  font-size: var(--type-meta-label-size);
+  font-weight: var(--type-meta-label-weight);
+  line-height: var(--type-meta-label-leading);
+  letter-spacing: var(--type-meta-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-deep-accent);
+}
+
+/* UX-DR30: the underline is the non-colour affordance, 7.87:1 on deep. */
+.routeLink {
+  font-family: var(--type-route-link-family);
+  font-size: var(--type-route-link-size);
+  font-weight: var(--type-route-link-weight);
+  line-height: var(--type-route-link-leading);
+  letter-spacing: var(--type-route-link-tracking);
+  color: var(--color-on-deep);
+  text-decoration-line: underline;
+  text-decoration-thickness: var(--component-contact-hero-route-link-underline-width);
+  text-decoration-color: var(--color-deep-accent);
+  text-underline-offset: var(--component-contact-hero-route-link-underline-offset);
+  overflow-wrap: anywhere;
+}
+
+.when {
+  margin: var(--space-stack-xs) 0 0;
+  max-width: var(--space-measure-caption);
+  font-family: var(--type-small-family);
+  font-size: var(--type-small-size);
+  font-weight: var(--type-small-weight);
+  line-height: var(--type-small-leading);
+  color: var(--color-deep-muted);
+}
+
+/* Sentence case, never tracked caps; the dot is decorative only. */
+.availability {
+  display: flex;
+  align-items: center;
+  gap: var(--space-stack-xs);
+  margin: var(--space-stack-md) 0 0;
+  font-family: var(--type-small-family);
+  font-size: var(--type-small-size);
+  font-weight: var(--type-small-weight);
+  line-height: var(--type-small-leading);
+  color: var(--color-deep-muted);
+}
+
+.availability::before {
+  content: "";
+  flex: none;
+  width: var(--component-availability-dot-size);
+  height: var(--component-availability-dot-size);
+  border-radius: var(--radius-dot);
+  background: var(--color-deep-accent);
+}
+
+/* {components.hero-plate} on {colors.studio-ground}: a fixed box; the crop
+   comes only from the box and object-position, so the 1311 x 1200 source
+   is never upscaled. */
+.plate {
+  flex: none;
+  box-sizing: border-box;
+  width: var(--space-contact-plate-width);
+  max-width: 100%;
+  height: var(--space-contact-plate-height);
+  overflow: hidden;
+  border: var(--space-rule-hairline) solid var(--color-deep-rule);
+  border-radius: var(--radius-default);
+  background: var(--color-studio-ground);
+}
+
+.portrait {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: var(--component-contact-hero-plate-position);
+}
+
+/* The statement that there is no CV, on paper below the hero. */
+.noCv {
+  padding: var(--space-section) var(--space-margin);
+}
+
+.noCvHeading {
+  margin: 0 0 var(--space-stack-sm);
+  font-family: var(--type-subsection-title-family);
+  font-size: var(--type-subsection-title-size);
+  font-weight: var(--type-subsection-title-weight);
+  line-height: var(--type-subsection-title-leading);
+  letter-spacing: var(--type-subsection-title-tracking);
+  color: var(--color-ink);
+}
+
+.noCvBody {
+  margin: 0;
+  max-width: var(--space-measure-body);
+  font-family: var(--type-body-family);
+  font-size: var(--type-body-size);
+  font-weight: var(--type-body-weight);
+  line-height: var(--type-body-leading);
+  color: var(--color-muted);
+}

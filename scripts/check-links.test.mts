@@ -14,6 +14,9 @@ import {
   ATTEMPTS,
   BOT_BLOCK_EXEMPTION,
   CANONICAL_ORIGINS,
+  CV_DOCUMENT,
+  CV_WORDS,
+  DOCUMENT_EXTENSIONS,
   CONCURRENCY,
   MAX_PAGES,
   EXPECTED_REPOSITORIES,
@@ -24,6 +27,7 @@ import {
   NOT_ALLOWED,
   bodyPointsAtUnlistedRepository,
   classify,
+  cvDocumentProblem,
   decodeEntities,
   expectedStatus,
   extractHrefs,
@@ -585,6 +589,80 @@ describe("I/O matrix", () => {
     const result = await checkLinks(BASE, d);
     assert.equal(result.failures.length, 1);
     assert.match(result.failures[0].detail, /query/);
+  });
+});
+
+// ---------------------------------------------------------------- CV documents (FR-23)
+
+describe("cvDocumentProblem", () => {
+  test("the rule is the five document extensions and the two words", () => {
+    assert.deepEqual([...DOCUMENT_EXTENSIONS], ["pdf", "doc", "docx", "rtf", "odt"]);
+    assert.deepEqual([...CV_WORDS], ["cv", "resume"]);
+  });
+
+  const positives = [
+    "/files/profile.pdf",
+    "/shahrouz.PDF",
+    "https://example.org/a/b/c.doc",
+    "https://example.org/a/b/c.docx?download=1",
+    "/x.rtf#page=2",
+    "/x.odt",
+    "/x.pdf/",
+    "/cv",
+    "/CV/",
+    "/downloads/cv-2026",
+    "/shahrouz_cv",
+    "/resume",
+    "/my-resume.html",
+    "/r%C3%A9sum%C3%A9",
+    "/résumé",
+    "https://shahrouzmohaghegh.com/cv",
+    "https://drive.example.com/file/resume/view",
+    "/x%2Epdf",
+  ];
+  for (const href of positives) test(`fails ${href}`, () => assert.equal(cvDocumentProblem(href), CV_DOCUMENT));
+
+  const negatives = [
+    "/",
+    "/contact",
+    "/experience/offshore-delivery-turnaround",
+    "/projects/career-application-system",
+    LINKEDIN,
+    PR1,
+    PR2,
+    `${PR2}/blob/main/README.md`,
+    "mailto:me@example.com",
+    "mailto:cv@example.com",
+    "/cvs-are-written-per-job",
+    "/curve",
+    "/resumes-later",
+    "/pdf-guide",
+    "/docs/intro",
+    "/?file=cv.pdf",
+    "/#cv",
+  ];
+  for (const href of negatives) test(`allows ${href}`, () => assert.equal(cvDocumentProblem(href), null));
+});
+
+describe("CV document links", () => {
+  test("a CV document link on any page fails, names the page, and is never fetched", async () => {
+    for (const href of ["/cv.pdf", "https://example.org/resume", "/files/shahrouz-cv.docx"]) {
+      const { deps: d, calls } = deps(goodSite({ [`${BASE}/contact`]: page(FOOTER + links(href)) }));
+      const result = await checkLinks(BASE, d);
+      assert.equal(result.failures.length, 1, href);
+      assert.equal(result.failures[0].subject, href);
+      assert.equal(result.failures[0].detail, CV_DOCUMENT);
+      assert.deepEqual(result.failures[0].foundOn, ["/contact"]);
+      assert.ok(!calls.some((c) => c.url.endsWith(href.replace(/^\//, ""))), `${href} not fetched`);
+    }
+  });
+
+  test("main exits 1 on a CV document link", async () => {
+    const { deps: d } = deps(goodSite({ [`${BASE}/`]: page(FOOTER + links("/cv")) }));
+    const out: string[] = [];
+    const code = await main([BASE], { ...d, out: (t) => out.push(t), err: () => {} });
+    assert.equal(code, 1);
+    assert.match(out.join(""), /\/cv: links to a CV/);
   });
 });
 

@@ -1,9 +1,8 @@
 import Link from "next/link";
 
 import { site } from "@/content/site";
+import { EmailAddress } from "./email-address";
 import styles from "./site-footer.module.css";
-
-const [emailUser, emailDomain] = site.email.split("@");
 
 // {components.footer}: three columns on panel ground, one below 768px.
 export function SiteFooter() {
@@ -32,14 +31,9 @@ export function SiteFooter() {
           <p className={styles.label}>{site.contactLabel}</p>
           <ul className={styles.links}>
             <li>
-              {/* Lightly obfuscated as in the mockup: the visible "@" is hidden from
-                  assistive technology, which reads a visually hidden one instead,
-                  so the address is never one contiguous text run. */}
+              {/* Lightly obfuscated as in the mockup (components/email-address.tsx). */}
               <a href={`mailto:${site.email}`} className={styles.link}>
-                {emailUser}
-                <span aria-hidden="true">@</span>
-                <span className={styles.visuallyHidden}>@</span>
-                {emailDomain}
+                <EmailAddress address={site.email} />
               </a>
             </li>
             <li>

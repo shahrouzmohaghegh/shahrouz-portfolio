@@ -40,6 +40,11 @@
 //    repository, is allowed. The failure names no repository.
 // 5. mailto: links must name one address and carry no query. Any other
 //    scheme fails.
+// 6. No CV document (FR-23). Any href on a crawled page whose path ends in
+//    a document extension (DOCUMENT_EXTENSIONS: .pdf, .doc, .docx, .rtf,
+//    .odt) or names cv or resume as a word (CV_WORDS) fails and is never
+//    fetched. The site offers no CV, generic or otherwise: every CV is
+//    written for one job and sent by email.
 //
 // Exit 1 names each failure: the page or link, the status, and the pages it
 // was found on. Built-ins only; the HTTP layer is injected, so the tests
@@ -124,6 +129,39 @@ export function pointsAtUnlistedRepository(text: string): boolean {
 export function bodyPointsAtUnlistedRepository(html: string): boolean {
   const unescaped = html.replace(/\\u002f/gi, "/").replace(/\\\//g, "/").replace(/%2f/gi, "/");
   return [html, decodeEntities(html), unescaped, decodeEntities(unescaped)].some(unlistedIn);
+}
+
+// ---------------------------------------------------------------- CV documents
+
+// FR-23: no route links a CV, resume or profile document.
+export const DOCUMENT_EXTENSIONS = ["pdf", "doc", "docx", "rtf", "odt"] as const;
+export const CV_WORDS = ["cv", "resume"] as const;
+export const CV_DOCUMENT = "links to a CV, resume or document file; the site offers none (FR-23)";
+
+// Why an href is a CV or document link, or null. Only the path counts, as
+// written and percent-decoded, lower-cased and with accents dropped (so
+// résumé is resume): a final extension from DOCUMENT_EXTENSIONS, or cv or
+// resume as a whole word between non-alphanumerics. mailto: and other
+// non-http schemes have no path to judge and pass.
+export function cvDocumentProblem(href: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(href, "http://site.invalid/");
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+  let path = url.pathname;
+  try {
+    path = decodeURIComponent(path);
+  } catch {
+    // keep the encoded form
+  }
+  path = path.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const extension = /\.([a-z0-9]+)\/*$/.exec(path)?.[1];
+  if (extension !== undefined && (DOCUMENT_EXTENSIONS as readonly string[]).includes(extension)) return CV_DOCUMENT;
+  const words = path.split(/[^a-z0-9]+/);
+  return words.some((word) => (CV_WORDS as readonly string[]).includes(word)) ? CV_DOCUMENT : null;
 }
 
 // ---------------------------------------------------------------- extraction
@@ -404,6 +442,10 @@ export async function checkLinks(baseUrl: string, deps: Deps): Promise<Result> {
       if (pointsAtUnlistedRepository(href)) {
         unlistedHref = true;
         fail("a link", NOT_ALLOWED, [path]);
+        continue;
+      }
+      if (cvDocumentProblem(href) !== null) {
+        fail(href, CV_DOCUMENT, [path]);
         continue;
       }
       const link = classify(href, pageUrl, origin);
