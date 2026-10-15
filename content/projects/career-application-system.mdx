@@ -1,0 +1,94 @@
+<Section name="problem">
+
+Applying for roles well is a lot of repeated, careful work: scoring each role honestly against an evidence base, drafting documents tailored to it, preparing for the interview, and keeping track of the people involved. A language model can help with every part of it, but it also forgets. A rule the model is merely asked to remember is a rule that quietly stops being followed, and in documents that go to employers, a quietly broken rule means an overclaim or a stale page.
+
+So the problem was not only to automate the work. It was to automate it in a way that keeps its own rules.
+
+</Section>
+
+<Section name="approach">
+
+I built a multi-agent system with four agents, fifteen workflow skills, nineteen knowledge files and a document toolchain, built and run by one person on one laptop. It is built on BMAD, where agents and workflows are Claude Code skills.
+
+- **Four agents, each owning a stage.** The stages are drawn where the work fails differently, which is the first decision below. One scores a role and decides whether it is worth the effort. One writes the tailored documents. One handles recruiter conversations and public content. One prepares for interviews. The analysis hands off to the documents automatically only when the score clears a threshold; the later stages wait for a real event, such as an interview being booked.
+- **A knowledge layer the agents load on activation.** Facts, conventions and corrections live in files, one rule in exactly one file, so the system behaves consistently without being reminded.
+- **Guardrails written as scripts.** Every rule that can be checked mechanically is checked mechanically, by the toolchain rather than by the model.
+- **Markdown as the source of truth.** Nothing is authored in a binary format. The toolchain checks a draft for drift, renders it to Word and PDF, names it and publishes it.
+- **A person in the loop.** The system never sends anything to an employer by itself. Every outbound document passes through me first.
+
+The architecture is documented in C4 form, at context, container and component level, with a dynamic view of one application end to end and a deployment view. The agents, the toolchain and the significant decisions each have their own document in the repository.
+
+</Section>
+
+<Section name="decisions">
+
+<TradeoffList>
+<TradeoffPair decision="Split the agents by how their work fails, not by topic." buys="Each agent optimises for one way of failing: a document that is never read fails silently in an inbox, while an interview fails in ninety seconds in front of a person, and one persona cannot optimise for both." costs="Four agents to define and keep consistent rather than three, and a boundary that has to be argued: the recruiter phone screen stayed with outreach, because it is a conversation about motivation and level, not a test of capability.">
+My first call was to stay at three agents, on the grounds that the capability mostly existed already. I changed my mind, because that answered the wrong question. The right test was how the work fails, and by that test the split is correct.
+</TradeoffPair>
+<TradeoffPair decision="Make guardrails scripts, not intentions." buys="Rules are enforced rather than remembered. The validator runs 281 checks, and a drift check fails a run when a tailored document reorganises its source instead of re-emphasising it." costs="Every rule has to be written as code, and each guardrail has to be proven by breaking it on purpose, which is work a prompt would not need." />
+<TradeoffPair decision="Write Word files directly with the docx library, rather than converting through pandoc." buys="No external binary on the Word path, which a serverless backend could not easily use, and Markdown handled by the line-oriented parser these documents rely on, where each source line becomes one paragraph." costs="More code: pandoc with a reference document would have inherited the template's styles with almost no code of its own. And PDF still needs LibreOffice headless, an external process the Word path avoids." />
+<TradeoffPair decision="Keep the drift check asymmetric." buys="A tailored document may select less than its source, because the source is a library and selection is the point. Content that grows past the source is flagged, because it was either invented or imported from somewhere it should not have been." costs="A section that shrinks is never flagged, so the check cannot catch a document that selects too little; that judgement stays with the reader." />
+</TradeoffList>
+
+</Section>
+
+<Section name="technologies">
+
+- **Agent runtime:** Claude Code, with agents and workflow skills defined in Markdown and TOML on BMAD.
+- **Toolchain:** Node and TypeScript under strict settings, including `exactOptionalPropertyTypes` and `noUncheckedIndexedAccess`, run directly with no build step.
+- **Documents:** the `docx` library for Word output, LibreOffice headless for PDF, `yaml` for frontmatter and `exceljs` for the tracker.
+- **Publishing:** a mounted Google Drive, so the documents can be read on a phone before a call.
+- **Architecture documentation:** C4 diagrams drawn as plain Mermaid flowcharts, which render reliably everywhere, with every element typed in C4 terms.
+
+The toolchain is laid out domain first. `domain/` is pure, with no I/O and no external imports; `infrastructure/` talks to the outside world and imports only the domain; `cli/` holds the entry points and is imported by neither. That direction is what lets the domain logic move into another runtime unchanged.
+
+</Section>
+
+<Section name="tradeoffs">
+
+The system is file-based by design, because it has exactly one user: one machine, no server, no database and no network service. That keeps it simple to run and simple to reason about, and it is also the first thing that would have to change for anyone else to use it.
+
+The most important boundary is between the part that reasons and the part that does not. The agent runtime interprets instructions and writes prose. Everything else either stores bytes or transforms them deterministically. That split is why the toolchain can be tested and the runtime cannot, and it is the reason the guardrails live in the toolchain.
+
+The public repository holds the architecture documentation and the toolchain source, and leaves out the agent and skill definitions, the knowledge files and everything personal. The code can be read alongside the architecture, but the entry points will not run standalone against it.
+
+</Section>
+
+<Section name="testing">
+
+- **Rendering fidelity, verified rather than assumed.** The Word output was compared with Word's own: identical paragraph count, identical style distribution, identical bold-run count and character-identical text. LibreOffice produced an identical page count on the first test, though pagination will not always match Word exactly, so any check on page count is indicative.
+- **Each guardrail proven by breaking it.** The drift check was verified by deleting a section and confirming it named the section and failed the run. The validator's check on the multi-agent rooms was verified by misspelling a member's name.
+- **The validator catches what breaks silently.** It checks for menu items pointing at skills that do not exist, script paths that moved and knowledge globs that match nothing. It found one multi-agent room that had never resolved a single member, hidden behind a check too weak to notice.
+- **Stale output fails the build.** One check fails when a rendered document is older than its Markdown source, because editing a source without re-rendering silently publishes stale content.
+
+</Section>
+
+<Section name="outcome">
+
+<OutcomeBand tag="Guardrails" figure="281 automated checks" qualifier="run by the repository's validator, several of them added because a specific failure shipped and prose alone had not prevented it." />
+
+The system is not a demonstration: it is a working tool, and the documents it produces are the ones that get sent.
+
+<SourceNote instrument="The counts come from the public repository's own README and documentation, as published." weakness="The skills and knowledge files are not in the public repository, and the validator's checks run against them, so a reader can read the validator but cannot rerun it to verify the counts. They also count checks and parts, not quality: the system has one user, so nothing here shows how it would hold up in anyone else's hands." />
+
+<KeyValueList rows={[
+  { term: "Validator", value: "281 checks across the repository" },
+  { term: "Built and run by", value: "One person on one laptop" },
+  { term: "Agents", value: "Four, split by how their work fails, after a first call to stay at three" },
+  { term: "Why the split", value: "An unread document fails silently, while an interview fails in ninety seconds" },
+  { term: "Workflow skills", value: "Fifteen" },
+  { term: "Knowledge files", value: "Nineteen" },
+  { term: "Architecture", value: "C4 views at context, container and component level, plus a dynamic view and a deployment view" },
+  { term: "What the drawing exposed", value: "Two structural facts: no application layer, and infrastructure bound concretely" },
+]} />
+
+</Section>
+
+<Section name="lessons">
+
+Drawing the C4 diagrams exposed two structural facts that prose had been hiding. There is no application layer: the command-line boundary holds both argument parsing and the use cases, so a web backend would have to duplicate that orchestration or shell out to a command. And infrastructure is bound concretely, not through interfaces, so publishing means a mounted drive at compile time and nothing could be swapped in. Neither is a defect for one user on one machine, but both are the first things I would change if it became a backend.
+
+The other lesson is about duplication. Adding a document type once took three edits in step, and a validator category existed only to police them. They still drifted: one type was added to two of the three places and published under its working name. Removing the duplication, with one catalogue of document types, worked where checking it had not.
+
+</Section>

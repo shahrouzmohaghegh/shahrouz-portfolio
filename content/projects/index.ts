@@ -23,7 +23,7 @@ export const projects: readonly Project[] = [
     kind: "project",
     title: "This website",
     summary:
-      "Next.js, React and TypeScript, built with BMAD agents while he held the requirements, architecture, decisions and acceptance criteria.",
+      "Next.js, React and TypeScript, built with BMAD agents while he held the requirements, architecture, decisions and review.",
     capabilities: ["hands-on"],
     headlineMetric: {
       value: "Twelve automated checks run on every merge to main",
@@ -52,4 +52,4 @@ export const projects: readonly Project[] = [
 // get a page: proxy.ts answers every other /projects/<slug> with the project
 // not-found page and a 404. Add a slug here in the same change that writes
 // its MDX (Story 3.7); lib/evidence.test.ts fails while the two disagree.
-export const writtenProjectSlugs: readonly string[] = [];
+export const writtenProjectSlugs: readonly string[] = ["career-application-system", "this-website", "platform-modernisation"];
