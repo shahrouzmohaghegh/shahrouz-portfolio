@@ -6,9 +6,13 @@
 // an item added or removed changes the card count, which proves the route
 // follows lib/evidence with no edit to the page. The title comes from
 // listingTitle in lib/evidence, for /projects too, and the root template adds
-// the site name once. The listing asks for no noindex, is static, hydrates no
-// island and has no filter yet (Epic 4). Static markup is what a visitor with
-// JavaScript off gets, so every card and link is checked there.
+// the site name once. Unfiltered, the listing asks for no noindex; it renders
+// per request because it reads search params (AD-4), and hydrates no island.
+// The capability filter (Epic 4) is checked against the spec's I/O matrix:
+// unfiltered, one capability, a union, a liberal read, all unknown or empty,
+// and no match here with a match on /projects. Static markup is what a
+// visitor with JavaScript off gets, so every chip, card and link is checked
+// there, and a chip is a plain link that filters by full page load.
 
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -19,13 +23,28 @@ import { describe, expect, test, vi } from "vitest";
 import gridStyles from "@/components/card-grid.module.css";
 import cardStyles from "@/components/evidence-card.module.css";
 import { metricSentence } from "@/components/evidence-card";
+import filterStyles from "@/components/capability-filter.module.css";
+import { capabilityFilter } from "@/content/capability-filter";
 import { experience } from "@/content/experience";
-import { CAPABILITY_NAME, caseStudyItems, listingTitle, type EvidenceItem } from "@/lib/evidence";
+import {
+  CAPABILITY_NAME,
+  caseStudyItems,
+  crossListing,
+  listingTitle,
+  projectItems,
+  stateLine,
+  type EvidenceItem,
+} from "@/lib/evidence";
 import { metadata as rootMetadata } from "../layout";
-import { metadata as projectsMetadata } from "../projects/page";
+import * as projectsModule from "../projects/page";
 import * as experienceModule from "./page";
 
 const ExperiencePage = experienceModule.default;
+type SearchParams = Record<string, string | string[] | undefined>;
+const props = (searchParams: SearchParams = {}) => ({ searchParams: Promise.resolve(searchParams) });
+const metadataFor = (searchParams: SearchParams = {}) => experienceModule.generateMetadata(props(searchParams));
+const projectsMetadata = await projectsModule.generateMetadata(props());
+const unfilteredMetadata = await metadataFor();
 
 const decode = (s: string): string =>
   s
@@ -36,13 +55,17 @@ const decode = (s: string): string =>
     .replace(/&amp;/g, "&");
 const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const text = (fragment: string): string => decode(fragment.replace(/<[^>]*>/g, " ")).replace(/\s+/g, " ").trim();
+// Text as read, without the space text() puts at every tag boundary.
+const tight = (fragment: string): string => decode(fragment.replace(/<[^>]*>/g, "")).replace(/\s+/g, " ").trim();
 const source = (path: string): string => readFileSync(join(process.cwd(), path), "utf8");
 
-const render = (page: () => unknown): string => renderToStaticMarkup(<>{page() as ReactNode}</>);
+type ListingPage = (p: ReturnType<typeof props>) => Promise<unknown>;
+const render = async (page: ListingPage, searchParams: SearchParams = {}): Promise<string> =>
+  renderToStaticMarkup(<>{(await page(props(searchParams))) as ReactNode}</>);
 const mainOf = (html: string): string => html.slice(html.search(/<main[\s>]/), html.lastIndexOf("</main>"));
 const cardsIn = (fragment: string): string[] => fragment.split("<article").slice(1).map((card) => card.slice(0, card.indexOf("</article>")));
 
-const html = render(ExperiencePage);
+const html = await render(ExperiencePage);
 const main = mainOf(html);
 
 describe("the /experience listing", () => {
@@ -53,6 +76,7 @@ describe("the /experience listing", () => {
         "Case studies in engineering leadership: an offshore delivery turnaround, AI-native engineering measured across pilot projects, and a standing seat on the Digital Governance Board.",
       intro: "Work from regulated healthcare, each with the decisions behind it, what they cost, and the measured outcome.",
       cta: "Read the case study",
+      empty: "The case studies tell the organisational story. Hands-on evidence is carried by the systems themselves, so it lives on Projects.",
     });
   });
 
@@ -93,15 +117,16 @@ describe("the /experience listing", () => {
     expect(main.split(`<li class="${gridStyles.item}"><article`), "one grid item per card").toHaveLength(caseStudyItems.length + 1);
   });
 
-  test("no chips, state line, filter, cross-listing link or project yet (Epic 4)", () => {
-    expect(main).not.toMatch(/role="status"|aria-current="true"|capability=/);
-    expect(main).not.toMatch(/href="\/projects/);
+  test("unfiltered: no chip is selected, no live region, no form control, and the cross-listing link counts every project", () => {
+    expect(main).not.toMatch(/role="status"|aria-live|aria-pressed|aria-current="true"/);
     expect(main).not.toMatch(/<form[\s>]|<input[\s>]|<button[\s>]/);
+    expect(main).toContain(`href="/projects"`);
+    expect(text(main)).toContain(`${projectItems.length} Projects are listed separately`);
   });
 
-  test("app/experience/page.tsx passes the collection to the shared grid and lists no item itself", () => {
+  test("app/experience/page.tsx passes the collection to the filtered listing and lists no item itself", () => {
     const page = source("app/experience/page.tsx");
-    expect(page).toMatch(/<CardGrid\s+items=\{caseStudyItems\}/);
+    expect(page).toMatch(/<FilteredListing\s+kind="case-study"\s+selection=\{selection\}\s+items=\{caseStudyItems\}/);
     for (const item of caseStudyItems) {
       expect(page, `app/experience/page.tsx names ${item.slug}`).not.toContain(item.slug);
       expect(page, `app/experience/page.tsx names ${item.title}`).not.toContain(item.title);
@@ -119,7 +144,7 @@ describe("the /experience listing", () => {
     });
     try {
       const mocked = await import("./page");
-      const cards = cardsIn(mainOf(render(mocked.default)));
+      const cards = cardsIn(mainOf(await render(mocked.default)));
       const expected = change(caseStudyItems);
       expect(cards).toHaveLength(expected.length);
       expect(cards.map((card) => card.match(/href="([^"]*)"/)?.[1])).toEqual(expected.map((item) => item.href));
@@ -134,7 +159,7 @@ describe("the listing titles", () => {
   const template = (rootMetadata.title as { template: string }).template;
 
   test("/experience and /projects take metadata.title from listingTitle", () => {
-    expect(experienceModule.metadata.title).toBe(listingTitle("case-study"));
+    expect(unfilteredMetadata.title).toBe(listingTitle("case-study"));
     expect(projectsMetadata.title).toBe(listingTitle("project"));
   });
 
@@ -143,13 +168,18 @@ describe("the listing titles", () => {
   });
 
   test("the root template renders each with the site name once", () => {
-    expect(template.replace("%s", String(experienceModule.metadata.title))).toBe("Experience | Shahrouz Mohaghegh");
+    expect(template.replace("%s", String(unfilteredMetadata.title))).toBe("Experience | Shahrouz Mohaghegh");
     expect(template.replace("%s", String(projectsMetadata.title))).toBe("Projects | Shahrouz Mohaghegh");
+  });
+
+  test("a filtered view's title carries its count, with the site name once", async () => {
+    const title = String((await metadataFor({ capability: "leadership,ai-native" })).title);
+    expect(template.replace("%s", title)).toBe("Experience, 2 of 3 case studies, Engineering Leadership or AI-Native Engineering | Shahrouz Mohaghegh");
   });
 
   test("neither route composes its own title", () => {
     for (const path of ["app/experience/page.tsx", "app/projects/page.tsx"]) {
-      expect(source(path), path).toMatch(/title:\s*listingTitle\("(case-study|project)"\)/);
+      expect(source(path), path).toMatch(/title:\s*listingTitle\("(case-study|project)", selection, (caseStudyItems|projectItems)\)/);
       expect(source(path), path).not.toMatch(/Shahrouz Mohaghegh/);
     }
   });
@@ -162,21 +192,33 @@ describe("indexing and rendering", () => {
       (m) => m[1] ?? m[2] ?? m[3],
     );
 
-  test("/experience asks for no noindex", () => {
-    expect(experienceModule.metadata.robots).toBeUndefined();
+  test("unfiltered /experience asks for no noindex", async () => {
+    expect(unfilteredMetadata.robots).toBeUndefined();
+    expect((await metadataFor({ capability: "zzz" })).robots).toBeUndefined();
+    expect((await metadataFor({ capability: "" })).robots).toBeUndefined();
+  });
+
+  test("every filtered /experience URL asks for noindex", async () => {
+    for (const capability of ["leadership", "hands-on", "ai-native,leadership", "Hands-On,zzz"]) {
+      expect((await metadataFor({ capability })).robots, capability).toEqual({ index: false });
+    }
   });
 
   test("/experience carries its meta description, from content/experience.ts", () => {
-    expect(experienceModule.metadata.description).toBe(experience.description);
+    expect(unfilteredMetadata.description).toBe(experience.description);
   });
 
-  test("the route stays static: no search params, no dynamic rendering", () => {
+  // AD-4: the listing reads search params, so it renders per request; the
+  // build marks it dynamic. Nothing forces it, and it reads no request
+  // beyond the params; only lib/evidence reads the capability parameter.
+  test("the route renders dynamically from search params, through lib/evidence only", () => {
     const page = source("app/experience/page.tsx");
-    expect(page).not.toMatch(/searchParams|export const dynamic|cookies\(|headers\(/);
+    expect(page).toMatch(/selectionFrom\(await searchParams\)/);
+    expect(page).not.toMatch(/export const dynamic|cookies\(|headers\(|generateStaticParams|\.capability\b|\[["']capability["']\]/);
   });
 
   test("the route and the components it renders reach no island", () => {
-    const islands = ["app/experience/page.tsx", "components/card-grid.tsx", "components/evidence-card.tsx"].flatMap((path) =>
+    const islands = ["app/experience/page.tsx", "components/capability-filter.tsx", "components/card-grid.tsx", "components/evidence-card.tsx"].flatMap((path) =>
       specifiers(source(path)).filter((specifier) => /(^|\/)islands\//.test(specifier)),
     );
     expect(islands).toEqual([]);
@@ -192,5 +234,131 @@ describe("indexing and rendering", () => {
     const users = [...sheets("app"), ...sheets("components")].filter((path) => source(path).includes("--component-card-grid-columns"));
     expect(users).toEqual(["components/card-grid.module.css"]);
     expect(source("components/selected-work.tsx")).toMatch(/<CardGrid\s/);
+  });
+});
+
+// The capability filter on /experience, against the spec's I/O matrix.
+describe("the capability filter on /experience", () => {
+  const view = async (searchParams: SearchParams) => {
+    const page = mainOf(await render(ExperiencePage, searchParams));
+    return { main: page, cards: cardsIn(page), metadata: await metadataFor(searchParams) };
+  };
+  const chips = (fragment: string) =>
+    [...fragment.matchAll(/<a ([^>]*class="[^"]*\bchip\b[^"]*"[^>]*)>([\s\S]*?)<\/a>/g)].map(([, attrs, inner]) => ({
+      href: decode(attrs.match(/href="([^"]*)"/)?.[1] ?? ""),
+      selected: /aria-current="true"/.test(attrs),
+      label: tight(inner),
+    }));
+  const chipClass = filterStyles.chip;
+  const chipsIn = (fragment: string) =>
+    chips(fragment.replaceAll(`class="${chipClass}"`, 'class="chip"'));
+
+  test("the page order: h1, intro, chip label and group, state line, cross-listing link, then cards", () => {
+    const at = (pattern: RegExp) => main.search(pattern);
+    const order = [
+      at(/<h1[\s>]/),
+      at(new RegExp(`<p[^>]*>${escapeRegExp(experience.intro)}</p>`)),
+      at(/<p id="capfilter"/),
+      at(/<ul role="group" aria-labelledby="capfilter"/),
+      at(/<p id="filter-status"/),
+      at(/href="\/projects"/),
+      at(/<article/),
+    ];
+    for (const index of order) expect(index).toBeGreaterThan(-1);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+  });
+
+  test("unfiltered: every case study, the title Experience, no noindex, the unfiltered state line", async () => {
+    const { cards, metadata, main: page } = await view({});
+    expect(cards).toHaveLength(caseStudyItems.length);
+    expect(metadata.title).toBe("Experience");
+    expect(metadata.robots).toBeUndefined();
+    expect(tight(page)).toContain("Showing all 3 case studies. No capability filter applied.");
+    expect(chipsIn(page).map((chip) => chip.selected)).toEqual([false, false, false, false]);
+    expect(chipsIn(page).map((chip) => chip.href)).toEqual([
+      "/experience?capability=leadership",
+      "/experience?capability=ai-native",
+      "/experience?capability=executive-influence",
+      "/experience?capability=hands-on",
+    ]);
+  });
+
+  test("one capability: matching items only, a counted title, the chip current, noindex", async () => {
+    const { cards, metadata, main: page } = await view({ capability: "leadership" });
+    const expected = caseStudyItems.filter((item) => item.capabilities.includes("leadership"));
+    expect(cards.map((card) => card.match(/href="([^"]*)"/)?.[1])).toEqual(expected.map((item) => item.href));
+    expect(metadata.title).toBe(`Experience, ${expected.length} of 3 case studies, Engineering Leadership`);
+    expect(metadata.robots).toEqual({ index: false });
+    const [leadership, ...rest] = chipsIn(page);
+    expect(leadership).toEqual({ href: "/experience", selected: true, label: "\u2713Leadership, selected" });
+    expect(rest.map((chip) => chip.selected)).toEqual([false, false, false]);
+    expect(rest.map((chip) => chip.href)).toEqual([
+      "/experience?capability=leadership,ai-native",
+      "/experience?capability=leadership,executive-influence",
+      "/experience?capability=leadership,hands-on",
+    ]);
+    const { emphasis, rest: sentence } = stateLine("case-study", ["leadership"]);
+    expect(decode(page)).toContain(`<span class="${filterStyles.emphasis}">${emphasis}</span>${sentence}`);
+  });
+
+  test("a union: both capabilities' case studies, the title joined with or", async () => {
+    const { cards, metadata } = await view({ capability: "ai-native,leadership" });
+    const expected = caseStudyItems.filter((item) => item.capabilities.some((c) => c === "ai-native" || c === "leadership"));
+    expect(cards).toHaveLength(expected.length);
+    expect(metadata.title).toBe(`Experience, ${expected.length} of 3 case studies, Engineering Leadership or AI-Native Engineering`);
+  });
+
+  test.each(["Hands-On,leadership,leadership,zzz", "hands-on%2Cleadership", "leadership,hands-on"])(
+    "a liberal read of %s is the canonical leadership,hands-on, and the chips emit canonical hrefs",
+    async (capability) => {
+      const canonical = await view({ capability: "leadership,hands-on" });
+      const liberal = await view({ capability });
+      expect(liberal.main).toBe(canonical.main);
+      expect(liberal.metadata).toEqual(canonical.metadata);
+      expect(chipsIn(liberal.main).map((chip) => chip.href)).toEqual([
+        "/experience?capability=hands-on",
+        "/experience?capability=leadership,ai-native,hands-on",
+        "/experience?capability=leadership,executive-influence,hands-on",
+        "/experience?capability=leadership",
+      ]);
+    },
+  );
+
+  test.each([["zzz"], [""], [","]])("all unknown or empty (%j) renders unfiltered", async (capability) => {
+    const unknown = await view({ capability });
+    expect(unknown.main).toBe(main);
+    expect(unknown.metadata).toEqual(unfilteredMetadata);
+  });
+
+  test("no match here, a match on /projects: the empty state, led by the cross-listing link", async () => {
+    const { cards, metadata, main: page } = await view({ capability: "hands-on" });
+    const link = crossListing("case-study", ["hands-on"]);
+    expect(link).toBeDefined();
+    expect(cards).toEqual([]);
+    expect(metadata.title).toBe("Experience, no case studies match, Hands-On Engineering");
+    expect(metadata.robots).toEqual({ index: false });
+    expect(tight(page)).toContain("Showing 0 of 3 case studies, filtered by Hands-On Engineering.");
+    const empty = page.slice(page.indexOf(`<div class="${filterStyles.empty}">`));
+    expect(empty.length, "the empty state renders").toBeLessThan(page.length);
+    const links = [...empty.matchAll(/<a [^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g)].map(([, href, inner]) => ({ href, text: text(inner) }));
+    expect(links[0]).toEqual({ href: "/projects?capability=hands-on", text: `${link?.count} Projects also match Hands-On Engineering` });
+    expect(empty, "the cross-listing link is the empty state's first element").toMatch(
+      new RegExp(`^<div class="${filterStyles.empty}"><p class="${filterStyles.crossListing}"><a `),
+    );
+    expect(links[1]).toEqual({ href: "/experience", text: capabilityFilter.showAll });
+    expect(text(empty)).toContain(experience.empty);
+    // The link sits inside the empty state, not above it as well.
+    expect(page.split('href="/projects?capability=hands-on"')).toHaveLength(2);
+  });
+
+  test("the chips are links in a named group, never buttons, with no aria-pressed or live region", async () => {
+    for (const capability of [undefined, "leadership", "hands-on", "leadership,ai-native,executive-influence,hands-on"]) {
+      const { main: page } = await view(capability === undefined ? {} : { capability });
+      expect(page).toMatch(new RegExp(`<p id="capfilter"[^>]*>${escapeRegExp(capabilityFilter.groupLabel)}</p>`));
+      expect(page.match(/<ul role="group" aria-labelledby="capfilter"[^>]*>([\s\S]*?)<\/ul>/)?.[1]).toMatch(/^(<li><a [^>]*>[\s\S]*?<\/a><\/li>){4}$/);
+      expect(page).not.toMatch(/aria-pressed|role="status"|aria-live|<button[\s>]/);
+      expect(page).toMatch(/<p id="filter-status" class="[^"]*">/);
+      expect(page).not.toMatch(/tabindex/);
+    }
   });
 });

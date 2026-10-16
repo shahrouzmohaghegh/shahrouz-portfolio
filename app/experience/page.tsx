@@ -1,25 +1,38 @@
 import type { Metadata } from "next";
 
-import { CardGrid } from "@/components/card-grid";
+import { FilteredListing } from "@/components/capability-filter";
 import { SiteFrame } from "@/components/site-frame";
 import { experience } from "@/content/experience";
-import { caseStudyItems, listingTitle } from "@/lib/evidence";
+import { caseStudyItems, isFiltered, listingTitle, selectionFrom, type ListingSearchParams } from "@/lib/evidence";
 import styles from "./experience.module.css";
 
-export const metadata: Metadata = { title: listingTitle("case-study"), description: experience.description };
+type ListingProps = { readonly searchParams: Promise<ListingSearchParams> };
 
-// The case study listing (Story 3.1): the h1, one intro line, then one
-// evidence card per case study in the shared grid, titles as h2 under the h1.
-// The route passes the collection whole and lists no item itself, so adding
-// or removing a case study needs no edit here. Static, and it hydrates no
-// island: every card and link is in the HTML with JavaScript off.
-export default function ExperiencePage() {
+// The title carries the filter state (AD-3), and a filtered view is never
+// indexed (AD-16), so the counted titles never compete with the listing.
+export async function generateMetadata({ searchParams }: ListingProps): Promise<Metadata> {
+  const selection = selectionFrom(await searchParams);
+  return {
+    title: listingTitle("case-study", selection, caseStudyItems),
+    description: experience.description,
+    ...(isFiltered(selection) ? { robots: { index: false } } : {}),
+  };
+}
+
+// The case study listing (Story 3.1, Epic 4): the h1, one intro line, then
+// the capability filter and the case studies it selects, titles as h2 under
+// the h1. The route passes the collection whole and lists no item itself, so
+// adding or removing a case study needs no edit here. It reads search
+// params, so it renders per request (AD-4), and it hydrates no island: every
+// chip, card and link is in the HTML with JavaScript off.
+export default async function ExperiencePage({ searchParams }: ListingProps) {
+  const selection = selectionFrom(await searchParams);
   return (
     <SiteFrame current="/experience">
       <div className={styles.listing}>
         <h1 className={styles.title}>{experience.heading}</h1>
         <p className={styles.intro}>{experience.intro}</p>
-        <CardGrid items={caseStudyItems} ctaLabel={experience.cta} headingLevel={2} />
+        <FilteredListing kind="case-study" selection={selection} items={caseStudyItems} ctaLabel={experience.cta} emptyText={experience.empty} />
       </div>
     </SiteFrame>
   );

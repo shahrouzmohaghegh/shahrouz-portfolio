@@ -11,7 +11,10 @@
 // is tested in components/islands/section-rail.test.ts.
 //
 // Matrix (spec I/O table): the listing has the h1, the intro and one h2 card
-// per project in collection order with "Read the project", and no noindex.
+// per project in collection order with "Read the project", and no noindex
+// unfiltered. Filtered (Epic 4), it shows the union, asks for noindex, and
+// when nothing matches (Leadership or Executive Influence at launch) shows
+// the empty state led by the link to the matching case studies.
 // A written project renders the header, the repository call to action when
 // it has a repository (and none when it has not), a rail of eight under
 // three group headers with the repository repeated at its foot, the eight
@@ -40,6 +43,8 @@ import repoStyles from "@/components/repo-cta.module.css";
 import { repoCtaName } from "@/components/repo-cta";
 import { caseStudyPage } from "@/content/case-study-page";
 import { projectPage } from "@/content/project-page";
+import filterStyles from "@/components/capability-filter.module.css";
+import { capabilityFilter } from "@/content/capability-filter";
 import { projectsPage } from "@/content/projects-page";
 import { useMDXComponents } from "@/mdx-components";
 import {
@@ -133,9 +138,16 @@ afterEach(() => {
   state.bodies = {};
 });
 
-describe("the /projects listing", () => {
-  const html = renderToStaticMarkup(<>{listing.default() as ReactNode}</>);
+type SearchParams = Record<string, string | string[] | undefined>;
+const listingProps = (searchParams: SearchParams = {}) => ({ searchParams: Promise.resolve(searchParams) });
+const renderListing = async (searchParams: SearchParams = {}): Promise<string> =>
+  renderToStaticMarkup(<>{(await listing.default(listingProps(searchParams))) as ReactNode}</>);
+const listingMetadata = (searchParams: SearchParams = {}) => listing.generateMetadata(listingProps(searchParams));
+
+describe("the /projects listing", async () => {
+  const html = await renderListing();
   const main = mainOf(html);
+  const metadata = await listingMetadata();
 
   test("content/projects-page.ts holds the reviewed words", () => {
     expect(projectsPage).toEqual({
@@ -144,6 +156,7 @@ describe("the /projects listing", () => {
         "Projects in hands-on engineering: a governed multi-agent system, this website, and platform modernisation through agentic loops.",
       intro: "Systems I built, each with the decisions behind it, what they cost, and how they were tested.",
       cta: "Read the project",
+      empty: "The projects are systems I built. Leadership and stakeholder influence are told through the case studies, on Experience.",
     });
   });
 
@@ -178,14 +191,16 @@ describe("the /projects listing", () => {
   test("the cards sit in the shared card grid, and the route lists no item itself", () => {
     expect(main.split(`<ul class="${gridStyles.grid}">`)).toHaveLength(2);
     const page = source("app/projects/page.tsx");
-    expect(page).toMatch(/<CardGrid\s+items=\{projectItems\}[^>]*headingLevel=\{2\}/);
+    expect(page).toMatch(/<FilteredListing\s+kind="project"\s+selection=\{selection\}\s+items=\{projectItems\}/);
+    expect(source("components/capability-filter.tsx")).toMatch(/<CardGrid\s+items=\{shown\}[^>]*headingLevel=\{2\}/);
     for (const item of projectItems) expect(page).not.toContain(item.slug);
   });
 
-  test("no chips, state line or filter yet (Epic 4), and no repository link on the listing", () => {
-    expect(main).not.toMatch(/role="status"|aria-current="true"|capability=/);
+  test("unfiltered: no chip selected, no live region or form control, and no repository link on the listing", () => {
+    expect(main).not.toMatch(/role="status"|aria-live|aria-pressed|aria-current="true"/);
     expect(main).not.toMatch(/<form[\s>]|<input[\s>]|<button[\s>]/);
     expect(main).not.toMatch(/github\.com/);
+    expect(main).toContain(`href="/experience"`);
   });
 
   test("the primary nav marks Projects as current", () => {
@@ -193,15 +208,48 @@ describe("the /projects listing", () => {
   });
 
   test("the title comes from listingTitle, the description from content, and there is no noindex", () => {
-    expect(listing.metadata.title).toBe(listingTitle("project"));
-    expect(listing.metadata.description).toBe(projectsPage.description);
-    expect(listing.metadata.robots).toBeUndefined();
+    expect(metadata.title).toBe(listingTitle("project"));
+    expect(metadata.description).toBe(projectsPage.description);
+    expect(metadata.robots).toBeUndefined();
   });
 
-  test("the route stays static and reaches no island", () => {
+  test("the route renders dynamically from search params, through lib/evidence only, and reaches no island", () => {
     const page = source("app/projects/page.tsx");
-    expect(page).not.toMatch(/searchParams|export const dynamic|cookies\(|headers\(/);
+    expect(page).toMatch(/selectionFrom\(await searchParams\)/);
+    expect(page).not.toMatch(/export const dynamic|cookies\(|headers\(|generateStaticParams|\.capability\b|\[["']capability["']\]/);
     expect(specifiers(page).filter((s) => /(^|\/)islands\//.test(s))).toEqual([]);
+  });
+
+  test("filtered: the union of the selection, a counted title and noindex", async () => {
+    const filtered = await listingMetadata({ capability: "ai-native,hands-on" });
+    const expected = projectItems.filter((item) => item.capabilities.some((c) => c === "ai-native" || c === "hands-on"));
+    expect(cardsIn(mainOf(await renderListing({ capability: "ai-native,hands-on" })))).toHaveLength(expected.length);
+    expect(filtered.title).toBe(`Projects, ${expected.length} of 3 projects, AI-Native Engineering or Hands-On Engineering`);
+    expect(filtered.robots).toEqual({ index: false });
+    const one = await listingMetadata({ capability: "ai-native" });
+    expect(one.title).toBe("Projects, 1 of 3 projects, AI-Native Engineering");
+  });
+
+  test.each([
+    ["leadership", "1 case study also matches Engineering Leadership", "Projects, no projects match, Engineering Leadership"],
+    ["executive-influence", "1 case study also matches Executive and Stakeholder Influence", "Projects, no projects match, Executive and Stakeholder Influence"],
+    [
+      "executive-influence,leadership",
+      "2 case studies also match Engineering Leadership or Executive and Stakeholder Influence",
+      "Projects, no projects match, Engineering Leadership or Executive and Stakeholder Influence",
+    ],
+  ])("%s matches no project: the empty state, led by the link to Experience", async (capability, sentence, title) => {
+    const page = mainOf(await renderListing({ capability }));
+    expect(cardsIn(page)).toEqual([]);
+    expect((await listingMetadata({ capability })).title).toBe(title);
+    const empty = page.slice(page.indexOf(`<div class="${filterStyles.empty}">`));
+    expect(empty).toMatch(new RegExp(`^<div class="${filterStyles.empty}"><p class="${filterStyles.crossListing}"><a `));
+    const links = anchors(empty).map(({ attrs, inner }) => ({ href: decode(attr(attrs, "href") ?? ""), text: text(inner) }));
+    const canonical = capability.split(",").sort((a, b) => (a === "leadership" ? -1 : b === "leadership" ? 1 : 0)).join(",");
+    expect(links[0]).toEqual({ href: `/experience?capability=${canonical}`, text: sentence });
+    expect(links[1]).toEqual({ href: "/projects", text: capabilityFilter.showAll });
+    expect(text(empty)).toContain(projectsPage.empty);
+    expect(page).not.toMatch(/aria-pressed|role="status"|aria-live|<button[\s>]|tabindex/);
   });
 });
 

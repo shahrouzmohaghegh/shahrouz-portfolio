@@ -365,6 +365,8 @@
   --component-cross-listing-link-underline-width: 1px;
   --component-cross-listing-link-underline-offset: 3px;
   --component-empty-state-padding: 36px 40px;
+  /* {components.empty-state} link: {colors.accent} at 600. */
+  --component-empty-state-link-weight: 600;
   --component-sequence-stage-dot-size: 19px;
   --component-sequence-stage-dot-border-width: 1.5px;
   --component-footer-link-underline-width: 1px;

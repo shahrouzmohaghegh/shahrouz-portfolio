@@ -51,10 +51,10 @@ export const home = {
   ],
   // The Selected work section below the bands (Story 2.6). Its cards come
   // from lib/evidence, never from here; only the words around them live
-  // here. Epic 4 adds the capability filter wording to the cross-link.
+  // here. The cross-link names the capability filter /experience carries.
   selectedWork: {
     heading: "Selected work",
     cta: "Read the case study",
-    crossLink: { label: "All case studies", href: "/experience" },
+    crossLink: { label: "All case studies, with the capability filter", href: "/experience" },
   },
 } as const;

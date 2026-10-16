@@ -6,7 +6,12 @@
 //
 // 1. Internal crawl. From <base-url>/, every same-origin <a href> is
 //    followed, query and fragment stripped, each page fetched once without
-//    following redirects. A link to the site's canonical origin
+//    following redirects. The one exception is the capability filter
+//    (Epic 4): on the two listings (LISTING_ROUTES) the capability
+//    parameter is kept, so every chip and cross-listing href is crawled as
+//    its own page. A filtered listing (a non-empty capability) must answer
+//    200 and carry a robots noindex meta; an unfiltered listing must not
+//    carry one; and no link may emit an empty "?capability=". A link to the site's canonical origin
 //    (CANONICAL_ORIGINS) is internal too, mapped onto <base-url>. The crawl
 //    fails clearly past MAX_PAGES pages. A page must answer 200, except the two not-found pages
 //    (/case-study-not-available, /project-not-available) and any
@@ -62,6 +67,11 @@ export const MAX_PAGES = 200;
 // The production origins: a link to either is a link to this site, so it is
 // crawled against the base URL rather than fetched from production.
 export const CANONICAL_ORIGINS = ["https://shahrouzmohaghegh.com", "https://www.shahrouzmohaghegh.com"] as const;
+
+// The two listings, the only routes whose capability parameter is kept
+// (AD-4: one parameter, shared by both).
+export const LISTING_ROUTES = ["/experience", "/projects"] as const;
+export const FILTER_PARAM = "capability";
 
 // The two static not-found pages, as lib/not-found-rewrite.ts names them
 // (the test pins the two together).
@@ -162,7 +172,9 @@ export type Classified =
   | { kind: "other"; reason: string };
 
 // One href found on pageUrl, against the site's origin. Internal paths lose
-// their query and fragment; the canonical origins count as internal.
+// their query and fragment, except a listing's capability parameter, which
+// is kept as written (its commas unencoded); the canonical origins count as
+// internal.
 export function classify(href: string, pageUrl: string, origin: string): Classified {
   if (/^mailto:/i.test(href)) {
     const rest = href.slice("mailto:".length);
@@ -177,6 +189,10 @@ export function classify(href: string, pageUrl: string, origin: string): Classif
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") return { kind: "other", reason: `unsupported scheme ${url.protocol}` };
   if (url.origin === origin || (CANONICAL_ORIGINS as readonly string[]).includes(url.origin)) {
+    const capability = url.searchParams.get(FILTER_PARAM);
+    if (capability !== null && (LISTING_ROUTES as readonly string[]).includes(url.pathname)) {
+      return { kind: "internal", path: `${url.pathname}?${FILTER_PARAM}=${encodeURIComponent(capability).replace(/%2C/gi, ",")}` };
+    }
     return { kind: "internal", path: url.pathname };
   }
   url.hash = "";
@@ -195,6 +211,24 @@ export function mailtoProblem(address: string, query: string): string | null {
     return "is not valid percent-encoding";
   }
   return ONE_ADDRESS.test(decoded) ? null : "does not name exactly one address";
+}
+
+// A listing path and whether it is filtered (a non-empty capability), or
+// null for any other page.
+export function listingFilterOf(path: string): { filtered: boolean; empty: boolean } | null {
+  const url = new URL(path, "http://listing.invalid");
+  if (!(LISTING_ROUTES as readonly string[]).includes(url.pathname)) return null;
+  const capability = url.searchParams.get(FILTER_PARAM);
+  return { filtered: capability !== null && capability !== "", empty: capability === "" };
+}
+
+// Whether a page asks not to be indexed: a robots meta whose content names
+// noindex, in either attribute order.
+export function hasNoindex(html: string): boolean {
+  for (const tag of html.matchAll(/<meta\b[^>]*>/gi)) {
+    if (/\bname\s*=\s*["']?robots\b/i.test(tag[0]) && /\bcontent\s*=\s*["'][^"']*\bnoindex\b/i.test(tag[0])) return true;
+  }
+  return false;
 }
 
 // The status a site path must answer: 404 for the not-found pages and any
@@ -396,6 +430,13 @@ export async function checkLinks(baseUrl: string, deps: Deps): Promise<Result> {
       if (response.status >= 300 && response.status < 400) continue;
     }
 
+    const listing = listingFilterOf(path);
+    if (listing !== null && response.status === 200) {
+      const noindex = hasNoindex(response.body);
+      if (listing.filtered && !noindex) fail(path, "a filtered listing does not carry a robots noindex", internalFoundOn.get(path) ?? []);
+      if (!listing.filtered && noindex) fail(path, "an unfiltered listing carries a robots noindex", internalFoundOn.get(path) ?? []);
+    }
+
     const hrefs = extractHrefs(response.body);
     const writtenSlug = writtenProjectOf(path, writtenProjects);
     const githubLinks: string[] = [];
@@ -410,6 +451,7 @@ export async function checkLinks(baseUrl: string, deps: Deps): Promise<Result> {
       if (link.kind === "internal") {
         const target = link.path;
         note(internalFoundOn, target, path);
+        if (listingFilterOf(target)?.empty === true) fail(href, `emits an empty ?${FILTER_PARAM}=`, [path]);
         if (!seen.has(target)) {
           seen.add(target);
           queue.push(target);

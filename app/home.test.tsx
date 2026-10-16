@@ -5,7 +5,8 @@
 // checks the statement stays inside FR-4's 40 to 45 words, that no banned
 // word reaches the rendered Home, and that the root layout no longer asks for
 // noindex while the empty route shell still does (/experience and
-// /projects have their content now, so they no longer do).
+// /projects have their content now, so they no longer do, except a filtered
+// view of either, which always does).
 //
 // Below the hero (Story 2.5): exactly two evidence bands, Cloud delivery on
 // deep then Release discipline on paper, each one tag, one figure and one
@@ -38,10 +39,10 @@ import { home } from "@/content/home";
 import { site } from "@/content/site";
 import { CAPABILITY_NAME, caseStudyItems, type EvidenceItem } from "@/lib/evidence";
 import { metadata as contactMetadata } from "./contact/page";
-import { metadata as experienceMetadata } from "./experience/page";
+import { generateMetadata as experienceMetadata } from "./experience/page";
 import { metadata } from "./layout";
 import * as homeModule from "./page";
-import { metadata as projectsMetadata } from "./projects/page";
+import { generateMetadata as projectsMetadata } from "./projects/page";
 
 const Home = homeModule.default;
 
@@ -330,7 +331,7 @@ describe("Selected work below the bands", () => {
     expect(home.selectedWork).toEqual({
       heading: "Selected work",
       cta: "Read the case study",
-      crossLink: { label: "All case studies", href: "/experience" },
+      crossLink: { label: "All case studies, with the capability filter", href: "/experience" },
     });
   });
 
@@ -472,11 +473,18 @@ describe("indexing", () => {
     expect(homeModule.metadata.description).toBe(home.description);
   });
 
+  // Unfiltered, each listing is indexable; every filtered view asks for
+  // noindex (AD-16), so its counted title never competes in search.
   test.each([
     ["/experience", experienceMetadata],
     ["/projects", projectsMetadata],
-  ])("%s has its content, so it asks for no noindex", (_route, routeMetadata) => {
-    expect(routeMetadata.robots).toBeUndefined();
+  ])("%s has its content, so it asks for no noindex unfiltered, and noindex filtered", async (_route, generate) => {
+    const of = async (searchParams: Record<string, string>) => (await generate({ searchParams: Promise.resolve(searchParams) })).robots;
+    expect(await of({})).toBeUndefined();
+    expect(await of({ capability: "" })).toBeUndefined();
+    expect(await of({ capability: "zzz" })).toBeUndefined();
+    expect(await of({ capability: "leadership" })).toEqual({ index: false });
+    expect(await of({ capability: "ai-native,hands-on" })).toEqual({ index: false });
   });
 
   test.each([["/contact", contactMetadata]])("the empty shell %s asks for noindex, nofollow", (_route, routeMetadata) => {
