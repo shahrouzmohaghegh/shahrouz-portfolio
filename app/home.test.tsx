@@ -35,6 +35,7 @@ import { describe, expect, test, vi } from "vitest";
 import cardStyles from "@/components/evidence-card.module.css";
 import bandStyles from "@/components/evidence-band.module.css";
 import { metricSentence } from "@/components/evidence-card";
+import { HERO_PORTRAIT_SIZES } from "@/components/home-hero";
 import { home } from "@/content/home";
 import { site } from "@/content/site";
 import { CAPABILITY_NAME, caseStudyItems, type EvidenceItem } from "@/lib/evidence";
@@ -175,6 +176,15 @@ describe("the Home hero", () => {
     expect(imgs[0]).toContain('width="1311"');
     expect(imgs[0]).toContain('height="1200"');
     expect(imgs[0]).not.toMatch(/fetchpriority/i);
+  });
+
+  test("sizes matches the plate widths at the 768px switch, so a phone fetches near 264px", () => {
+    const tokens = readFileSync(join(process.cwd(), "styles/tokens.css"), "utf8");
+    const mobile = tokens.match(/--space-hero-plate-mobile-width:\s*(\d+px)/)?.[1];
+    const desktop = tokens.match(/--space-hero-plate-desktop-width:\s*(\d+px)/)?.[1];
+    expect(readFileSync(join(process.cwd(), "styles/breakpoints.css"), "utf8")).toContain("@media (max-width: 767px)");
+    expect(HERO_PORTRAIT_SIZES).toBe(`(max-width: 767px) ${mobile}, ${desktop}`);
+    expect(main).toContain(`sizes="${HERO_PORTRAIT_SIZES}"`);
   });
 
   test("the portrait file exists at the size the image declares", () => {
