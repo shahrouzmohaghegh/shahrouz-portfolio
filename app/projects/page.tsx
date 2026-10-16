@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { FilteredListing } from "@/components/capability-filter";
 import { SiteFrame } from "@/components/site-frame";
 import { projectsPage } from "@/content/projects-page";
-import { isFiltered, listingTitle, projectItems, selectionFrom, type ListingSearchParams } from "@/lib/evidence";
+import { isFiltered, listingHref, listingTitle, projectItems, selectionFrom, type ListingSearchParams } from "@/lib/evidence";
 // The listing treatment is the /experience one, shared rather than copied.
 import styles from "../experience/experience.module.css";
 
@@ -11,10 +11,14 @@ type ListingProps = { readonly searchParams: Promise<ListingSearchParams> };
 
 // The title carries the filter state (AD-3), and a filtered view is never
 // indexed (AD-16), so the counted titles never compete with the listing.
+// The canonical URL is the canonical spelling of the parsed selection, so a
+// junk or out-of-order spelling names the one page it duplicates (the
+// unfiltered listing when nothing valid is selected).
 export async function generateMetadata({ searchParams }: ListingProps): Promise<Metadata> {
   const selection = selectionFrom(await searchParams);
   return {
     title: listingTitle("project", selection, projectItems),
+    alternates: { canonical: listingHref("project", selection) },
     description: projectsPage.description,
     ...(isFiltered(selection) ? { robots: { index: false } } : {}),
   };

@@ -52,7 +52,10 @@ import {
   PROJECT_SECTION_GROUPS,
   PROJECT_SECTIONS,
   caseStudyItems,
+  joinCapabilityNames,
+  listingHref,
   listingTitle,
+  parseSelection,
   projectItems,
   type EvidenceItem,
   type EvidenceKind,
@@ -200,7 +203,7 @@ describe("the /projects listing", async () => {
     expect(main).not.toMatch(/role="status"|aria-live|aria-pressed|aria-current="true"/);
     expect(main).not.toMatch(/<form[\s>]|<input[\s>]|<button[\s>]/);
     expect(main).not.toMatch(/github\.com/);
-    expect(main).toContain(`href="/experience"`);
+    expect(main).toContain(`href="/experience#filter-status"`);
   });
 
   test("the primary nav marks Projects as current", () => {
@@ -220,37 +223,52 @@ describe("the /projects listing", async () => {
     expect(specifiers(page).filter((s) => /(^|\/)islands\//.test(s))).toEqual([]);
   });
 
-  test("filtered: the union of the selection, a counted title and noindex", async () => {
+  // Counts are read from the collections, never written in.
+  const total = projectItems.length;
+  const projectsNoun = (count: number) => `${count} ${count === 1 ? "project" : "projects"}`;
+  const carrying = (items: readonly EvidenceItem[], selection: readonly string[]) =>
+    items.filter((item) => item.capabilities.some((c) => selection.includes(c)));
+
+  test("filtered: the union of the selection, a counted title, noindex and its canonical URL", async () => {
     const filtered = await listingMetadata({ capability: "ai-native,hands-on" });
-    const expected = projectItems.filter((item) => item.capabilities.some((c) => c === "ai-native" || c === "hands-on"));
+    const expected = carrying(projectItems, ["ai-native", "hands-on"]);
     expect(cardsIn(mainOf(await renderListing({ capability: "ai-native,hands-on" })))).toHaveLength(expected.length);
-    expect(filtered.title).toBe(`Projects, ${expected.length} of 3 projects, AI-Native Engineering or Hands-On Engineering`);
+    expect(filtered.title).toBe(`Projects, ${expected.length} of ${projectsNoun(total)}, AI-Native Engineering or Hands-On Engineering`);
     expect(filtered.robots).toEqual({ index: false });
+    expect(filtered.alternates?.canonical).toBe("/projects?capability=ai-native,hands-on");
     const one = await listingMetadata({ capability: "ai-native" });
-    expect(one.title).toBe("Projects, 1 of 3 projects, AI-Native Engineering");
+    expect(one.title).toBe(`Projects, ${carrying(projectItems, ["ai-native"]).length} of ${projectsNoun(total)}, AI-Native Engineering`);
   });
 
   test.each([
-    ["leadership", "1 case study also matches Engineering Leadership", "Projects, no projects match, Engineering Leadership"],
-    ["executive-influence", "1 case study also matches Executive and Stakeholder Influence", "Projects, no projects match, Executive and Stakeholder Influence"],
-    [
-      "executive-influence,leadership",
-      "2 case studies also match Engineering Leadership or Executive and Stakeholder Influence",
-      "Projects, no projects match, Engineering Leadership or Executive and Stakeholder Influence",
-    ],
-  ])("%s matches no project: the empty state, led by the link to Experience", async (capability, sentence, title) => {
-    const page = mainOf(await renderListing({ capability }));
-    expect(cardsIn(page)).toEqual([]);
-    expect((await listingMetadata({ capability })).title).toBe(title);
-    const empty = page.slice(page.indexOf(`<div class="${filterStyles.empty}">`));
-    expect(empty).toMatch(new RegExp(`^<div class="${filterStyles.empty}"><p class="${filterStyles.crossListing}"><a `));
-    const links = anchors(empty).map(({ attrs, inner }) => ({ href: decode(attr(attrs, "href") ?? ""), text: text(inner) }));
-    const canonical = capability.split(",").sort((a, b) => (a === "leadership" ? -1 : b === "leadership" ? 1 : 0)).join(",");
-    expect(links[0]).toEqual({ href: `/experience?capability=${canonical}`, text: sentence });
-    expect(links[1]).toEqual({ href: "/projects", text: capabilityFilter.showAll });
-    expect(text(empty)).toContain(projectsPage.empty);
-    expect(page).not.toMatch(/aria-pressed|role="status"|aria-live|<button[\s>]|tabindex/);
+    [{ capability: "zzz" }, "/projects"],
+    [{ capability: "" }, "/projects"],
+    [{}, "/projects"],
+    [{ capability: "Hands-On,AI-NATIVE,hands-on" }, "/projects?capability=ai-native,hands-on"],
+  ])("%j has the canonical URL %s", async (searchParams, canonical) => {
+    expect((await listingMetadata(searchParams)).alternates?.canonical).toBe(canonical);
   });
+
+  test.each([["leadership"], ["executive-influence"], ["executive-influence,leadership"]])(
+    "%s matches no project: the empty state, led by the link to Experience",
+    async (capability) => {
+      const selection = parseSelection(capability);
+      const names = joinCapabilityNames(selection);
+      const page = mainOf(await renderListing({ capability }));
+      expect(carrying(projectItems, selection)).toEqual([]);
+      expect(cardsIn(page)).toEqual([]);
+      expect((await listingMetadata({ capability })).title).toBe(`Projects, no projects match, ${joinCapabilityNames(selection, " or ")}`);
+      const empty = page.slice(page.indexOf(`<div class="${filterStyles.empty}">`));
+      expect(empty).toMatch(new RegExp(`^<div class="${filterStyles.empty}"><p class="${filterStyles.crossListing}"><a `));
+      const links = anchors(empty).map(({ attrs, inner }) => ({ href: decode(attr(attrs, "href") ?? ""), text: text(inner) }));
+      const count = carrying(caseStudyItems, selection).length;
+      const sentence = `${count} ${count === 1 ? "case study also matches" : "case studies also match"} ${names}`;
+      expect(links[0]).toEqual({ href: `${listingHref("case-study", selection)}#filter-status`, text: sentence });
+      expect(links[1]).toEqual({ href: "/projects#filter-status", text: capabilityFilter.showAll });
+      expect(text(empty)).toContain(projectsPage.empty);
+      expect(page).not.toMatch(/aria-pressed|role="status"|aria-live|<button[\s>]|tabindex/);
+    },
+  );
 });
 
 describe("a written project", () => {

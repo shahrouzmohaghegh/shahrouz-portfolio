@@ -31,6 +31,7 @@ import {
   hasNoindex,
   LISTING_ROUTES,
   listingFilterOf,
+  selectedCapabilities,
   isBotBlock,
   pointsAtUnlistedRepository,
   mailtoProblem,
@@ -247,6 +248,10 @@ describe("classify", () => {
     assert.deepEqual(classify("/projects?capability=ai-native%2Chands-on&x=1", at, BASE), {
       kind: "internal",
       path: "/projects?capability=ai-native,hands-on",
+    });
+    assert.deepEqual(classify("/projects?capability=hands-on&capability=leadership", at, BASE), {
+      kind: "internal",
+      path: "/projects?capability=hands-on,leadership",
     });
     assert.deepEqual(classify("/projects?x=1", at, BASE), { kind: "internal", path: "/projects" });
     assert.deepEqual(classify("/contact?capability=leadership", at, BASE), { kind: "internal", path: "/contact" });
@@ -608,16 +613,23 @@ describe("I/O matrix", () => {
 });
 
 describe("listingFilterOf and hasNoindex", () => {
-  test("a listing is filtered only with a non-empty capability", () => {
+  test("a listing is filtered only when it selects a valid capability, as the app reads it", () => {
     assert.deepEqual(listingFilterOf("/experience"), { filtered: false, empty: false });
     assert.deepEqual(listingFilterOf("/projects?capability=leadership"), { filtered: true, empty: false });
+    assert.deepEqual(listingFilterOf("/projects?capability=Hands-On,zzz"), { filtered: true, empty: false });
+    assert.deepEqual(listingFilterOf("/projects?capability=zzz&capability=hands-on"), { filtered: true, empty: false });
+    assert.deepEqual(listingFilterOf("/projects?capability=zzz"), { filtered: false, empty: false });
+    assert.deepEqual(listingFilterOf("/projects?capability=,"), { filtered: false, empty: false });
     assert.deepEqual(listingFilterOf("/projects?capability="), { filtered: false, empty: true });
+    assert.deepEqual(selectedCapabilities(["hands-on%2CLEADERSHIP", "leadership"]), ["leadership", "hands-on"]);
     assert.equal(listingFilterOf("/contact"), null);
     assert.equal(listingFilterOf("/experience/offshore-delivery-turnaround"), null);
   });
   test("a robots meta naming noindex, in either attribute order", () => {
     assert.equal(hasNoindex('<meta name="robots" content="noindex"/>'), true);
     assert.equal(hasNoindex('<meta content="noindex, nofollow" name="robots">'), true);
+    assert.equal(hasNoindex("<meta name=robots content=noindex>"), true);
+    assert.equal(hasNoindex("<meta name='robots' content='noindex'>"), true);
     assert.equal(hasNoindex('<meta name="robots" content="index, follow"/>'), false);
     assert.equal(hasNoindex('<meta name="description" content="noindex"/>'), false);
     assert.equal(hasNoindex("<title>noindex</title>"), false);
@@ -666,10 +678,21 @@ describe("the capability filter", () => {
     assert.ok(result.failures.some((f) => f.subject === "/experience?capability=leadership" && /HTTP 404, expected 200/.test(f.detail)));
   });
 
-  test("an empty capability parameter emitted anywhere fails", async () => {
-    const { deps: d } = deps(filteredSite({ [`${BASE}/experience?capability=leadership`]: page(NOINDEX + FOOTER + links("/experience?capability=")) }));
+  test("an empty capability parameter emitted anywhere fails once, by its normalised path, and is not crawled", async () => {
+    const { deps: d, calls } = deps(
+      filteredSite({ [`${BASE}/experience?capability=leadership`]: page(NOINDEX + FOOTER + links("/experience?capability=#x")) }),
+    );
     const result = await checkLinks(BASE, d);
-    assert.ok(result.failures.some((f) => f.subject === "/experience?capability=" && /emits an empty \?capability=/.test(f.detail)));
+    assert.deepEqual(
+      result.failures.map((f) => [f.subject, f.detail, f.foundOn]),
+      [["/experience?capability=", "emits an empty ?capability=", ["/experience?capability=leadership"]]],
+    );
+    assert.ok(!calls.some((c) => c.url.endsWith("?capability=")));
+  });
+
+  test("a junk capability spelling is an unfiltered listing: no noindex required", async () => {
+    const { deps: d } = deps(filteredSite({ [`${BASE}/experience`]: page(FOOTER + chips + links("/experience?capability=zzz")), [`${BASE}/experience?capability=zzz`]: page(FOOTER) }));
+    assert.deepEqual((await checkLinks(BASE, d)).failures, []);
   });
 });
 

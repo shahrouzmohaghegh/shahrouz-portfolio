@@ -2,8 +2,9 @@ import { capabilityFilter } from "@/content/capability-filter";
 import {
   crossListing,
   filterChips,
+  FILTER_STATUS_ID,
   filterItems,
-  listingHref,
+  filterLinkHref,
   stateLine,
   type CrossListing,
   type EvidenceItem,
@@ -24,30 +25,33 @@ import styles from "./capability-filter.module.css";
 // document title (the unfiltered or an earlier selection's), although the
 // server's response carries the right one. The title is the only
 // announcement (AD-3), so a stale one announces the wrong count. A full load
-// always gets the server's title. See deferred-work.md before going back. Every string and every href comes
-// from lib/evidence.ts (AD-13); nothing here parses or serialises the
-// selection. There is no live region and no focus move: the counted document
-// title is the announcement (AD-3).
+// always gets the server's title. See
+// _bmad-output/implementation-artifacts/deferred-work.md before going back.
+// The header and footer links to the two listings are plain anchors too.
+// Each filter href ends in #filter-status, so the reload lands on the result.
+//
+// Every string and every href comes from lib/evidence.ts (AD-13); nothing
+// here parses or serialises the selection. There is no live region and no
+// focus move: the counted document title is the announcement (AD-3).
 
 export type CapabilityChipsProps = { readonly kind: EvidenceKind; readonly selection: Selection };
 
-// A group named by its visible label, one link per capability in chip order.
+// A group named by its visible label, wrapping a list (which keeps its list
+// semantics) of one link per capability in chip order.
 // A selected chip carries aria-current="true", a check glyph hidden from
 // assistive technology and the hidden text ", selected"; never aria-pressed.
 export function CapabilityChips({ kind, selection }: CapabilityChipsProps) {
   return (
-    <>
+    <div role="group" aria-labelledby="capfilter">
       <p id="capfilter" className={styles.label}>
         {capabilityFilter.groupLabel}
       </p>
-      <ul role="group" aria-labelledby="capfilter" className={styles.chips}>
+      <ul className={styles.chips}>
         {filterChips(kind, selection).map((chip) => (
           <li key={chip.capability}>
             {chip.selected ? (
               <a href={chip.href} className={styles.chip} aria-current="true">
-                <span aria-hidden="true">
-                  &#10003;
-                </span>
+                <span aria-hidden="true">&#10003;</span>
                 {chip.label}
                 <span className={styles.visuallyHidden}>{capabilityFilter.selectedHint}</span>
               </a>
@@ -59,7 +63,7 @@ export function CapabilityChips({ kind, selection }: CapabilityChipsProps) {
           </li>
         ))}
       </ul>
-    </>
+    </div>
   );
 }
 
@@ -69,7 +73,7 @@ export type FilterStateLineProps = { readonly kind: EvidenceKind; readonly selec
 export function FilterStateLine({ kind, selection, items }: FilterStateLineProps) {
   const { emphasis, rest } = stateLine(kind, selection, items);
   return (
-    <p id="filter-status" className={styles.stateLine}>
+    <p id={FILTER_STATUS_ID} className={styles.stateLine}>
       <span className={styles.emphasis}>{emphasis}</span>
       {rest}
     </p>
@@ -103,7 +107,7 @@ export function EmptyState({ kind, link, explanation }: EmptyStateProps) {
       {link === undefined ? null : <CrossListingLink link={link} />}
       <p className={styles.emptyText}>{explanation}</p>
       <p className={styles.emptyText}>
-        <a href={listingHref(kind, [])} className={styles.emptyLink}>
+        <a href={filterLinkHref(kind, [])} className={styles.emptyLink}>
           {capabilityFilter.showAll}
         </a>
       </p>

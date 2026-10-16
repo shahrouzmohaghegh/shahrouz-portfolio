@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { site } from "@/content/site";
+import { isListingPath } from "@/lib/evidence";
 import styles from "./site-header.module.css";
 
 export type NavCurrent = "/" | "/experience" | "/projects" | "/contact" | null;
@@ -25,9 +26,18 @@ export function SiteHeader({ current }: { current: NavCurrent }) {
         <ul className={styles.items}>
           {NAV_ITEMS.map(({ href, label }) => (
             <li key={href}>
-              <Link href={href} className={styles.item} aria-current={ariaCurrent(current === href)}>
-                {label}
-              </Link>
+              {/* A listing is a plain anchor, a full page load: a next/link
+                  move off a filtered listing changes only the search params
+                  and can keep its stale title (components/capability-filter.tsx). */}
+              {isListingPath(href) ? (
+                <a href={href} className={styles.item} aria-current={ariaCurrent(current === href)}>
+                  {label}
+                </a>
+              ) : (
+                <Link href={href} className={styles.item} aria-current={ariaCurrent(current === href)}>
+                  {label}
+                </Link>
+              )}
             </li>
           ))}
         </ul>

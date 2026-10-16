@@ -33,6 +33,7 @@ import {
   listingTitle,
   projectItems,
   stateLine,
+  type Capability,
   type EvidenceItem,
 } from "@/lib/evidence";
 import { metadata as rootMetadata } from "../layout";
@@ -120,7 +121,7 @@ describe("the /experience listing", () => {
   test("unfiltered: no chip is selected, no live region, no form control, and the cross-listing link counts every project", () => {
     expect(main).not.toMatch(/role="status"|aria-live|aria-pressed|aria-current="true"/);
     expect(main).not.toMatch(/<form[\s>]|<input[\s>]|<button[\s>]/);
-    expect(main).toContain(`href="/projects"`);
+    expect(main).toContain(`href="/projects#filter-status"`);
     expect(text(main)).toContain(`${projectItems.length} Projects are listed separately`);
   });
 
@@ -148,6 +149,11 @@ describe("the /experience listing", () => {
       const expected = change(caseStudyItems);
       expect(cards).toHaveLength(expected.length);
       expect(cards.map((card) => card.match(/href="([^"]*)"/)?.[1])).toEqual(expected.map((item) => item.href));
+      // A filtered view follows the mocked collection too.
+      const filtered = expected.filter((item) => item.capabilities.includes("leadership"));
+      const filteredMain = mainOf(await render(mocked.default, { capability: "leadership" }));
+      expect(cardsIn(filteredMain).map((card) => card.match(/href="([^"]*)"/)?.[1])).toEqual(filtered.map((item) => item.href));
+      expect(tight(filteredMain)).toContain(`Showing ${filtered.length} of ${expected.length} case studies`);
     } finally {
       vi.doUnmock("@/lib/evidence");
       vi.resetModules();
@@ -238,64 +244,69 @@ describe("indexing and rendering", () => {
 });
 
 // The capability filter on /experience, against the spec's I/O matrix.
+// Counts are read from the collections, never written in.
 describe("the capability filter on /experience", () => {
+  const total = caseStudyItems.length;
+  const caseStudies = (count: number) => `${count} ${count === 1 ? "case study" : "case studies"}`;
+  const carrying = (...capabilities: Capability[]) =>
+    caseStudyItems.filter((item) => item.capabilities.some((c) => capabilities.includes(c)));
   const view = async (searchParams: SearchParams) => {
     const page = mainOf(await render(ExperiencePage, searchParams));
     return { main: page, cards: cardsIn(page), metadata: await metadataFor(searchParams) };
   };
-  const chips = (fragment: string) =>
-    [...fragment.matchAll(/<a ([^>]*class="[^"]*\bchip\b[^"]*"[^>]*)>([\s\S]*?)<\/a>/g)].map(([, attrs, inner]) => ({
+  const chipsIn = (fragment: string) =>
+    [...fragment.matchAll(new RegExp(`<a ([^>]*class="${filterStyles.chip}"[^>]*)>([\\s\\S]*?)</a>`, "g"))].map(([, attrs, inner]) => ({
       href: decode(attrs.match(/href="([^"]*)"/)?.[1] ?? ""),
       selected: /aria-current="true"/.test(attrs),
       label: tight(inner),
     }));
-  const chipClass = filterStyles.chip;
-  const chipsIn = (fragment: string) =>
-    chips(fragment.replaceAll(`class="${chipClass}"`, 'class="chip"'));
+  const chipHref = (value?: string) => (value === undefined ? "/experience#filter-status" : `/experience?capability=${value}#filter-status`);
 
   test("the page order: h1, intro, chip label and group, state line, cross-listing link, then cards", () => {
     const at = (pattern: RegExp) => main.search(pattern);
     const order = [
       at(/<h1[\s>]/),
       at(new RegExp(`<p[^>]*>${escapeRegExp(experience.intro)}</p>`)),
-      at(/<p id="capfilter"/),
-      at(/<ul role="group" aria-labelledby="capfilter"/),
+      at(/<div role="group" aria-labelledby="capfilter"><p id="capfilter"/),
+      at(new RegExp(`<ul class="${filterStyles.chips}">`)),
       at(/<p id="filter-status"/),
-      at(/href="\/projects"/),
+      at(/href="\/projects#filter-status"/),
       at(/<article/),
     ];
     for (const index of order) expect(index).toBeGreaterThan(-1);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
   });
 
-  test("unfiltered: every case study, the title Experience, no noindex, the unfiltered state line", async () => {
+  test("unfiltered: every case study, the title Experience, no noindex, canonical /experience, the unfiltered state line", async () => {
     const { cards, metadata, main: page } = await view({});
-    expect(cards).toHaveLength(caseStudyItems.length);
+    expect(cards).toHaveLength(total);
     expect(metadata.title).toBe("Experience");
     expect(metadata.robots).toBeUndefined();
-    expect(tight(page)).toContain("Showing all 3 case studies. No capability filter applied.");
+    expect(metadata.alternates?.canonical).toBe("/experience");
+    expect(tight(page)).toContain(`Showing all ${caseStudies(total)}. No capability filter applied.`);
     expect(chipsIn(page).map((chip) => chip.selected)).toEqual([false, false, false, false]);
     expect(chipsIn(page).map((chip) => chip.href)).toEqual([
-      "/experience?capability=leadership",
-      "/experience?capability=ai-native",
-      "/experience?capability=executive-influence",
-      "/experience?capability=hands-on",
+      chipHref("leadership"),
+      chipHref("ai-native"),
+      chipHref("executive-influence"),
+      chipHref("hands-on"),
     ]);
   });
 
   test("one capability: matching items only, a counted title, the chip current, noindex", async () => {
     const { cards, metadata, main: page } = await view({ capability: "leadership" });
-    const expected = caseStudyItems.filter((item) => item.capabilities.includes("leadership"));
+    const expected = carrying("leadership");
     expect(cards.map((card) => card.match(/href="([^"]*)"/)?.[1])).toEqual(expected.map((item) => item.href));
-    expect(metadata.title).toBe(`Experience, ${expected.length} of 3 case studies, Engineering Leadership`);
+    expect(metadata.title).toBe(`Experience, ${expected.length} of ${caseStudies(total)}, Engineering Leadership`);
     expect(metadata.robots).toEqual({ index: false });
+    expect(metadata.alternates?.canonical).toBe("/experience?capability=leadership");
     const [leadership, ...rest] = chipsIn(page);
-    expect(leadership).toEqual({ href: "/experience", selected: true, label: "\u2713Leadership, selected" });
+    expect(leadership).toEqual({ href: chipHref(), selected: true, label: "\u2713Leadership, selected" });
     expect(rest.map((chip) => chip.selected)).toEqual([false, false, false]);
     expect(rest.map((chip) => chip.href)).toEqual([
-      "/experience?capability=leadership,ai-native",
-      "/experience?capability=leadership,executive-influence",
-      "/experience?capability=leadership,hands-on",
+      chipHref("leadership,ai-native"),
+      chipHref("leadership,executive-influence"),
+      chipHref("leadership,hands-on"),
     ]);
     const { emphasis, rest: sentence } = stateLine("case-study", ["leadership"]);
     expect(decode(page)).toContain(`<span class="${filterStyles.emphasis}">${emphasis}</span>${sentence}`);
@@ -303,62 +314,71 @@ describe("the capability filter on /experience", () => {
 
   test("a union: both capabilities' case studies, the title joined with or", async () => {
     const { cards, metadata } = await view({ capability: "ai-native,leadership" });
-    const expected = caseStudyItems.filter((item) => item.capabilities.some((c) => c === "ai-native" || c === "leadership"));
+    const expected = carrying("ai-native", "leadership");
     expect(cards).toHaveLength(expected.length);
-    expect(metadata.title).toBe(`Experience, ${expected.length} of 3 case studies, Engineering Leadership or AI-Native Engineering`);
+    expect(metadata.title).toBe(`Experience, ${expected.length} of ${caseStudies(total)}, Engineering Leadership or AI-Native Engineering`);
   });
 
-  test.each(["Hands-On,leadership,leadership,zzz", "hands-on%2Cleadership", "leadership,hands-on"])(
-    "a liberal read of %s is the canonical leadership,hands-on, and the chips emit canonical hrefs",
+  test.each(["Hands-On,leadership,leadership,zzz", "hands-on%2Cleadership", "HANDS-ON,Leadership", "leadership,hands-on"])(
+    "a liberal read of %s is the canonical leadership,hands-on: same page, canonical URL and chip hrefs",
     async (capability) => {
       const canonical = await view({ capability: "leadership,hands-on" });
       const liberal = await view({ capability });
       expect(liberal.main).toBe(canonical.main);
       expect(liberal.metadata).toEqual(canonical.metadata);
+      expect(liberal.metadata.alternates?.canonical).toBe("/experience?capability=leadership,hands-on");
       expect(chipsIn(liberal.main).map((chip) => chip.href)).toEqual([
-        "/experience?capability=hands-on",
-        "/experience?capability=leadership,ai-native,hands-on",
-        "/experience?capability=leadership,executive-influence,hands-on",
-        "/experience?capability=leadership",
+        chipHref("hands-on"),
+        chipHref("leadership,ai-native,hands-on"),
+        chipHref("leadership,executive-influence,hands-on"),
+        chipHref("leadership"),
       ]);
     },
   );
 
-  test.each([["zzz"], [""], [","]])("all unknown or empty (%j) renders unfiltered", async (capability) => {
+  test.each([["zzz"], [""], [","]])("all unknown or empty (%j) renders unfiltered, canonical /experience", async (capability) => {
     const unknown = await view({ capability });
     expect(unknown.main).toBe(main);
     expect(unknown.metadata).toEqual(unfilteredMetadata);
+    expect(unknown.metadata.alternates?.canonical).toBe("/experience");
   });
 
   test("no match here, a match on /projects: the empty state, led by the cross-listing link", async () => {
     const { cards, metadata, main: page } = await view({ capability: "hands-on" });
     const link = crossListing("case-study", ["hands-on"]);
-    expect(link).toBeDefined();
+    const projects = projectItems.filter((item) => item.capabilities.includes("hands-on")).length;
+    expect(carrying("hands-on")).toEqual([]);
+    expect(link?.count).toBe(projects);
     expect(cards).toEqual([]);
     expect(metadata.title).toBe("Experience, no case studies match, Hands-On Engineering");
     expect(metadata.robots).toEqual({ index: false });
-    expect(tight(page)).toContain("Showing 0 of 3 case studies, filtered by Hands-On Engineering.");
+    expect(tight(page)).toContain(`Showing 0 of ${caseStudies(total)}, filtered by Hands-On Engineering.`);
     const empty = page.slice(page.indexOf(`<div class="${filterStyles.empty}">`));
     expect(empty.length, "the empty state renders").toBeLessThan(page.length);
-    const links = [...empty.matchAll(/<a [^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g)].map(([, href, inner]) => ({ href, text: text(inner) }));
-    expect(links[0]).toEqual({ href: "/projects?capability=hands-on", text: `${link?.count} Projects also match Hands-On Engineering` });
     expect(empty, "the cross-listing link is the empty state's first element").toMatch(
       new RegExp(`^<div class="${filterStyles.empty}"><p class="${filterStyles.crossListing}"><a `),
     );
-    expect(links[1]).toEqual({ href: "/experience", text: capabilityFilter.showAll });
+    const links = [...empty.matchAll(/<a [^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g)].map(([, href, inner]) => ({ href, text: text(inner) }));
+    expect(links[0]).toEqual({
+      href: "/projects?capability=hands-on#filter-status",
+      text: `${projects} ${projects === 1 ? "Project also matches" : "Projects also match"} Hands-On Engineering`,
+    });
+    expect(links[1]).toEqual({ href: "/experience#filter-status", text: capabilityFilter.showAll });
     expect(text(empty)).toContain(experience.empty);
     // The link sits inside the empty state, not above it as well.
-    expect(page.split('href="/projects?capability=hands-on"')).toHaveLength(2);
+    expect(page.split('href="/projects?capability=hands-on#filter-status"')).toHaveLength(2);
   });
 
-  test("the chips are links in a named group, never buttons, with no aria-pressed or live region", async () => {
+  test("the chips are a list in a named group, plain links, never buttons, no aria-pressed or live region", async () => {
     for (const capability of [undefined, "leadership", "hands-on", "leadership,ai-native,executive-influence,hands-on"]) {
       const { main: page } = await view(capability === undefined ? {} : { capability });
-      expect(page).toMatch(new RegExp(`<p id="capfilter"[^>]*>${escapeRegExp(capabilityFilter.groupLabel)}</p>`));
-      expect(page.match(/<ul role="group" aria-labelledby="capfilter"[^>]*>([\s\S]*?)<\/ul>/)?.[1]).toMatch(/^(<li><a [^>]*>[\s\S]*?<\/a><\/li>){4}$/);
-      expect(page).not.toMatch(/aria-pressed|role="status"|aria-live|<button[\s>]/);
+      expect(page).toContain(
+        `<div role="group" aria-labelledby="capfilter"><p id="capfilter" class="${filterStyles.label}">${capabilityFilter.groupLabel}</p>`,
+      );
+      const list = page.match(new RegExp(`<ul class="${filterStyles.chips}">([\\s\\S]*?)</ul>`))?.[1];
+      expect(list).toMatch(/^(<li><a [^>]*>[\s\S]*?<\/a><\/li>){4}$/);
+      expect(page).not.toMatch(/<ul[^>]*role=|aria-pressed|role="status"|aria-live|<button[\s>]|tabindex/);
       expect(page).toMatch(/<p id="filter-status" class="[^"]*">/);
-      expect(page).not.toMatch(/tabindex/);
     }
   });
 });

@@ -95,6 +95,14 @@ export function selectionFrom(searchParams: ListingSearchParams | undefined): Se
 
 export const isFiltered = (selection: Selection): boolean => selection.length > 0;
 
+// Whether an href is one of the two listings, with or without a query:
+// every link there is a plain anchor, never next/link (see
+// components/capability-filter.tsx).
+export function isListingPath(href: string): boolean {
+  const path = href.split(/[?#]/)[0];
+  return (Object.values(EVIDENCE_ROUTE) as string[]).includes(path);
+}
+
 // Canonical on write: chip order, comma separated, the comma left as is,
 // and "" for no selection.
 export function serialiseSelection(selection: Selection): string {
@@ -106,6 +114,16 @@ export function serialiseSelection(selection: Selection): string {
 export function listingHref(kind: EvidenceKind, selection: Selection): string {
   const value = serialiseSelection(selection);
   return value === "" ? EVIDENCE_ROUTE[kind] : `${EVIDENCE_ROUTE[kind]}?${CAPABILITY_PARAM}=${value}`;
+}
+
+// The id of the state line under the chips. Every filter link (chip,
+// cross-listing link, Show all) ends in this fragment, so after the full page
+// load the reading position lands on the result, not the top of the page.
+export const FILTER_STATUS_ID = "filter-status";
+
+// A filter link: the canonical listing href, then the fragment.
+export function filterLinkHref(kind: EvidenceKind, selection: Selection): string {
+  return `${listingHref(kind, selection)}#${FILTER_STATUS_ID}`;
 }
 
 // The selection with one capability toggled in or out, in canonical order.
@@ -205,7 +223,7 @@ export function crossListing(
   const rest = isFiltered(selection)
     ? ` also ${count === 1 ? "matches" : "match"} ${joinCapabilityNames(selection)}`
     : ` ${count === 1 ? "is" : "are"} listed separately`;
-  return { kind: other, count, href: listingHref(other, selection), prefix, rest };
+  return { kind: other, count, href: filterLinkHref(other, selection), prefix, rest };
 }
 
 // A filter chip (EXPERIENCE.md, Markup: chips are links): its short label,
@@ -217,7 +235,7 @@ export function filterChips(kind: EvidenceKind, selection: Selection): readonly 
     capability,
     label: CAPABILITY_CHIP_LABEL[capability],
     selected: selection.includes(capability),
-    href: listingHref(kind, toggleCapability(selection, capability)),
+    href: filterLinkHref(kind, toggleCapability(selection, capability)),
   }));
 }
 
