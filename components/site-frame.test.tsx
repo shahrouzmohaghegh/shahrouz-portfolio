@@ -12,6 +12,12 @@
 // the not-found page instead. A header or footer
 // inside <main> (an article's own header, say) is not a landmark and is not
 // counted.
+//
+// FR-24 (Story 3.8): every page and not-found page has a /contact link in
+// the Primary nav and a contact route (the mailto: and the LinkedIn link)
+// in the footer landmark. FR-23: no rendered route offers a download or
+// links a CV, resume or document file, by the same rule the link check
+// applies to the running site (cvDocumentProblem in scripts/check-links.mts).
 
 import { readdirSync } from "node:fs";
 import { join, relative, sep } from "node:path";
@@ -22,6 +28,7 @@ import { describe, expect, test, vi } from "vitest";
 
 import { site } from "@/content/site";
 import { caseStudyItems, projectItems } from "@/lib/evidence";
+import { cvDocumentProblem, extractHrefs } from "@/scripts/check-links.mts";
 import { SiteFooter } from "./site-footer";
 
 vi.mock("@/lib/evidence", async (importOriginal) => {
@@ -37,7 +44,14 @@ const APP_DIR = fileURLToPath(new URL("../app/", import.meta.url));
 const NAV_HREFS = ["/", "/experience", "/projects", "/contact"];
 
 type RouteModule = { default: ComponentType<Record<string, unknown>> };
-type Frame = { header: number; main: number; footer: number; nav: number; links: Array<{ href: string; current: boolean }> };
+type Frame = {
+  header: number;
+  main: number;
+  footer: number;
+  nav: number;
+  links: Array<{ href: string; current: boolean }>;
+  footerHrefs: string[];
+};
 
 const PAGE_FILE = /^page\.(tsx|ts|jsx|js)$/;
 const NOT_FOUND_FILE = /^not-found\.(tsx|ts|jsx|js)$/;
@@ -85,6 +99,7 @@ function readFrame(html: string): Frame {
   const outside = mainStart === -1 || mainEnd === -1 ? html : html.slice(0, mainStart) + html.slice(mainEnd);
   const navs = [...html.matchAll(/<nav\s[^>]*aria-label="Primary"[^>]*>([\s\S]*?)<\/nav>/g)];
   const header = outside.match(/<header[\s>][\s\S]*?<\/header>/)?.[0] ?? "";
+  const footer = outside.match(/<footer[\s>][\s\S]*?<\/footer>/)?.[0] ?? "";
   const navInHeader = navs.filter((n) => header.includes(n[0])).length;
   const links = [...(navs[0]?.[1] ?? "").matchAll(/<a\s([^>]*)>/g)].map(([, attrs]) => ({
     href: attrs.match(/href="([^"]*)"/)?.[1] ?? "",
@@ -97,6 +112,7 @@ function readFrame(html: string): Frame {
     // 1 only when the one Primary nav sits inside the landmark header.
     nav: navs.length === 1 ? (navInHeader === 1 ? 1 : 0) : navs.length,
     links,
+    footerHrefs: extractHrefs(footer),
   };
 }
 
@@ -108,6 +124,31 @@ function expectFrame(route: string, frame: Frame): void {
   expect(frame.links.map((l) => l.href), `${route}: nav links in order`).toEqual(NAV_HREFS);
 }
 
+// FR-24: Contact is reachable from the nav and the footer of this route.
+function expectContactReachable(route: string, frame: Frame): void {
+  expect(frame.links.map((l) => l.href), `${route}: a /contact link in the Primary nav`).toContain("/contact");
+  expect(frame.footerHrefs, `${route}: the footer's contact routes`).toEqual(
+    expect.arrayContaining([`mailto:${site.email}`, site.linkedin.href]),
+  );
+}
+
+// Whether any <a> or <area> tag carries a download attribute, in any
+// position. Attribute values are blanked first, so prose and an href that
+// merely contains the word never match.
+function hasDownloadAttribute(html: string): boolean {
+  return [...html.matchAll(/<(?:a|area)\b[^>]*>/gi)].some((tag) =>
+    /\sdownload(?=[\s=/>])/i.test(tag[0].replace(/"[^"]*"|'[^']*'/g, '""')),
+  );
+}
+
+// FR-23: no download and no CV or document link anywhere on this route.
+// The hrefs come from the link check's own extraction (entity-decoded).
+function expectNoCvDocument(route: string, html: string): void {
+  expect(hasDownloadAttribute(html), `${route}: no download attribute`).toBe(false);
+  const hrefs = extractHrefs(html);
+  expect(hrefs.filter((href) => cvDocumentProblem(href) !== null), `${route}: no CV or document link`).toEqual([]);
+}
+
 const pages = routeFiles(PAGE_FILE).map((file) => ({ file, route: routeOf(file) }));
 const notFounds = routeFiles(NOT_FOUND_FILE).map((file) => ({ file, route: `not-found ${routeOf(file)}` }));
 
@@ -117,8 +158,11 @@ describe("every route renders the site frame", () => {
   });
 
   test.each(pages)("$route", async ({ file, route }) => {
-    const frame = readFrame(await render(file));
+    const html = await render(file);
+    const frame = readFrame(html);
     expectFrame(route, frame);
+    expectContactReachable(route, frame);
+    expectNoCvDocument(route, html);
     const current = frame.links.filter((l) => l.current).map((l) => l.href);
     if (NAV_HREFS.includes(route)) {
       expect(current, `${route}: only its own nav item is current`).toEqual([route]);
@@ -132,8 +176,11 @@ describe("every route renders the site frame", () => {
   });
 
   test.each(notFounds)("$route", async ({ file, route }) => {
-    const frame = readFrame(await render(file));
+    const html = await render(file);
+    const frame = readFrame(html);
     expectFrame(route, frame);
+    expectContactReachable(route, frame);
+    expectNoCvDocument(route, html);
     expect(frame.links.filter((l) => l.current), `${route}: no nav item is current`).toEqual([]);
   });
 
@@ -151,6 +198,23 @@ describe("the frame checks themselves", () => {
   test("a Primary nav outside the header fails", () => {
     const frame = readFrame('<header></header><nav aria-label="Primary"><a href="/">x</a></nav><main></main><footer></footer>');
     expect(() => expectFrame("/stray-nav", frame)).toThrow(/\/stray-nav: one <nav aria-label="Primary"> inside the header/);
+  });
+
+  test("a footer without a contact route fails FR-24", () => {
+    const frame = readFrame('<header><nav aria-label="Primary"><a href="/contact">x</a></nav></header><main></main><footer><a href="/projects">p</a></footer>');
+    expect(() => expectContactReachable("/no-contact", frame)).toThrow(/\/no-contact: the footer's contact routes/);
+  });
+
+  test("a CV document link or a download fails FR-23", () => {
+    expect(() => expectNoCvDocument("/cv-link", '<a href="/files/cv.pdf">CV</a>')).toThrow(/\/cv-link: no CV or document link/);
+    expect(() => expectNoCvDocument("/dl", '<a href="/x" download>x</a>')).toThrow(/\/dl: no download attribute/);
+    expect(() => expectNoCvDocument("/dl-first", '<a download href="/x">x</a>')).toThrow(/\/dl-first: no download attribute/);
+    expect(() => expectNoCvDocument("/dl-named", '<a href="/x" download="file">x</a>')).toThrow(/no download attribute/);
+    expect(() => expectNoCvDocument("/entity", '<a href="/files/cv&#46;pdf">x</a>')).toThrow(/\/entity: no CV or document link/);
+  });
+
+  test("the word download in prose or in an href is not a download attribute", () => {
+    expect(hasDownloadAttribute('<p>No CV download.</p><a href="/download-notes" title="a download">x</a>')).toBe(false);
   });
 
   test("a header inside main is not a landmark", () => {

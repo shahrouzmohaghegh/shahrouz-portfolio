@@ -99,9 +99,10 @@ describe("the real repository", () => {
     // columns and the four section rail pairs (position, background, border,
     // padding); the case-study content components' two pairs (key-value
     // columns, trade-off pair columns); the retrieval diagram's state columns;
-    // the repository call to action's padding and its rail repeat's display
-    const expected = typeRemaps + 7 + 24;
-    assert.equal(expected, 104);
+    // the repository call to action's padding and its rail repeat's display;
+    // the Contact hero's two pairs (padding, plate position)
+    const expected = typeRemaps + 7 + 26;
+    assert.equal(expected, 106);
     assert.equal(Object.keys(expectedRemaps(groups)).length, expected);
   });
 

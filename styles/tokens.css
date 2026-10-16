@@ -374,6 +374,18 @@
   --component-footer-columns: 1.4fr 1fr 1fr;
   --component-rail-group-header-tracking: 0.18em;
   --component-contact-hero-route-link-underline-width: 1.5px;
+  /* {components.contact-hero} (Story 3.8), from screen-contact.html: the
+     padding, the underline offset and the plate crops (14% 50% beside the
+     text, 10% 50% in the narrower mobile box). The text sits beside the
+     plate only when its column can hold --component-contact-hero-text-min-width
+     (the email route at 25.5px is about 380px); otherwise text then plate
+     stack, text first. */
+  --component-contact-hero-padding-mobile: 30px var(--space-margin) var(--space-stack-xl);
+  --component-contact-hero-padding: 84px var(--space-margin);
+  --component-contact-hero-text-min-width: 440px;
+  --component-contact-hero-route-link-underline-offset: 4px;
+  --component-contact-hero-plate-position-mobile: 10% 50%;
+  --component-contact-hero-plate-position: 14% 50%;
   --component-repo-cta-padding: 26px 30px 28px;
   --component-repo-cta-max-width: 660px;
   --component-repo-cta-rail-padding: 14px 15px 15px;
