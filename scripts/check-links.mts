@@ -52,6 +52,9 @@
 //    document, Google Drive or Dropbox link. The site offers no CV, generic
 //    or otherwise: every CV is written for one job and sent by email.
 //
+// The crawl itself is crawlSite, exported so scripts/check-content.mts and
+// scripts/check-a11y.mts read exactly the same page set.
+//
 // Exit 1 names each failure: the page or link, the status, and the pages it
 // was found on. Built-ins only; the HTTP layer is injected, so the tests
 // touch no network.
@@ -365,7 +368,7 @@ export function writtenProjectOf(path: string, written: readonly string[] = writ
 // ---------------------------------------------------------------- HTTP
 
 // One request. Rejects on a network error or timeout; any status resolves.
-export type HttpResponse = { status: number; body: string };
+export type HttpResponse = { status: number; body: string; contentType?: string };
 export type Http = (url: string, options: { follow: boolean }) => Promise<HttpResponse>;
 export type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
 
@@ -383,11 +386,82 @@ export function makeHttp(fetchImpl: FetchLike = fetch, timeoutMs = TIMEOUT_MS): 
       await response.body?.cancel().catch(() => {});
       return { status: response.status, body: "" };
     }
-    return { status: response.status, body: await response.text() };
+    return { status: response.status, body: await response.text(), contentType: response.headers.get("content-type") ?? "" };
   };
 }
 
 const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+
+// ---------------------------------------------------------------- crawl
+
+const note = (map: Map<string, Set<string>>, key: string, page: string): void => {
+  const pages = map.get(key) ?? new Set<string>();
+  pages.add(page);
+  map.set(key, pages);
+};
+
+
+// One page the crawl fetched: the status it answered (null with no answer,
+// and then error says why), the status it should answer and its HTML.
+export type CrawledPage = { path: string; url: string; status: number | null; expected: 200 | 404; body: string; error?: string };
+export type Crawl = { pages: CrawledPage[]; maxPages: number; stoppedWithQueued: number | null };
+export type CrawlDeps = {
+  http: Http;
+  maxPages?: number;
+  routes?: ReadonlyArray<{ prefix: string; written: readonly string[] }>;
+};
+
+// The site crawl, shared by every check that reads the running site (this
+// one, scripts/check-content.mts and scripts/check-a11y.mts), so they all
+// read the same page set. Breadth first from / and the two not-found pages,
+// each path once, never following a redirect. Every same-origin <a href> is
+// queued, query and fragment dropped except a listing's capability parameter
+// (classify), so every filter state is its own page. A link that points at a
+// repository off the allowlist, a CV or document link, or an empty
+// ?capability= is never queued; checkLinks reports those. visit runs on each
+// page as it is fetched, before its links are queued, with the pages already
+// known to link to it. Past maxPages the crawl stops, and says how many were
+// still queued.
+export async function crawlSite(
+  baseUrl: string,
+  deps: CrawlDeps,
+  visit: (page: CrawledPage, foundOn: string[]) => void = () => {},
+): Promise<Crawl> {
+  const origin = new URL(baseUrl).origin;
+  const routes = deps.routes ?? DETAIL_ROUTES;
+  const maxPages = deps.maxPages ?? MAX_PAGES;
+  const pages: CrawledPage[] = [];
+  const queue: string[] = ["/", ...NOT_FOUND_PAGES];
+  const seen = new Set(queue);
+  const foundOn = new Map<string, Set<string>>();
+  while (queue.length > 0) {
+    if (pages.length >= maxPages) return { pages, maxPages, stoppedWithQueued: queue.length };
+    const path = queue.shift() as string;
+    const url = new URL(path, origin).href;
+    const expected = expectedStatus(path, routes);
+    let page: CrawledPage;
+    try {
+      const response = await deps.http(url, { follow: false });
+      page = { path, url, status: response.status, expected, body: response.body };
+    } catch (error) {
+      page = { path, url, status: null, expected, body: "", error: errorText(error) };
+    }
+    pages.push(page);
+    visit(page, [...(foundOn.get(path) ?? [])]);
+    if (page.status === null || (page.status >= 300 && page.status < 400)) continue;
+    for (const href of extractHrefs(page.body)) {
+      if (pointsAtUnlistedRepository(href) || cvDocumentProblem(href, origin) !== null) continue;
+      const link = classify(href, url, origin);
+      if (link.kind !== "internal" || listingFilterOf(link.path)?.empty === true) continue;
+      note(foundOn, link.path, path);
+      if (!seen.has(link.path)) {
+        seen.add(link.path);
+        queue.push(link.path);
+      }
+    }
+  }
+  return { pages, maxPages, stoppedWithQueued: null };
+}
 
 // ---------------------------------------------------------------- check
 
@@ -455,12 +529,6 @@ export async function mapLimited<T, R>(items: readonly T[], limit: number, task:
   return results;
 }
 
-const note = (map: Map<string, Set<string>>, key: string, page: string): void => {
-  const pages = map.get(key) ?? new Set<string>();
-  pages.add(page);
-  map.set(key, pages);
-};
-
 export async function checkLinks(baseUrl: string, deps: Deps): Promise<Result> {
   const origin = new URL(baseUrl).origin;
   const projectList = deps.projects ?? projects;
@@ -500,43 +568,26 @@ export async function checkLinks(baseUrl: string, deps: Deps): Promise<Result> {
     if (!unlisted.has(slug)) note(externalFoundOn, url, MODEL_SOURCE);
   }
 
-  // Breadth-first crawl, each path once.
-  const pages: PageResult[] = [];
-  const queue: string[] = ["/", ...NOT_FOUND_PAGES];
-  const seen = new Set(queue);
-  const internalFoundOn = new Map<string, Set<string>>();
   const mailtos = new Set<string>();
-  const maxPages = deps.maxPages ?? MAX_PAGES;
-  while (queue.length > 0) {
-    if (pages.length >= maxPages) {
-      fail("crawl", `stopped after ${maxPages} pages with ${queue.length} still queued; the site should not have this many pages, so look for a link loop`, []);
-      break;
+  const crawl = await crawlSite(baseUrl, { http: deps.http, maxPages: deps.maxPages, routes }, (page, foundOn) => {
+    const { path } = page;
+    if (page.status === null) {
+      fail(path, `no answer: ${page.error ?? "no response"}`, foundOn);
+      return;
     }
-    const path = queue.shift() as string;
-    const pageUrl = new URL(path, origin).href;
-    const expected = expectedStatus(path, routes);
-    let response: HttpResponse;
-    try {
-      response = await deps.http(pageUrl, { follow: false });
-    } catch (error) {
-      pages.push({ path, status: null, expected });
-      fail(path, `no answer: ${errorText(error)}`, internalFoundOn.get(path) ?? []);
-      continue;
-    }
-    pages.push({ path, status: response.status, expected });
-    if (response.status !== expected) {
-      fail(path, `HTTP ${response.status}, expected ${expected}`, internalFoundOn.get(path) ?? []);
-      if (response.status >= 300 && response.status < 400) continue;
+    if (page.status !== page.expected) {
+      fail(path, `HTTP ${page.status}, expected ${page.expected}`, foundOn);
+      if (page.status >= 300 && page.status < 400) return;
     }
 
     const listing = listingFilterOf(path);
-    if (listing !== null && response.status === 200) {
-      const noindex = hasNoindex(response.body);
-      if (listing.filtered && !noindex) fail(path, "a filtered listing does not carry a robots noindex", internalFoundOn.get(path) ?? []);
-      if (!listing.filtered && noindex) fail(path, "an unfiltered listing carries a robots noindex", internalFoundOn.get(path) ?? []);
+    if (listing !== null && page.status === 200) {
+      const noindex = hasNoindex(page.body);
+      if (listing.filtered && !noindex) fail(path, "a filtered listing does not carry a robots noindex", foundOn);
+      if (!listing.filtered && noindex) fail(path, "an unfiltered listing carries a robots noindex", foundOn);
     }
 
-    const hrefs = extractHrefs(response.body);
+    const hrefs = extractHrefs(page.body);
     const writtenSlug = writtenProjectOf(path, writtenProjects);
     const githubLinks: string[] = [];
     let unlistedHref = false;
@@ -550,18 +601,9 @@ export async function checkLinks(baseUrl: string, deps: Deps): Promise<Result> {
         fail(href, CV_DOCUMENT, [path]);
         continue;
       }
-      const link = classify(href, pageUrl, origin);
+      const link = classify(href, page.url, origin);
       if (link.kind === "internal") {
-        const target = link.path;
-        if (listingFilterOf(target)?.empty === true) {
-          fail(target, `emits an empty ?${FILTER_PARAM}=`, [path]);
-          continue;
-        }
-        note(internalFoundOn, target, path);
-        if (!seen.has(target)) {
-          seen.add(target);
-          queue.push(target);
-        }
+        if (listingFilterOf(link.path)?.empty === true) fail(link.path, `emits an empty ?${FILTER_PARAM}=`, [path]);
       } else if (link.kind === "external") {
         note(externalFoundOn, link.url, path);
         if (new URL(link.url).hostname.toLowerCase().replace(/^www\./, "") === "github.com") githubLinks.push(href);
@@ -574,7 +616,7 @@ export async function checkLinks(baseUrl: string, deps: Deps): Promise<Result> {
       }
     }
 
-    if (!unlistedHref && bodyPointsAtUnlistedRepository(response.body)) {
+    if (!unlistedHref && bodyPointsAtUnlistedRepository(page.body)) {
       fail(path, `the page's HTML ${NOT_ALLOWED}`, [path]);
     }
 
@@ -587,6 +629,10 @@ export async function checkLinks(baseUrl: string, deps: Deps): Promise<Result> {
         fail(path, `written project page does not link its repository ${repository}`, [path]);
       }
     }
+  });
+  const pages: PageResult[] = crawl.pages.map(({ path, status, expected }) => ({ path, status, expected }));
+  if (crawl.stoppedWithQueued !== null) {
+    fail("crawl", `stopped after ${crawl.maxPages} pages with ${crawl.stoppedWithQueued} still queued; the site should not have this many pages, so look for a link loop`, []);
   }
 
   const external: ExternalResult[] = await mapLimited([...externalFoundOn], CONCURRENCY, async ([url, foundOn]) => ({

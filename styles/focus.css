@@ -10,6 +10,11 @@
  * {colors.focus-ring-on-deep} on itself, and its descendants inherit it (the
  * deep evidence band does, in evidence-band.module.css).
  * scripts/check-tokens.mts fails any outline: none or zero offset anywhere.
+ *
+ * The indicator must stay an outline: scripts/check-a11y.mts reads each
+ * focused element's computed outline (style, width and colour) and fails one
+ * without it, so a ring drawn another way (box-shadow, border) would fail
+ * the gate even if it were visible.
  */
 
 :root {

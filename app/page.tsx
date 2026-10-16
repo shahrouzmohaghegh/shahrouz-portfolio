@@ -9,7 +9,7 @@ import { home } from "@/content/home";
 import { caseStudyItems } from "@/lib/evidence";
 
 // The title stays the root default, "Shahrouz Mohaghegh".
-export const metadata: Metadata = { description: home.description };
+export const metadata: Metadata = { description: home.description, alternates: { canonical: "/" } };
 
 // Home hydrates one island, RevealOnScroll, which fades in the evidence
 // bands. The hero, its figure pair and Selected work are never reveal

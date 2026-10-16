@@ -4,7 +4,7 @@ import { DetailNotFound } from "@/components/detail-not-found";
 import { SiteFrame } from "@/components/site-frame";
 import { caseStudyPage } from "@/content/case-study-page";
 
-export const metadata: Metadata = { title: caseStudyPage.notFound.title, robots: { index: false } };
+export const metadata: Metadata = { title: caseStudyPage.notFound.title, description: caseStudyPage.notFound.body, robots: { index: false } };
 
 // The case-study not-found page as static HTML (AD-23 note of 2026-10-12).
 // proxy.ts rewrites every unwritten or unknown /experience/<slug>, and this

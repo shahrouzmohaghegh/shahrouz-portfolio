@@ -88,3 +88,7 @@ next-env.d.ts
 
 # Local Obsidian vault settings
 /.obsidian/
+
+# Playwright run output
+/test-results/
+/playwright-report/

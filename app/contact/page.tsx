@@ -13,7 +13,7 @@ import styles from "./contact.module.css";
 // a 1x screen fetches an image near 420px, not the full 1311px.
 export const PORTRAIT_SIZES = "(max-width: 767px) 264px, 420px";
 
-export const metadata: Metadata = { title: "Contact", description: contact.description };
+export const metadata: Metadata = { title: "Contact", description: contact.description, alternates: { canonical: "/contact" } };
 
 // The Contact route (Story 3.8, {components.contact-hero}). The hero sits on
 // the deep ground: the h1, the line under it, then exactly two routes, email

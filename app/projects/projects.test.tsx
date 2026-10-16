@@ -192,7 +192,7 @@ describe("the /projects listing", async () => {
   });
 
   test("the cards sit in the shared card grid, and the route lists no item itself", () => {
-    expect(main.split(`<ul class="${gridStyles.grid}">`)).toHaveLength(2);
+    expect(main.split(`<ul class="${gridStyles.grid}" data-card-grid="">`)).toHaveLength(2);
     const page = source("app/projects/page.tsx");
     expect(page).toMatch(/<FilteredListing\s+kind="project"\s+selection=\{selection\}\s+items=\{projectItems\}/);
     expect(source("components/capability-filter.tsx")).toMatch(/<CardGrid\s+items=\{shown\}[^>]*headingLevel=\{2\}/);
@@ -294,7 +294,7 @@ describe("a written project", () => {
     expect(attr(attrs, "href")).toBe(pr1.repository);
     expect(inner, "the panel holds no second link").not.toMatch(/<a[\s>]/);
     expect(text(inner)).toBe(`Repository Open the repository on GitHub ${pr1.repository}`);
-    expect(decode(attr(attrs, "aria-label") ?? "")).toBe(repoCtaName(projectPage.repository.title, pr1.repository ?? ""));
+    expect(decode(attr(attrs, "aria-label") ?? "")).toBe(repoCtaName(projectPage.repository.kicker, projectPage.repository.title, pr1.repository ?? ""));
     expect(decode(header).indexOf(pr1.summary)).toBeLessThan(header.indexOf(repoStyles.panel));
   });
 
@@ -308,8 +308,10 @@ describe("a written project", () => {
     const repository = anchors(main).filter(({ attrs }) => attr(attrs, "href") === pr2.repository);
     expect(repository.map(({ attrs }) => attr(attrs, "class"))).toEqual([repoStyles.panel, repoStyles.rail]);
     expect(new Set(repository.map(({ attrs }) => attr(attrs, "aria-label"))).size).toBe(1);
-    // The accessible name holds the visible title, so speech input can use it.
+    // The accessible name holds the visible words in order, so speech input can use them.
     expect(text(repeats[0].inner)).toContain(projectPage.repository.title);
+    const words = (s: string) => s.toLowerCase().replace(/[^a-z0-9/.:-]+/g, " ").replace(/[:()]/g, " ").replace(/\s+/g, " ").trim();
+    expect(words(decode(attr(repeats[0].attrs, "aria-label") ?? ""))).toContain(words(text(repeats[0].inner)));
   });
 
   test("a project without a repository renders no call to action, in the header or the rail", async () => {

@@ -12,10 +12,11 @@ export type CardGridProps = {
 
 // The one grid of evidence cards (Story 3.1), shared by Home's Selected work
 // and the /experience listing: a list with one card per item it is given, in
-// that order. A Server Component; it lists no item itself.
+// that order. A Server Component; it lists no item itself. data-card-grid is
+// the stable hook scripts/check-a11y.mts finds every grid by at 768px.
 export function CardGrid({ items, ctaLabel, headingLevel }: CardGridProps) {
   return (
-    <ul className={styles.grid}>
+    <ul className={styles.grid} data-card-grid="">
       {items.map((item) => (
         <li key={item.slug} className={styles.item}>
           <EvidenceCard item={item} ctaLabel={ctaLabel} headingLevel={headingLevel} />

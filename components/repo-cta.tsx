@@ -12,9 +12,11 @@ export type RepoCtaProps = {
 };
 
 // The one accessible name both variants share, so a screen reader's link
-// list shows one destination twice, not two different links. It holds the
-// visible title, so speech input can use the words on screen.
-export const repoCtaName = (title: string, href: string): string => `${title} (${href})`;
+// list shows one destination twice, not two different links. It holds every
+// visible word, kicker first, in order (WCAG 2.5.3 Label in Name, which the
+// axe audit in scripts/check-a11y.mts enforces), so speech input can use the
+// words on screen.
+export const repoCtaName = (kicker: string, title: string, href: string): string => `${kicker}: ${title} ${href}`;
 
 // {components.repo-cta} and {components.repo-cta-rail} (Story 3.5,
 // DESIGN.md and EXPERIENCE.md): a solid accent fill that is one <a>, not a
@@ -27,10 +29,18 @@ export const repoCtaName = (title: string, href: string): string => `${title} ($
 export function RepoCta({ href, kicker, title, variant }: RepoCtaProps) {
   const rail = variant === "rail";
   return (
-    <a href={href} aria-label={repoCtaName(title, href)} className={rail ? styles.rail : styles.panel}>
-      <span className={rail ? styles.railKicker : styles.kicker}>{kicker}</span>
+    <a href={href} aria-label={repoCtaName(kicker, title, href)} className={rail ? styles.rail : styles.panel}>
+      {/* The spaces keep the words apart in the text an accessibility check
+          compares with the accessible name; the spans are blocks, so they
+          draw nothing. */}
+      <span className={rail ? styles.railKicker : styles.kicker}>{kicker}</span>{" "}
       <span className={rail ? styles.railTitle : styles.title}>{title}</span>
-      {!rail && <span className={styles.url}>{href}</span>}
+      {!rail && (
+        <>
+          {" "}
+          <span className={styles.url}>{href}</span>
+        </>
+      )}
     </a>
   );
 }

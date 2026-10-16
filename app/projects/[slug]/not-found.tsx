@@ -4,7 +4,7 @@ import { DetailNotFound } from "@/components/detail-not-found";
 import { SiteFrame } from "@/components/site-frame";
 import { projectPage } from "@/content/project-page";
 
-export const metadata: Metadata = { title: projectPage.notFound.title };
+export const metadata: Metadata = { title: projectPage.notFound.title, description: projectPage.notFound.body };
 
 // The fallback project not-found page (AD-23). An unwritten or unknown slug
 // under /projects is answered by proxy.ts first, which rewrites it with a
