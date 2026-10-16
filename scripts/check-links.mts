@@ -6,7 +6,12 @@
 //
 // 1. Internal crawl. From <base-url>/, every same-origin <a href> is
 //    followed, query and fragment stripped, each page fetched once without
-//    following redirects. A link to the site's canonical origin
+//    following redirects. The one exception is the capability filter
+//    (Epic 4): on the two listings (LISTING_ROUTES) the capability
+//    parameter is kept, so every chip and cross-listing href is crawled as
+//    its own page. A filtered listing (a non-empty capability) must answer
+//    200 and carry a robots noindex meta; an unfiltered listing must not
+//    carry one; and no link may emit an empty "?capability=". A link to the site's canonical origin
 //    (CANONICAL_ORIGINS) is internal too, mapped onto <base-url>. The crawl
 //    fails clearly past MAX_PAGES pages. A page must answer 200, except the two not-found pages
 //    (/case-study-not-available, /project-not-available) and any
@@ -68,6 +73,26 @@ export const MAX_PAGES = 200;
 // The production origins: a link to either is a link to this site, so it is
 // crawled against the base URL rather than fetched from production.
 export const CANONICAL_ORIGINS = ["https://shahrouzmohaghegh.com", "https://www.shahrouzmohaghegh.com"] as const;
+
+// The two listings, the only routes whose capability parameter is kept
+// (AD-4: one parameter, shared by both).
+export const LISTING_ROUTES = ["/experience", "/projects"] as const;
+export const FILTER_PARAM = "capability";
+
+// The capability slugs in chip order: CAPABILITIES in lib/evidence-types.ts,
+// which this script cannot import (it runs on plain Node, without the @/
+// alias). lib/evidence.test.ts fails if the two lists, or the two readers
+// below, ever disagree.
+export const CAPABILITY_SLUGS = ["leadership", "ai-native", "executive-influence", "hands-on"] as const;
+
+// The capabilities a capability parameter selects, read as parseSelection
+// in lib/evidence.ts reads it: every value (a repeated parameter is one
+// list), split on a comma or %2C, trimmed, case folded, unknown slugs
+// dropped, duplicates collapsed, in chip order.
+export function selectedCapabilities(values: readonly string[]): string[] {
+  const slugs = new Set(values.flatMap((value) => value.split(/,|%2c/i)).map((slug) => slug.trim().toLowerCase()));
+  return CAPABILITY_SLUGS.filter((slug) => slugs.has(slug));
+}
 
 // The two static not-found pages, as lib/not-found-rewrite.ts names them
 // (the test pins the two together).
@@ -242,7 +267,9 @@ export type Classified =
   | { kind: "other"; reason: string };
 
 // One href found on pageUrl, against the site's origin. Internal paths lose
-// their query and fragment; the canonical origins count as internal.
+// their query and fragment, except a listing's capability parameter, which
+// is kept as written (its commas unencoded); the canonical origins count as
+// internal.
 export function classify(href: string, pageUrl: string, origin: string): Classified {
   if (/^mailto:/i.test(href)) {
     const rest = href.slice("mailto:".length);
@@ -257,6 +284,11 @@ export function classify(href: string, pageUrl: string, origin: string): Classif
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") return { kind: "other", reason: `unsupported scheme ${url.protocol}` };
   if (url.origin === origin || (CANONICAL_ORIGINS as readonly string[]).includes(url.origin)) {
+    const values = url.searchParams.getAll(FILTER_PARAM);
+    if (values.length > 0 && (LISTING_ROUTES as readonly string[]).includes(url.pathname)) {
+      const capability = values.join(",");
+      return { kind: "internal", path: `${url.pathname}?${FILTER_PARAM}=${encodeURIComponent(capability).replace(/%2C/gi, ",")}` };
+    }
     return { kind: "internal", path: url.pathname };
   }
   url.hash = "";
@@ -275,6 +307,27 @@ export function mailtoProblem(address: string, query: string): string | null {
     return "is not valid percent-encoding";
   }
   return ONE_ADDRESS.test(decoded) ? null : "does not name exactly one address";
+}
+
+// A listing path, whether it is filtered (it selects at least one valid
+// capability, as the app reads it), and whether it carries an empty
+// capability parameter; null for any other page.
+export function listingFilterOf(path: string): { filtered: boolean; empty: boolean } | null {
+  const url = new URL(path, "http://listing.invalid");
+  if (!(LISTING_ROUTES as readonly string[]).includes(url.pathname)) return null;
+  const values = url.searchParams.getAll(FILTER_PARAM);
+  return { filtered: selectedCapabilities(values).length > 0, empty: values.length > 0 && values.join("") === "" };
+}
+
+// Whether a page asks not to be indexed: a robots meta whose content names
+// noindex, in either attribute order, the content quoted or not.
+export function hasNoindex(html: string): boolean {
+  for (const tag of html.matchAll(/<meta\b[^>]*>/gi)) {
+    const content = /\bcontent\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>"']+))/i.exec(tag[0]);
+    const value = content === null ? "" : (content[1] ?? content[2] ?? content[3]);
+    if (/\bname\s*=\s*["']?robots\b/i.test(tag[0]) && /\bnoindex\b/i.test(value)) return true;
+  }
+  return false;
 }
 
 // The status a site path must answer: 404 for the not-found pages and any
@@ -476,6 +529,13 @@ export async function checkLinks(baseUrl: string, deps: Deps): Promise<Result> {
       if (response.status >= 300 && response.status < 400) continue;
     }
 
+    const listing = listingFilterOf(path);
+    if (listing !== null && response.status === 200) {
+      const noindex = hasNoindex(response.body);
+      if (listing.filtered && !noindex) fail(path, "a filtered listing does not carry a robots noindex", internalFoundOn.get(path) ?? []);
+      if (!listing.filtered && noindex) fail(path, "an unfiltered listing carries a robots noindex", internalFoundOn.get(path) ?? []);
+    }
+
     const hrefs = extractHrefs(response.body);
     const writtenSlug = writtenProjectOf(path, writtenProjects);
     const githubLinks: string[] = [];
@@ -493,6 +553,10 @@ export async function checkLinks(baseUrl: string, deps: Deps): Promise<Result> {
       const link = classify(href, pageUrl, origin);
       if (link.kind === "internal") {
         const target = link.path;
+        if (listingFilterOf(target)?.empty === true) {
+          fail(target, `emits an empty ?${FILTER_PARAM}=`, [path]);
+          continue;
+        }
         note(internalFoundOn, target, path);
         if (!seen.has(target)) {
           seen.add(target);

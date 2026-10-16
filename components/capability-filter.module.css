@@ -1,0 +1,128 @@
+/* The capability filter (DESIGN.md capability-chip, state-line,
+   cross-listing-link and empty-state). The chips wrap onto a second line at
+   375px and never scroll. A selected chip is an accent fill on paper, so the
+   global ring (styles/focus.css) already takes {colors.focus-ring}, drawn on
+   the paper around it at a 2px offset. */
+.label {
+  margin: 0 0 var(--space-stack-sm);
+  font-family: var(--type-meta-label-family);
+  font-size: var(--type-meta-label-size);
+  font-weight: var(--type-meta-label-weight);
+  line-height: var(--type-meta-label-leading);
+  letter-spacing: var(--type-meta-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-stack-xs);
+  margin: 0 0 var(--space-stack-md);
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-stack-xs);
+  padding: var(--component-capability-chip-padding);
+  border: var(--space-rule-hairline) solid var(--color-chip-border);
+  border-radius: var(--radius-full);
+  font-family: var(--type-ui-family);
+  font-size: var(--type-ui-size);
+  font-weight: var(--type-ui-weight);
+  line-height: var(--type-ui-leading);
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.chip:hover {
+  text-decoration-line: underline;
+}
+
+.chip[aria-current="true"] {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+/* Read by assistive technology, never drawn: a hairline box clipped to
+   nothing and out of flow. */
+.visuallyHidden {
+  position: absolute;
+  width: var(--space-rule-hairline);
+  height: var(--space-rule-hairline);
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.stateLine {
+  margin: 0 0 var(--space-stack-sm);
+  font-family: var(--type-data-row-family);
+  font-size: var(--type-data-row-size);
+  font-weight: var(--type-data-row-weight);
+  line-height: var(--type-data-row-leading);
+  color: var(--color-muted);
+}
+
+.emphasis {
+  font-weight: var(--component-data-row-emphasis-weight);
+  color: var(--color-ink);
+}
+
+.crossListing {
+  margin: 0 0 var(--space-stack-xl);
+  font-family: var(--type-ui-family);
+  font-size: var(--type-ui-size);
+  font-weight: var(--type-ui-weight);
+  line-height: var(--type-ui-leading);
+}
+
+.crossListingLink {
+  color: var(--color-accent);
+  text-decoration-line: underline;
+  text-decoration-thickness: var(--component-cross-listing-link-underline-width);
+  text-underline-offset: var(--component-cross-listing-link-underline-offset);
+}
+
+.count {
+  font-family: var(--type-meta-label-family);
+  font-size: var(--type-meta-label-size);
+  font-weight: var(--type-meta-label-weight);
+  letter-spacing: var(--type-meta-label-tracking);
+  text-transform: uppercase;
+}
+
+.empty {
+  margin: var(--space-stack-md) 0 0;
+  padding: var(--component-empty-state-padding);
+  border: var(--space-rule-hairline) solid var(--color-rule);
+  background: var(--color-panel);
+  overflow-wrap: break-word;
+}
+
+.empty .crossListing {
+  margin: 0 0 var(--space-stack-sm);
+}
+
+.emptyText {
+  margin: 0 0 var(--space-stack-sm);
+  font-family: var(--type-body-family);
+  font-size: var(--type-body-size);
+  font-weight: var(--type-body-weight);
+  line-height: var(--type-body-leading);
+  color: var(--color-ink);
+}
+
+.emptyText:last-child {
+  margin-bottom: 0;
+}
+
+.emptyLink {
+  font-weight: var(--component-empty-state-link-weight);
+  color: var(--color-accent);
+  text-decoration-line: underline;
+}

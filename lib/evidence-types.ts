@@ -23,6 +23,16 @@ export const CAPABILITY_NAME = {
   "hands-on": "Hands-On Engineering",
 } as const satisfies Record<Capability, string>;
 
+// Each capability's chip label (EXPERIENCE.md Capability chip): the short
+// form, used on the filter chips only. Headings, cards, the state line and
+// the title always use CAPABILITY_NAME.
+export const CAPABILITY_CHIP_LABEL = {
+  leadership: "Leadership",
+  "ai-native": "AI-Native",
+  "executive-influence": "Executive Influence",
+  "hands-on": "Hands-On",
+} as const satisfies Record<Capability, string>;
+
 // One or more, never zero.
 export type Capabilities = readonly [Capability, ...Capability[]];
 

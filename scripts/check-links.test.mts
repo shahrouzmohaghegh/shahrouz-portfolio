@@ -33,6 +33,11 @@ import {
   decodeEntities,
   expectedStatus,
   extractHrefs,
+  FILTER_PARAM,
+  hasNoindex,
+  LISTING_ROUTES,
+  listingFilterOf,
+  selectedCapabilities,
   isBotBlock,
   pointsAtUnlistedRepository,
   mailtoProblem,
@@ -238,6 +243,25 @@ describe("classify", () => {
     assert.deepEqual(classify("#main", at, BASE), { kind: "internal", path: "/projects" });
     assert.deepEqual(classify(`${BASE}/contact?x=1`, at, BASE), { kind: "internal", path: "/contact" });
     assert.deepEqual(classify("this-website", `${BASE}/projects/`, BASE), { kind: "internal", path: "/projects/this-website" });
+  });
+  test("a listing keeps its capability parameter, commas unencoded; every other query is dropped", () => {
+    assert.deepEqual([...LISTING_ROUTES], ["/experience", "/projects"]);
+    assert.equal(FILTER_PARAM, "capability");
+    assert.deepEqual(classify("/experience?capability=leadership,hands-on#x", at, BASE), {
+      kind: "internal",
+      path: "/experience?capability=leadership,hands-on",
+    });
+    assert.deepEqual(classify("/projects?capability=ai-native%2Chands-on&x=1", at, BASE), {
+      kind: "internal",
+      path: "/projects?capability=ai-native,hands-on",
+    });
+    assert.deepEqual(classify("/projects?capability=hands-on&capability=leadership", at, BASE), {
+      kind: "internal",
+      path: "/projects?capability=hands-on,leadership",
+    });
+    assert.deepEqual(classify("/projects?x=1", at, BASE), { kind: "internal", path: "/projects" });
+    assert.deepEqual(classify("/contact?capability=leadership", at, BASE), { kind: "internal", path: "/contact" });
+    assert.deepEqual(classify("/projects/this-website?capability=leadership", at, BASE), { kind: "internal", path: "/projects/this-website" });
   });
   test("the canonical origins are internal, mapped onto the base URL's paths", () => {
     assert.deepEqual([...CANONICAL_ORIGINS], ["https://shahrouzmohaghegh.com", "https://www.shahrouzmohaghegh.com"]);
@@ -591,6 +615,90 @@ describe("I/O matrix", () => {
     const result = await checkLinks(BASE, d);
     assert.equal(result.failures.length, 1);
     assert.match(result.failures[0].detail, /query/);
+  });
+});
+
+describe("listingFilterOf and hasNoindex", () => {
+  test("a listing is filtered only when it selects a valid capability, as the app reads it", () => {
+    assert.deepEqual(listingFilterOf("/experience"), { filtered: false, empty: false });
+    assert.deepEqual(listingFilterOf("/projects?capability=leadership"), { filtered: true, empty: false });
+    assert.deepEqual(listingFilterOf("/projects?capability=Hands-On,zzz"), { filtered: true, empty: false });
+    assert.deepEqual(listingFilterOf("/projects?capability=zzz&capability=hands-on"), { filtered: true, empty: false });
+    assert.deepEqual(listingFilterOf("/projects?capability=zzz"), { filtered: false, empty: false });
+    assert.deepEqual(listingFilterOf("/projects?capability=,"), { filtered: false, empty: false });
+    assert.deepEqual(listingFilterOf("/projects?capability="), { filtered: false, empty: true });
+    assert.deepEqual(selectedCapabilities(["hands-on%2CLEADERSHIP", "leadership"]), ["leadership", "hands-on"]);
+    assert.equal(listingFilterOf("/contact"), null);
+    assert.equal(listingFilterOf("/experience/offshore-delivery-turnaround"), null);
+  });
+  test("a robots meta naming noindex, in either attribute order", () => {
+    assert.equal(hasNoindex('<meta name="robots" content="noindex"/>'), true);
+    assert.equal(hasNoindex('<meta content="noindex, nofollow" name="robots">'), true);
+    assert.equal(hasNoindex("<meta name=robots content=noindex>"), true);
+    assert.equal(hasNoindex("<meta name='robots' content='noindex'>"), true);
+    assert.equal(hasNoindex('<meta name="robots" content="index, follow"/>'), false);
+    assert.equal(hasNoindex('<meta name="description" content="noindex"/>'), false);
+    assert.equal(hasNoindex("<title>noindex</title>"), false);
+  });
+});
+
+describe("the capability filter", () => {
+  const NOINDEX = '<meta name="robots" content="noindex"/>';
+  const chips = links("/experience?capability=leadership", "/experience?capability=hands-on", "/projects?capability=hands-on");
+  const filteredSite = (overrides: Record<string, Answer> = {}) =>
+    goodSite({
+      [`${BASE}/experience`]: page(FOOTER + chips),
+      [`${BASE}/experience?capability=leadership`]: page(NOINDEX + FOOTER + links("/experience")),
+      [`${BASE}/experience?capability=hands-on`]: page(NOINDEX + FOOTER + links("/experience")),
+      [`${BASE}/projects?capability=hands-on`]: page(NOINDEX + FOOTER + links("/projects")),
+      ...overrides,
+    });
+
+  test("every chip href is crawled as its own page, and filtered pages with noindex pass", async () => {
+    const { deps: d, calls } = deps(filteredSite());
+    const result = await checkLinks(BASE, d);
+    assert.deepEqual(result.failures, []);
+    for (const path of ["/experience?capability=leadership", "/experience?capability=hands-on", "/projects?capability=hands-on"]) {
+      assert.equal(calls.filter((c) => c.url === `${BASE}${path}`).length, 1, path);
+    }
+  });
+
+  test("a filtered page without noindex fails, naming the page", async () => {
+    const { deps: d } = deps(filteredSite({ [`${BASE}/projects?capability=hands-on`]: page(FOOTER) }));
+    const result = await checkLinks(BASE, d);
+    assert.deepEqual(
+      result.failures.map((f) => [f.subject, f.detail]),
+      [["/projects?capability=hands-on", "a filtered listing does not carry a robots noindex"]],
+    );
+  });
+
+  test("an unfiltered listing with noindex fails", async () => {
+    const { deps: d } = deps(filteredSite({ [`${BASE}/projects`]: page(NOINDEX + FOOTER) }));
+    const result = await checkLinks(BASE, d);
+    assert.ok(result.failures.some((f) => f.subject === "/projects" && /unfiltered listing carries a robots noindex/.test(f.detail)));
+  });
+
+  test("a filtered page answering 404 fails", async () => {
+    const { deps: d } = deps(filteredSite({ [`${BASE}/experience?capability=leadership`]: page(NOINDEX, 404) }));
+    const result = await checkLinks(BASE, d);
+    assert.ok(result.failures.some((f) => f.subject === "/experience?capability=leadership" && /HTTP 404, expected 200/.test(f.detail)));
+  });
+
+  test("an empty capability parameter emitted anywhere fails once, by its normalised path, and is not crawled", async () => {
+    const { deps: d, calls } = deps(
+      filteredSite({ [`${BASE}/experience?capability=leadership`]: page(NOINDEX + FOOTER + links("/experience?capability=#x")) }),
+    );
+    const result = await checkLinks(BASE, d);
+    assert.deepEqual(
+      result.failures.map((f) => [f.subject, f.detail, f.foundOn]),
+      [["/experience?capability=", "emits an empty ?capability=", ["/experience?capability=leadership"]]],
+    );
+    assert.ok(!calls.some((c) => c.url.endsWith("?capability=")));
+  });
+
+  test("a junk capability spelling is an unfiltered listing: no noindex required", async () => {
+    const { deps: d } = deps(filteredSite({ [`${BASE}/experience`]: page(FOOTER + chips + links("/experience?capability=zzz")), [`${BASE}/experience?capability=zzz`]: page(FOOTER) }));
+    assert.deepEqual((await checkLinks(BASE, d)).failures, []);
   });
 });
 

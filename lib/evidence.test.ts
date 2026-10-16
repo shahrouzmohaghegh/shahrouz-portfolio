@@ -12,6 +12,9 @@ import { describe, expect, test } from "vitest";
 
 import { writtenCaseStudySlugs } from "@/content/case-studies";
 import { writtenProjectSlugs } from "@/content/projects";
+import { experience } from "@/content/experience";
+import { projectsPage } from "@/content/projects-page";
+import { CAPABILITY_SLUGS, selectedCapabilities } from "@/scripts/check-links.mts";
 import { CI_PATH, gateStepNames } from "@/scripts/check-readme.mts";
 
 import {
@@ -25,12 +28,28 @@ import {
   evidenceItems,
   inCanonicalOrder,
   isWritten,
+  listingHref,
   listingTitle,
+  matchesSelection,
   nextWrittenItem,
+  OTHER_KIND,
+  CAPABILITY_PARAM,
+  crossListing,
+  filterChips,
+  filterItems,
+  filterLinkHref,
+  isListingPath,
+  joinCapabilityNames,
+  parseSelection,
+  selectionFrom,
+  serialiseSelection,
+  stateLine,
+  toggleCapability,
   projectItems,
   sectionsOf,
   writtenItems,
   type Capabilities,
+  type Capability,
   type EvidenceItem,
   type EvidenceKind,
 } from "@/lib/evidence";
@@ -486,21 +505,275 @@ describe("written projects", () => {
   });
 });
 
-// The one listing-title function (AD-16). It returns the bare segment; the
-// root layout's template adds " | Shahrouz Mohaghegh", so the suffix appears
-// once. Epic 4 extends it with the selected capability.
+// The capability filter (AD-2, AD-3, AD-4, AD-13): lib/evidence.ts alone
+// parses, serialises and applies the selection, counts the other listing,
+// and writes the title and the state line.
+const ALL_SELECTIONS: Capability[][] = Array.from({ length: 2 ** CAPABILITIES.length }, (_, mask) =>
+  CAPABILITIES.filter((_, bit) => mask & (2 ** bit)),
+);
+const KINDS = Object.keys(EVIDENCE_ROUTE) as EvidenceKind[];
+const ITEMS_OF: Record<EvidenceKind, readonly EvidenceItem[]> = { "case-study": caseStudyItems, project: projectItems };
+
+describe("reading the capability parameter", () => {
+  test.each([
+    ["leadership", ["leadership"]],
+    ["hands-on,leadership", ["leadership", "hands-on"]],
+    ["Hands-On,leadership,leadership,zzz", ["leadership", "hands-on"]],
+    ["hands-on%2Cleadership", ["leadership", "hands-on"]],
+    ["hands-on%2cLEADERSHIP", ["leadership", "hands-on"]],
+    [" ai-native , executive-influence ", ["ai-native", "executive-influence"]],
+    ["leadership,,", ["leadership"]],
+    ["zzz", []],
+    ["zzz,qqq", []],
+    ["", []],
+    [",", []],
+  ])("%j reads as %j", (raw, expected) => {
+    expect(parseSelection(raw)).toEqual(expected);
+  });
+
+  test("absent is no selection, and a repeated parameter is read as one list", () => {
+    expect(parseSelection(undefined)).toEqual([]);
+    expect(parseSelection(["hands-on", "leadership"])).toEqual(["leadership", "hands-on"]);
+  });
+
+  // scripts/check-links.mts runs on plain Node and cannot import this
+  // module, so it mirrors the reader; the two must agree on every input.
+  test("the link check's reader agrees with parseSelection", () => {
+    expect([...CAPABILITY_SLUGS]).toEqual([...CAPABILITIES]);
+    const inputs: string[][] = [
+      [],
+      [""],
+      [","],
+      ["zzz"],
+      ["leadership"],
+      ["Hands-On,leadership,leadership,zzz"],
+      ["hands-on%2Cleadership"],
+      ["hands-on%2cLEADERSHIP"],
+      [" ai-native , executive-influence "],
+      ["leadership,,"],
+      ["hands-on", "leadership"],
+      ["zzz", "AI-NATIVE"],
+      ["executive-influence,ai-native,hands-on,leadership"],
+    ];
+    for (const values of inputs) expect(selectedCapabilities(values), JSON.stringify(values)).toEqual([...parseSelection(values)]);
+  });
+
+  test("isListingPath names the two listings, with or without a query or fragment", () => {
+    expect(["/experience", "/projects", "/experience?capability=leadership", "/projects#filter-status"].every(isListingPath)).toBe(true);
+    expect(["/", "/contact", "/experience/offshore-delivery-turnaround", "/projects/this-website"].some(isListingPath)).toBe(false);
+  });
+
+  test("selectionFrom reads the capability parameter and nothing else", () => {
+    expect(selectionFrom({ capability: "ai-native", other: "leadership" })).toEqual(["ai-native"]);
+    expect(selectionFrom({ capabilities: "ai-native" })).toEqual([]);
+    expect(selectionFrom({})).toEqual([]);
+    expect(selectionFrom(undefined)).toEqual([]);
+  });
+});
+
+describe("writing the capability parameter", () => {
+  test("canonical: chip order, one comma-separated parameter, omitted when empty", () => {
+    expect(serialiseSelection([])).toBe("");
+    expect(listingHref("case-study", [])).toBe("/experience");
+    expect(listingHref("project", [])).toBe("/projects");
+    expect(listingHref("case-study", parseSelection("hands-on,leadership"))).toBe("/experience?capability=leadership,hands-on");
+    expect(listingHref("project", [...CAPABILITIES])).toBe("/projects?capability=leadership,ai-native,executive-influence,hands-on");
+  });
+
+  test.each(ALL_SELECTIONS.map((selection) => [selection.join(",") || "(none)", selection] as const))(
+    "%s round-trips, and every chip href toggles one capability canonically",
+    (_name, selection) => {
+      for (const kind of KINDS) {
+        const href = listingHref(kind, selection);
+        expect(href).not.toMatch(/capability=(&|$)|%2C|\[|&capability/i);
+        const query = href.split("?")[1] ?? "";
+        expect(parseSelection(new URLSearchParams(query).get(CAPABILITY_PARAM) ?? undefined)).toEqual(selection);
+        const chips = filterChips(kind, selection);
+        expect(chips.map((chip) => chip.capability)).toEqual([...CAPABILITIES]);
+        expect(chips.map((chip) => chip.label)).toEqual(["Leadership", "AI-Native", "Executive Influence", "Hands-On"]);
+        for (const chip of chips) {
+          expect(chip.selected).toBe(selection.includes(chip.capability));
+          const toggled = chip.selected ? selection.filter((c) => c !== chip.capability) : CAPABILITIES.filter((c) => c === chip.capability || selection.includes(c));
+          expect(chip.href).toBe(`${listingHref(kind, toggled)}#filter-status`);
+          expect(chip.href).toBe(filterLinkHref(kind, toggled));
+        }
+      }
+    },
+  );
+
+  test("toggling in click order still writes chip order", () => {
+    let selection = toggleCapability([], "hands-on");
+    selection = toggleCapability(selection, "leadership");
+    expect(selection).toEqual(["leadership", "hands-on"]);
+    expect(toggleCapability(selection, "hands-on")).toEqual(["leadership"]);
+  });
+});
+
+describe("the filter predicate", () => {
+  test("nothing selected shows every item", () => {
+    for (const kind of KINDS) expect(filterItems(ITEMS_OF[kind], [])).toEqual(ITEMS_OF[kind]);
+  });
+
+  // Every one-, two-, three- and four-capability selection is the union of
+  // its single-capability results, in collection order.
+  test.each(ALL_SELECTIONS.filter((s) => s.length > 0).map((selection) => [selection.join(","), selection] as const))(
+    "%s is the union of its capabilities",
+    (_name, selection) => {
+      for (const kind of KINDS) {
+        const union = ITEMS_OF[kind].filter((item) => selection.some((c) => filterItems(ITEMS_OF[kind], [c]).includes(item)));
+        expect(filterItems(ITEMS_OF[kind], selection)).toEqual(union);
+        for (const item of filterItems(ITEMS_OF[kind], selection)) expect(matchesSelection(item, selection)).toBe(true);
+      }
+    },
+  );
+
+  test("deselecting widens the set again", () => {
+    const two = filterItems(caseStudyItems, ["leadership", "ai-native"]);
+    const one = filterItems(caseStudyItems, ["leadership"]);
+    expect(two.length).toBeGreaterThan(one.length);
+    expect(filterItems(caseStudyItems, toggleCapability(["leadership"], "leadership"))).toEqual(caseStudyItems);
+  });
+
+  // The launch content (spec, Decisions: empty is a launch path).
+  test("at launch, Hands-On matches no case study, and Leadership or Executive Influence no project", () => {
+    expect(filterItems(caseStudyItems, ["hands-on"])).toEqual([]);
+    expect(filterItems(projectItems, ["leadership"])).toEqual([]);
+    expect(filterItems(projectItems, ["executive-influence"])).toEqual([]);
+    expect(filterItems(projectItems, ["leadership", "executive-influence"])).toEqual([]);
+  });
+});
+
+// Each listing's empty-state prose explains why particular capabilities
+// have nothing there. It must name exactly the single capabilities that
+// are empty on that listing, so a content change cannot leave it stale.
+describe("the empty-state prose", () => {
+  const MENTION: Record<Capability, RegExp> = {
+    leadership: /\bleadership\b/i,
+    "ai-native": /\bai-native\b/i,
+    "executive-influence": /\b(stakeholder|executive) influence\b/i,
+    "hands-on": /\bhands-on\b/i,
+  };
+  test.each([
+    ["case-study", experience.empty],
+    ["project", projectsPage.empty],
+  ] as const)("on the %s listing it names exactly the capabilities with no match there", (kind, prose) => {
+    const empty = CAPABILITIES.filter((capability) => filterItems(ITEMS_OF[kind], [capability]).length === 0);
+    const named = CAPABILITIES.filter((capability) => MENTION[capability].test(prose));
+    expect(named).toEqual(empty);
+  });
+});
+
+describe("the cross-listing count", () => {
+  test("counts the other listing for the whole selection and carries the selection there", () => {
+    for (const kind of KINDS) {
+      for (const selection of ALL_SELECTIONS) {
+        const other = OTHER_KIND[kind];
+        const count = filterItems(ITEMS_OF[other], selection).length;
+        const link = crossListing(kind, selection);
+        if (count === 0) {
+          expect(link).toBeUndefined();
+          continue;
+        }
+        expect(link?.kind).toBe(other);
+        expect(link?.count).toBe(count);
+        expect(link?.href).toBe(`${listingHref(other, selection)}#filter-status`);
+      }
+    }
+  });
+
+  test("Hands-On on /experience leads to Projects", () => {
+    const count = projectItems.filter((item) => item.capabilities.includes("hands-on")).length;
+    expect(crossListing("case-study", ["hands-on"])).toEqual({
+      kind: "project",
+      count,
+      href: "/projects?capability=hands-on#filter-status",
+      prefix: `${count} Projects`,
+      rest: " also match Hands-On Engineering",
+    });
+  });
+
+  test("the sentence: singular, several names, and unfiltered", () => {
+    expect(crossListing("project", ["leadership"])).toMatchObject({ prefix: "1 case study", rest: " also matches Engineering Leadership" });
+    expect(crossListing("project", ["leadership", "executive-influence"])).toMatchObject({
+      prefix: "2 case studies",
+      rest: " also match Engineering Leadership or Executive and Stakeholder Influence",
+    });
+    expect(crossListing("case-study", [])).toMatchObject({ href: "/projects#filter-status", prefix: `${projectItems.length} Projects`, rest: " are listed separately" });
+    expect(crossListing("project", [])).toMatchObject({ href: "/experience#filter-status", rest: " are listed separately" });
+  });
+});
+
+// AD-3: four states only, the suffix added once by the root template, and
+// a distinct title for every distinct state.
 describe("the listing title", () => {
   test.each([
     ["case-study", "Experience"],
     ["project", "Projects"],
-  ] as const)("%s listing is titled %s", (kind, title) => {
+  ] as const)("unfiltered, the %s listing is titled %s", (kind, title) => {
     expect(listingTitle(kind)).toBe(title);
+    expect(listingTitle(kind, [])).toBe(title);
+    expect(listingTitle(kind, parseSelection("zzz"))).toBe(title);
   });
 
-  test("each kind's title is distinct and carries no site-name suffix", () => {
-    const titles = (Object.keys(EVIDENCE_ROUTE) as Array<keyof typeof EVIDENCE_ROUTE>).map(listingTitle);
+  test("the four states, word for word", () => {
+    expect(listingTitle("case-study", ["executive-influence"])).toBe("Experience, 1 of 3 case studies, Executive and Stakeholder Influence");
+    expect(listingTitle("case-study", ["leadership", "ai-native"])).toBe(
+      "Experience, 2 of 3 case studies, Engineering Leadership or AI-Native Engineering",
+    );
+    expect(listingTitle("project", ["executive-influence"])).toBe("Projects, no projects match, Executive and Stakeholder Influence");
+    expect(listingTitle("case-study", ["hands-on"])).toBe("Experience, no case studies match, Hands-On Engineering");
+    expect(listingTitle("case-study", ["leadership", "ai-native", "executive-influence"])).toBe(
+      "Experience, 3 of 3 case studies, Engineering Leadership or AI-Native Engineering or Executive and Stakeholder Influence",
+    );
+  });
+
+  test("the noun is singular when the count is one", () => {
+    const one = caseStudyItems.slice(0, 1);
+    expect(listingTitle("case-study", [...one[0].capabilities], one)).toBe(`Experience, 1 of 1 case study, ${CAPABILITY_NAME[one[0].capabilities[0]]}`);
+  });
+
+  test("every reachable state on both listings has a distinct title, with no suffix, no and, and full names only", () => {
+    const titles = KINDS.flatMap((kind) => ALL_SELECTIONS.map((selection) => listingTitle(kind, selection)));
     expect(new Set(titles).size).toBe(titles.length);
-    for (const title of titles) expect(title).not.toMatch(/Shahrouz|\|/);
+    for (const title of titles) {
+      expect(title).not.toMatch(/Shahrouz|\||\band\b(?! Stakeholder)/);
+      expect(title).not.toMatch(/\u2014/);
+    }
+    for (const selection of ALL_SELECTIONS.filter((s) => s.length > 0)) {
+      for (const kind of KINDS) {
+        for (const c of selection) expect(listingTitle(kind, selection)).toContain(CAPABILITY_NAME[c]);
+      }
+    }
+  });
+});
+
+describe("the state line", () => {
+  test.each([
+    [[], { emphasis: "Showing all 3 case studies.", rest: " No capability filter applied." }],
+    [["executive-influence"], { emphasis: "Showing 1 of 3 case studies", rest: ", filtered by Executive and Stakeholder Influence." }],
+    [["leadership", "ai-native"], { emphasis: "Showing 2 of 3 case studies", rest: ", filtered by Engineering Leadership or AI-Native Engineering." }],
+    [
+      ["leadership", "ai-native", "executive-influence"],
+      { emphasis: "Showing 3 of 3 case studies", rest: ", filtered by Engineering Leadership, AI-Native Engineering or Executive and Stakeholder Influence." },
+    ],
+    [["hands-on"], { emphasis: "Showing 0 of 3 case studies", rest: ", filtered by Hands-On Engineering." }],
+  ] as Array<[Capability[], { emphasis: string; rest: string }]>)("on /experience, %j", (selection, expected) => {
+    expect(stateLine("case-study", selection)).toEqual(expected);
+  });
+
+  test("on /projects it says projects, and project for one", () => {
+    expect(stateLine("project", [])).toEqual({ emphasis: "Showing all 3 projects.", rest: " No capability filter applied." });
+    expect(stateLine("project", ["ai-native"]).emphasis).toBe("Showing 1 of 3 projects");
+    expect(stateLine("project", [], projectItems.slice(0, 1)).emphasis).toBe("Showing all 1 project.");
+  });
+
+  test("the title and the state line name a selection with the same joiner, in the same order", () => {
+    for (const selection of ALL_SELECTIONS.filter((s) => s.length > 0)) {
+      const names = joinCapabilityNames(selection);
+      expect(stateLine("case-study", selection).rest).toBe(`, filtered by ${names}.`);
+      expect(listingTitle("case-study", selection).endsWith(joinCapabilityNames(selection, " or "))).toBe(true);
+      if (selection.length <= 2) expect(joinCapabilityNames(selection, " or ")).toBe(names);
+    }
   });
 });
 

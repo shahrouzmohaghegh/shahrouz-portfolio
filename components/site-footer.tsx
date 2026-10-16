@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { site } from "@/content/site";
+import { isListingPath } from "@/lib/evidence";
 import { EmailAddress } from "./email-address";
 import styles from "./site-footer.module.css";
 
@@ -18,11 +19,20 @@ export function SiteFooter() {
         <div>
           <p className={styles.label}>{site.evidenceLabel}</p>
           <ul className={styles.links}>
+            {/* A listing is a plain anchor, a full page load: a next/link
+                move off a filtered listing changes only the search params and
+                can keep its stale title (components/capability-filter.tsx). */}
             {site.evidenceLinks.map(({ href, label }) => (
               <li key={href}>
-                <Link href={href} className={styles.link}>
-                  {label}
-                </Link>
+                {isListingPath(href) ? (
+                  <a href={href} className={styles.link}>
+                    {label}
+                  </a>
+                ) : (
+                  <Link href={href} className={styles.link}>
+                    {label}
+                  </Link>
+                )}
               </li>
             ))}
           </ul>
