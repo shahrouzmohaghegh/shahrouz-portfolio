@@ -76,6 +76,7 @@ jobs:
         run: npm run test
 
       - name: Build
+        id: build
         run: npm run build
 
       - name: Token drift check
@@ -113,7 +114,12 @@ jobs:
 
       # Chromium for the browser checks below, from the pinned
       # @playwright/test, with the system libraries it needs on this image.
+      # This step and the server start run whenever the build succeeded, even
+      # after a deterministic check above failed (an unticked content review
+      # box, most often), so one run still reports every server check. The
+      # gate stays red either way.
       - name: Install Chromium (Playwright)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: npx playwright install --with-deps chromium
 
       # The one server stage. Starts the build with next start on a local
@@ -126,6 +132,7 @@ jobs:
       # never stops them from running.
       - name: Start the built site (next start)
         id: site
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
           nohup ./node_modules/.bin/next start --port 3000 > "$RUNNER_TEMP/next-start.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/next-start.pid"
