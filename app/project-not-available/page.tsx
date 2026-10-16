@@ -4,7 +4,7 @@ import { DetailNotFound } from "@/components/detail-not-found";
 import { SiteFrame } from "@/components/site-frame";
 import { projectPage } from "@/content/project-page";
 
-export const metadata: Metadata = { title: projectPage.notFound.title, robots: { index: false } };
+export const metadata: Metadata = { title: projectPage.notFound.title, description: projectPage.notFound.body, robots: { index: false } };
 
 // The project not-found page as static HTML (Story 3.5, AD-23 note of
 // 2026-10-12), the project twin of app/case-study-not-available. proxy.ts

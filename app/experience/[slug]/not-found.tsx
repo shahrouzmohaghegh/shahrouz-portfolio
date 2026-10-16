@@ -4,7 +4,7 @@ import { DetailNotFound } from "@/components/detail-not-found";
 import { SiteFrame } from "@/components/site-frame";
 import { caseStudyPage } from "@/content/case-study-page";
 
-export const metadata: Metadata = { title: caseStudyPage.notFound.title };
+export const metadata: Metadata = { title: caseStudyPage.notFound.title, description: caseStudyPage.notFound.body };
 
 // The fallback case-study not-found page (AD-23). An unwritten or unknown
 // slug under /experience is answered by proxy.ts first, which rewrites it

@@ -26,7 +26,7 @@ export const projects: readonly Project[] = [
       "Next.js, React and TypeScript, built with BMAD agents while he held the requirements, architecture, decisions and review.",
     capabilities: ["hands-on"],
     headlineMetric: {
-      value: "Twelve automated checks run on every merge to main",
+      value: "Sixteen automated checks run on every merge to main",
       qualifierNotRequired: true,
     },
     href: "/projects/this-website",

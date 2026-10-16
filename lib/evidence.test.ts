@@ -64,6 +64,9 @@ const SETUP_STEPS = [
   "Restore confidential term list",
   "Set up Node from .nvmrc",
   "Install dependencies",
+  "Install Chromium (Playwright)",
+  "Start the built site (next start)",
+  "Stop the built site",
 ];
 const CHECK_STEPS = [
   "Lint",
@@ -71,7 +74,11 @@ const CHECK_STEPS = [
   "Script tests",
   "Unit tests",
   "Build",
-  "Link check (next start, every page and external link)",
+  "Content check (every page rendered, confidentiality and metadata)",
+  "Accessibility and width check (axe, landmarks, focus, four widths)",
+  "End-to-end test (UJ-1 skim at 375 x 550)",
+  "Lighthouse check (five pages, mobile and desktop)",
+  "Link check (every page and external link)",
   "Token drift check",
   "Repository scan (tree, every blob and commit message in history)",
   "Secret scan (gitleaks, full history)",
