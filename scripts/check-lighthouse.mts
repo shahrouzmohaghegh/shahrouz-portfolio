@@ -101,7 +101,7 @@ export function median(values: readonly number[]): number {
   return sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
-export type Run = { scores: Record<Category, number>; lcpMs: number };
+export type Run = { scores: Record<Category, number>; lcpMs: number; benchmarkIndex?: number };
 export type Measured = { page: string; profile: Profile; scores: Record<Category, number>; lcpMs: number };
 
 // The median of each score and of LCP across a page's runs on one profile.
@@ -206,7 +206,7 @@ const freePort = (): Promise<number> =>
     });
   });
 
-type LighthouseResult = { lhr: { categories: Record<string, { score: number | null }>; audits: Record<string, { numericValue?: number }>; runtimeError?: { message: string } } } | undefined;
+type LighthouseResult = { lhr: { categories: Record<string, { score: number | null }>; audits: Record<string, { numericValue?: number }>; environment?: { benchmarkIndex?: number }; runtimeError?: { message: string } } } | undefined;
 
 async function measure(url: string, profile: Profile, port: number): Promise<Run> {
   const flags = { port, output: "json" as const, logLevel: "error" as const, onlyCategories: [...CATEGORIES] };
@@ -220,7 +220,7 @@ async function measure(url: string, profile: Profile, port: number): Promise<Run
     return typeof score === "number" ? Math.round(score * 100) : Number.NaN;
   };
   const scores = Object.fromEntries(CATEGORIES.map((category) => [category, scoreOf(category)])) as Record<Category, number>;
-  return { scores, lcpMs: result.lhr.audits["largest-contentful-paint"]?.numericValue ?? Number.NaN };
+  return { scores, lcpMs: result.lhr.audits["largest-contentful-paint"]?.numericValue ?? Number.NaN, benchmarkIndex: result.lhr.environment?.benchmarkIndex };
 }
 
 async function readPortrait(browser: Browser, url: string, src: string, width: number): Promise<PortraitReading> {
@@ -307,7 +307,7 @@ export async function checkLighthouse(baseUrl: string, out: (text: string) => vo
         for (let i = 0; i < RUNS; i++) runs.push(await measure(new URL(page, baseUrl).href, profile, port));
         const result = medianOf(page, profile, runs);
         measured.push(result);
-        out(`  ${page} (${profile}): ${CATEGORIES.map((c) => `${c} ${result.scores[c]}`).join(", ")}; LCP ${(result.lcpMs / 1000).toFixed(2)}s (median of ${RUNS})\n`);
+        out(`  ${page} (${profile}): ${CATEGORIES.map((c) => `${c} ${result.scores[c]}`).join(", ")}; LCP ${(result.lcpMs / 1000).toFixed(2)}s (median of ${RUNS}); host CPU benchmark ${runs.map((r) => Math.round(r.benchmarkIndex ?? 0)).join("/")}\n`);
         failures.push(...thresholdProblems(result));
       }
     }
