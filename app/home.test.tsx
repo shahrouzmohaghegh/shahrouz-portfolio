@@ -465,6 +465,7 @@ describe("islands on Home", () => {
 describe("indexing", () => {
   test("/ asks for no noindex, from the root layout or its own page", () => {
     expect(metadata.robots, "app/layout.tsx metadata has no robots entry").toBeUndefined();
+    expect(String(metadata.metadataBase), "canonical and other relative URLs resolve against the live domain").toBe("https://shahrouzmohaghegh.com/");
     expect(homeModule.metadata.robots, "app/page.tsx sets no robots").toBeUndefined();
   });
 

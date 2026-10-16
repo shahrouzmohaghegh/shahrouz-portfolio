@@ -11,6 +11,8 @@ import "@/styles/focus.css";
 import styles from "./layout.module.css";
 
 export const metadata: Metadata = {
+  // Absolute base for every relative metadata URL, such as the listings' canonical links.
+  metadataBase: new URL("https://shahrouzmohaghegh.com"),
   // Each route's own title renders as "<Name> | Shahrouz Mohaghegh"; Home keeps the default.
   title: { default: "Shahrouz Mohaghegh", template: "%s | Shahrouz Mohaghegh" },
 };
