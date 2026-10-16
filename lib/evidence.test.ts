@@ -77,7 +77,7 @@ const CHECK_STEPS = [
   "Content check (every page rendered, confidentiality and metadata)",
   "Accessibility and width check (axe, landmarks, focus, four widths)",
   "End-to-end test (UJ-1 skim at 375 x 550)",
-  "Lighthouse check (five pages, mobile and desktop)",
+  "Lighthouse check (six pages, mobile and desktop)",
   "Link check (every page and external link)",
   "Token drift check",
   "Repository scan (tree, every blob and commit message in history)",
@@ -371,6 +371,21 @@ describe("the content collections", () => {
       value.startsWith(`${COUNT_WORDS[checks.length]} automated checks`),
       `The this-website Headline Metric must open with "${COUNT_WORDS[checks.length]} automated checks": the gate runs ${checks.length} (${checks.join(", ")}).`,
     ).toBe(true);
+  });
+
+  // The project page repeats the count in its outcome band and its
+  // key-value list, and names how many set-up steps it leaves out; all three
+  // move with the gate.
+  test("this website's page states the same check count, and the set-up step count, as the gate", () => {
+    const mdx = readFileSync(fileURLToPath(new URL("../content/projects/this-website.mdx", import.meta.url)), "utf8");
+    const { checks } = classifySteps(gateStepNames(readFileSync(CI_PATH, "utf8")));
+    const word = COUNT_WORDS[checks.length];
+    expect(mdx.match(/<OutcomeBand tag="The gate" figure="([^"]+)"/)?.[1]).toBe(`${word} automated checks`);
+    expect(mdx.match(/\{ term: "The gate", value: "(\w+) automated checks/)?.[1]).toBe(word);
+    const setup = COUNT_WORDS[SETUP_STEPS.length].toLowerCase();
+    const stated = [...mdx.matchAll(/leaving out the (\w+) set-up steps/g)].map((match) => match[1]);
+    expect(stated.length, "the source note and the key-value list both name the set-up steps").toBe(2);
+    for (const each of stated) expect(each).toBe(setup);
   });
 
   test("the display order is the reviewed one", () => {

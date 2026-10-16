@@ -3,8 +3,8 @@
 //
 //   node scripts/check-lighthouse.mts <base-url>     e.g. http://localhost:3000
 //
-// 1. Lighthouse. PAGES (Home, /experience, one case study, one project and
-//    /contact) on both PROFILES: mobile (Lighthouse's default, simulated
+// 1. Lighthouse. PAGES (Home, both listings, the first written case study
+//    and project, and /contact) on both PROFILES: mobile (Lighthouse's default, simulated
 //    throttling on a mid-range phone over slow 4G) and desktop. Each page and
 //    profile runs RUNS times and the median of each score is judged, so one
 //    noisy run neither passes nor fails the gate. Performance, Accessibility,
@@ -38,9 +38,26 @@ import { chromium, type Browser } from "@playwright/test";
 import lighthouse from "lighthouse";
 import desktopConfig from "lighthouse/core/config/desktop-config.js";
 
+import { caseStudies, writtenCaseStudySlugs } from "../content/case-studies/index.ts";
+import { projects, writtenProjectSlugs } from "../content/projects/index.ts";
 import { isEntryPoint } from "./entry-point.mts";
 
-export const PAGES = ["/", "/experience", "/experience/offshore-delivery-turnaround", "/projects/this-website", "/contact"] as const;
+// Home, both listings, the first written case study and project in
+// collection order (so a renamed or rewritten item never leaves the run
+// pointing at a page that is gone) and Contact.
+const firstWritten = (items: ReadonlyArray<{ slug: string; href: string }>, written: readonly string[]): string => {
+  const item = items.find((each) => written.includes(each.slug));
+  if (item === undefined) throw new Error("no written item to measure");
+  return item.href;
+};
+export const PAGES: readonly string[] = [
+  "/",
+  "/experience",
+  "/projects",
+  firstWritten(caseStudies, writtenCaseStudySlugs),
+  firstWritten(projects, writtenProjectSlugs),
+  "/contact",
+];
 export const PROFILES = ["mobile", "desktop"] as const;
 export type Profile = (typeof PROFILES)[number];
 export const CATEGORIES = ["performance", "accessibility", "best-practices", "seo"] as const;
@@ -75,8 +92,10 @@ export const LISTING_MANIFESTS = ["experience/page_client-reference-manifest.js"
 
 // ---------------------------------------------------------------- pure rules
 
+// The median; NaN (which fails every threshold) when there are no values or
+// any run went unscored, so a missing score never hides behind the others.
 export function median(values: readonly number[]): number {
-  if (values.length === 0) return Number.NaN;
+  if (values.length === 0 || values.some((value) => Number.isNaN(value))) return Number.NaN;
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
@@ -194,7 +213,13 @@ async function measure(url: string, profile: Profile, port: number): Promise<Run
   const result = (await lighthouse(url, flags, profile === "desktop" ? desktopConfig : undefined)) as LighthouseResult;
   if (result === undefined) throw new Error(`Lighthouse returned nothing for ${url}`);
   if (result.lhr.runtimeError) throw new Error(`Lighthouse could not measure ${url}: ${result.lhr.runtimeError.message}`);
-  const scores = Object.fromEntries(CATEGORIES.map((category) => [category, Math.round((result.lhr.categories[category]?.score ?? Number.NaN) * 100)])) as Record<Category, number>;
+  // A null score (Lighthouse could not score the category) is NaN, never 0
+  // or a pass: median() then fails the page.
+  const scoreOf = (category: Category): number => {
+    const score = result.lhr.categories[category]?.score;
+    return typeof score === "number" ? Math.round(score * 100) : Number.NaN;
+  };
+  const scores = Object.fromEntries(CATEGORIES.map((category) => [category, scoreOf(category)])) as Record<Category, number>;
   return { scores, lcpMs: result.lhr.audits["largest-contentful-paint"]?.numericValue ?? Number.NaN };
 }
 
@@ -206,7 +231,13 @@ async function readPortrait(browser: Browser, url: string, src: string, width: n
     await page.evaluate(async (needle) => {
       const img = [...document.images].find((each) => each.currentSrc.includes(needle) || each.src.includes(needle));
       img?.scrollIntoView();
-      if (img && !img.complete) await new Promise((resolve) => img.addEventListener("load", resolve, { once: true }));
+      // Load or error, whichever comes first, and never longer than 10s.
+      if (img && !img.complete)
+        await new Promise((resolve) => {
+          img.addEventListener("load", resolve, { once: true });
+          img.addEventListener("error", resolve, { once: true });
+          setTimeout(resolve, 10_000);
+        });
     }, src);
     return await page.evaluate((needle) => {
       const imgs = [...document.querySelectorAll("img")].filter((img) => (img.getAttribute("src") ?? "").includes(needle) || (img.getAttribute("srcset") ?? "").includes(needle));
@@ -243,7 +274,12 @@ export async function checkLighthouse(baseUrl: string, out: (text: string) => vo
   // NFR-7, from the repository and the build.
   for (const name of forbiddenPackages(readFileSync("package.json", "utf8"))) failures.push(`package.json: ${name} is a component library, CSS framework or animation library (NFR-7)`);
   const manifestRoot = ".next/server/app";
-  const manifests = manifestFiles(manifestRoot);
+  let manifests: string[] = [];
+  try {
+    manifests = manifestFiles(manifestRoot);
+  } catch {
+    // No build output at all: reported below, like an empty one.
+  }
   if (manifests.length === 0) failures.push(`${manifestRoot}: no client reference manifests; run npm run build first`);
   for (const listing of LISTING_MANIFESTS) if (!manifests.includes(listing)) failures.push(`${manifestRoot}/${listing}: missing, so the listing's client code cannot be checked`);
   for (const manifest of manifests) failures.push(...clientModuleProblems(manifest, projectClientModules(readFileSync(join(manifestRoot, manifest), "utf8"))));

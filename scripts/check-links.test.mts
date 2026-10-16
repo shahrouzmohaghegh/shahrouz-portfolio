@@ -427,7 +427,7 @@ describe("makeHttp", () => {
       return new Response("<a href='/'>x</a>", { status: 200 });
     });
     assert.deepEqual(await http(PR1, { follow: true }), { status: 200, body: "" });
-    assert.deepEqual(await http(`${BASE}/`, { follow: false }), { status: 200, body: "<a href='/'>x</a>" });
+    assert.deepEqual(await http(`${BASE}/`, { follow: false }), { status: 200, body: "<a href='/'>x</a>", contentType: "text/plain;charset=UTF-8" });
     assert.equal(seen[0].init.redirect, "follow");
     assert.equal(seen[1].init.redirect, "manual");
     assert.equal((seen[0].init.headers as Record<string, string>)["User-Agent"], USER_AGENT);

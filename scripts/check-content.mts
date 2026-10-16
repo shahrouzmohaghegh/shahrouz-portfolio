@@ -32,8 +32,13 @@
 // 5. Metadata. Every canonical route (canonicalRoutes) is crawled, answers
 //    200, carries no robots noindex and has a <title> and a meta
 //    description; every other page that answers 200 (a filtered listing)
-//    carries noindex; /sitemap.xml lists exactly the canonical routes; and
-//    /robots.txt allows everything and names the sitemap.
+//    carries noindex; /sitemap.xml lists exactly the canonical routes, each
+//    once; /robots.txt allows everything and names the sitemap; and each
+//    canonical route previews correctly (previewProblems: og:title and
+//    og:description are its own title and description, og:image is
+//    /opengraph-image, which answers as a PNG, og:site_name is set, the
+//    Twitter card is large, one Person block, and a canonical link on the
+//    live domain naming the route).
 //
 // Failures name the page and the rule, never the matched text, and read
 // differently from check-repo's, so a log says which check failed. Exit 1
@@ -43,11 +48,13 @@ import { existsSync, readFileSync } from "node:fs";
 
 import { caseStudies, writtenCaseStudySlugs } from "../content/case-studies/index.ts";
 import { projects, writtenProjectSlugs } from "../content/projects/index.ts";
+import { site } from "../content/site.ts";
 import { crawlSite, decodeEntities, hasNoindex, makeHttp, type Http } from "./check-links.mts";
 import { isEntryPoint } from "./entry-point.mts";
 
 export const TERMS_FILE = ".forbidden-terms";
-export const SITE_ORIGIN = "https://shahrouzmohaghegh.com";
+// The live domain, from content/site.ts, the one place it is written.
+export const SITE_ORIGIN = new URL(site.url).origin;
 
 // Phrases a term may appear inside, verbatim: the education credential
 // (Addendum section 3), which must pass as written.
@@ -55,7 +62,7 @@ export const EXEMPT_PHRASES = ["National University of Iran"] as const;
 
 // The canonical, indexable routes (Story 5.6): Home, both listings
 // unfiltered, Contact and every written detail page. app/sitemap.ts lists
-// exactly these, and app/sitemap.test.ts holds the two together.
+// exactly these, and app/seo.test.ts holds the two together.
 export function canonicalRoutes(writtenCaseStudies: readonly string[] = writtenCaseStudySlugs, writtenProjects: readonly string[] = writtenProjectSlugs): string[] {
   return ["/", "/experience", "/projects", "/contact", ...writtenCaseStudies.map((slug) => `/experience/${slug}`), ...writtenProjects.map((slug) => `/projects/${slug}`)];
 }
@@ -74,7 +81,7 @@ export const RULES: readonly Rule[] = [
   {
     name: "departure language",
     pattern:
-      /\b(resigned|resignation|managed out|let (him|her|them|me) go|laid off|lay-?offs?|made redundant|was fired|were fired|(my|his) (departure|exit)|(departed|left) the (company|business|organisation|organization)|(role|position|job) was (cut|eliminated|abolished))\b/i,
+      /\b(resigned|resignation|managed out|let (him|her|them|me) go|laid off|lay-?offs?|made redundant|terminated|parted ways|was fired|were fired|(my|his) (departure|exit)|(departed|left) the (company|business|organisation|organization)|(role|position|job) was (cut|eliminated|abolished))\b/i,
   },
   { name: "the internal title", pattern: /\bteam leads?\b/i },
   { name: "a CIO", pattern: /\bCIO\b/i },
@@ -110,19 +117,59 @@ export function parseTerms(text: string | null): Term[] {
 
 const ATTRIBUTE = (name: string): RegExp => new RegExp(`\\s${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`, "i");
 
-// Elements whose content no reader sees: hidden, templates and noscript.
-function withoutHidden(html: string): string {
-  let out = html.replace(/<(template|noscript)\b[\s\S]*?<\/\1\s*>/gi, " ");
-  // A hidden element, by tag name; nested elements of the same name are rare
-  // in this markup (Next.js's own hidden div holds only comments).
-  out = out.replace(/<([a-z][a-z0-9-]*)\b[^>]*\shidden(?:\s*=\s*(?:"[^"]*"|'[^']*'))?[^>]*>[\s\S]*?<\/\1\s*>/gi, " ");
-  return out;
+const VOID_ELEMENTS = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"]);
+
+// The attribute names of one start tag's attribute text, values skipped, so
+// a word inside a value (class="a hidden") is never read as a name.
+export function attributeNames(attributes: string): string[] {
+  const names: string[] = [];
+  for (const match of attributes.matchAll(/([^\s"'=<>/]+)(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?/g)) names.push(match[1].toLowerCase());
+  return names;
 }
+
+// Elements whose content no reader sees: an element carrying the hidden
+// attribute, a template and a noscript. A depth-counting scan over the tags
+// finds each one's own end tag, so a nested child of the same name never
+// ends it early.
+export function withoutHidden(html: string): string {
+  const tags = /<(\/?)([a-zA-Z][a-zA-Z0-9-]*)\b((?:[^>"']|"[^"]*"|'[^']*')*)>/g;
+  let out = "";
+  let at = 0;
+  let skipping: { name: string; depth: number } | null = null;
+  for (const match of html.matchAll(tags)) {
+    const [whole, closing, rawName, attributes] = match;
+    const name = rawName.toLowerCase();
+    const index = match.index ?? 0;
+    const selfClosing = VOID_ELEMENTS.has(name) || /\/\s*$/.test(attributes);
+    if (skipping !== null) {
+      if (name === skipping.name && !selfClosing) skipping.depth += closing ? -1 : 1;
+      if (skipping.depth === 0) {
+        skipping = null;
+        at = index + whole.length;
+        out += " ";
+      }
+      continue;
+    }
+    if (closing) continue;
+    const hidden = name === "template" || name === "noscript" || attributeNames(attributes).includes("hidden");
+    if (!hidden) continue;
+    out += html.slice(at, index) + " ";
+    at = index + whole.length;
+    if (!selfClosing) skipping = { name, depth: 1 };
+  }
+  return skipping === null ? out + html.slice(at) : out;
+}
+
+// Where one block ends and the next begins, in the visible text: a sentence
+// never runs across it (FR-34's "same sentence").
+export const BLOCK = "\uE000";
+const BLOCK_TAGS = /<\/?(?:address|article|aside|blockquote|dd|div|dl|dt|figcaption|figure|footer|form|h[1-6]|header|hr|li|main|nav|ol|p|pre|section|table|tbody|td|tfoot|th|thead|tr|ul|br)\b[^>]*>/gi;
+const plain = (text: string): string => text.split(BLOCK).join(" ").replace(/\s+/g, " ").trim();
 
 const collapse = (text: string): string => text.replace(/\s+/g, " ").trim();
 
 // What a reader or a link preview sees of one page, in two parts: the visible
-// body text, and the metadata (title, every meta content, the structured
+// body text (block boundaries marked with BLOCK), and the metadata (title, every meta content, the structured
 // data and the alt, aria-label and title attributes), each piece of it kept
 // apart so two neighbouring values never read as one phrase.
 export function readablePage(html: string): { text: string; metadata: string[] } {
@@ -132,7 +179,7 @@ export function readablePage(html: string): { text: string; metadata: string[] }
   const head = /<head\b[^>]*>([\s\S]*?)<\/head\s*>/i.exec(noScripts)?.[1] ?? "";
   const body = /<body\b[^>]*>([\s\S]*?)<\/body\s*>/i.exec(noScripts)?.[1] ?? noScripts.replace(/<head\b[\s\S]*?<\/head\s*>/i, " ");
   const visible = withoutHidden(body);
-  const text = collapse(decodeEntities(visible.replace(/<[^>]+>/g, " ")));
+  const text = collapse(decodeEntities(visible.replace(BLOCK_TAGS, ` ${BLOCK} `).replace(/<[^>]+>/g, " ")));
   const meta: string[] = [];
   const title = /<title\b[^>]*>([\s\S]*?)<\/title\s*>/i.exec(head)?.[1];
   if (title !== undefined) meta.push(title);
@@ -160,8 +207,11 @@ export function metaDescription(html: string): string | null {
   return null;
 }
 
+// The document <title>, read from the <head> only (an SVG <title> in the
+// body is not the page's).
 export function pageTitle(html: string): string | null {
-  const title = /<title\b[^>]*>([\s\S]*?)<\/title\s*>/i.exec(html)?.[1];
+  const head = /<head\b[^>]*>([\s\S]*?)<\/head\s*>/i.exec(html.replace(/<!--[\s\S]*?-->/g, ""))?.[1] ?? "";
+  const title = /<title\b[^>]*>([\s\S]*?)<\/title\s*>/i.exec(head)?.[1];
   return title === undefined ? null : decodeEntities(title).trim();
 }
 
@@ -188,32 +238,44 @@ const NUMBER_WORDS: Record<string, number> = Object.fromEntries([
   ),
   ...["twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"].map((word, i) => [word, (i + 2) * 10] as const),
   ["hundred", 100] as const,
+  ["thousand", 1000] as const,
 ]);
-const UNITS = "one|two|three|four|five|six|seven|eight|nine";
-const TENS = "twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety";
-const WORD_NUMBER = `(?:(?:${TENS})(?:[- ](?:${UNITS}))?|${Object.keys(NUMBER_WORDS).join("|")})`;
-const NUMBER = `(\\d[\\d,]*|${WORD_NUMBER})`;
-const PEOPLE = "(?:people|persons?|engineers?|developers?|staff|employees|heads|headcount|team members|members|reports|direct reports|testers|FTEs?)";
+const NUMBER_WORD = `(?:${Object.keys(NUMBER_WORDS).join("|")})`;
+// A number in words, composed: "sixty-four", "two hundred", "one thousand
+// two hundred and fifty", "a hundred".
+const WORD_NUMBER = `(?:an? )?${NUMBER_WORD}(?:(?:[- ]| and )${NUMBER_WORD})*`;
+// Digits, with thousands commas and an optional "+" ("40+").
+const NUMBER = `(\\d[\\d,]*\\+?|${WORD_NUMBER})`;
+const PEOPLE = "(?:people|persons?|engineers?|developers?|staff|employees|heads|headcount|team members|members|reports|direct reports|testers|FTEs?|teams?|groups?)";
 
 // A number attached to people: "N people", "N-person", "N-strong", "a team
-// of N", "headcount of N", "N engineers". Group 1 is the number as written.
+// of N", "headcount of N", "N engineers", "N teams". Group 1 is the number
+// as written.
 const HEADCOUNT_PATTERNS = [
   new RegExp(`\\b${NUMBER}(?:\\s+|-)(?:[a-z-]+\\s+){0,2}?${PEOPLE}\\b`, "gi"),
   new RegExp(`\\b${NUMBER}-(?:person|people|strong|member)\\b`, "gi"),
-  new RegExp(`\\b(?:team|function|organisation|organization|department|headcount|group) of (?:about |around |over |more than |nearly |some )?${NUMBER}\\b`, "gi"),
+  new RegExp(`\\b(?:team|function|organisation|organization|department|headcount|group) of (?:about |around |over |more than |nearly |some )?${NUMBER}`, "gi"),
 ];
 
+// The value of a number as written: digits (commas and a trailing "+"
+// dropped) or composed number words; null when it is neither.
 export function numberValue(written: string): number | null {
-  const text = written.toLowerCase().trim();
+  const text = written.toLowerCase().trim().replace(/\+$/, "");
   if (/^\d[\d,]*$/.test(text)) return Number(text.replace(/,/g, ""));
-  const parts = text.split(/[- ]/);
+  const parts = text.split(/[- ]+/).filter((part) => part !== "and");
+  if (parts[0] === "a" || parts[0] === "an") parts[0] = "one";
   let total = 0;
+  let current = 0;
   for (const part of parts) {
     const value = NUMBER_WORDS[part];
     if (value === undefined) return null;
-    total += value;
+    if (value === 100) current = (current || 1) * 100;
+    else if (value === 1000) {
+      total += (current || 1) * 1000;
+      current = 0;
+    } else current += value;
   }
-  return total;
+  return total + current;
 }
 
 // Whether a text states a headcount above MAX_HEADCOUNT.
@@ -232,9 +294,10 @@ export type Metric = { slug: string; value: string; qualifier?: string; qualifie
 const words = (text: string): string[] => text.toLowerCase().match(/[\p{L}\p{N}%$.-]+/gu)?.map((word) => word.replace(/^[.-]+|[.-]+$/g, "")).filter(Boolean) ?? [];
 
 // The rest of the sentence a position starts: up to a full stop, question or
-// exclamation mark followed by a space and a capital, or the end.
+// exclamation mark followed by a space and a capital, the end of the block
+// (BLOCK), or the end of the text.
 export function restOfSentence(text: string, from: number): string {
-  const end = /[.!?](?=\s+[\p{Lu}\d"“]|\s*$)/u.exec(text.slice(from));
+  const end = new RegExp(`[.!?](?=\\s+[\\p{Lu}\\d"“]|\\s*(?:${BLOCK}|$))|${BLOCK}`, "u").exec(text.slice(from));
   return end === null ? text.slice(from) : text.slice(from, from + end.index);
 }
 
@@ -272,6 +335,7 @@ export function qualifierProblems(text: string, metrics: readonly Metric[]): str
 
 // The paths a sitemap lists, each <loc> on the site's origin mapped to its
 // path (query kept); a <loc> on another origin is kept whole.
+// A duplicate <loc> is reported by sitemapProblems.
 export function sitemapPaths(xml: string, origin = SITE_ORIGIN): string[] {
   return [...xml.matchAll(/<loc>\s*([^<]+?)\s*<\/loc>/g)].map((match) => {
     const loc = decodeEntities(match[1]);
@@ -284,6 +348,10 @@ export function sitemapPaths(xml: string, origin = SITE_ORIGIN): string[] {
   });
 }
 
+export function sitemapDuplicates(paths: readonly string[]): string[] {
+  return [...new Set(paths.filter((path, i) => paths.indexOf(path) !== i))];
+}
+
 export function robotsProblems(text: string, origin = SITE_ORIGIN): string[] {
   const lines = text.split(/\r?\n/).map((line) => line.replace(/#.*/, "").trim()).filter(Boolean);
   const problems: string[] = [];
@@ -291,6 +359,75 @@ export function robotsProblems(text: string, origin = SITE_ORIGIN): string[] {
   if (!lines.some((line) => /^allow\s*:\s*\/$/i.test(line))) problems.push("does not allow /");
   if (lines.some((line) => /^disallow\s*:\s*\S/i.test(line))) problems.push("disallows a path");
   if (!lines.some((line) => line.toLowerCase() === `sitemap: ${origin}/sitemap.xml`)) problems.push(`does not point at ${origin}/sitemap.xml`);
+  return problems;
+}
+
+// ---------------------------------------------------------------- link previews
+
+// A <meta> content by its property or name attribute, or null.
+export function metaContent(html: string, key: string): string | null {
+  const head = /<head\b[^>]*>([\s\S]*?)<\/head\s*>/i.exec(html)?.[1] ?? "";
+  for (const tag of head.matchAll(/<meta\b[^>]*>/gi)) {
+    const named = new RegExp(`\\s(?:property|name)\\s*=\\s*["']${key.replace(/[.:]/g, "\\$&")}["']`, "i");
+    if (!named.test(tag[0])) continue;
+    const content = ATTRIBUTE("content").exec(tag[0]);
+    return content ? decodeEntities(content[1] ?? content[2]).trim() : "";
+  }
+  return null;
+}
+
+export function canonicalLink(html: string): string | null {
+  const head = /<head\b[^>]*>([\s\S]*?)<\/head\s*>/i.exec(html)?.[1] ?? "";
+  for (const tag of head.matchAll(/<link\b[^>]*>/gi)) {
+    if (!/\srel\s*=\s*["']canonical["']/i.test(tag[0])) continue;
+    const href = ATTRIBUTE("href").exec(tag[0]);
+    return href ? decodeEntities(href[1] ?? href[2]).trim() : "";
+  }
+  return null;
+}
+
+// The JSON-LD blocks a page carries, parsed; an unparseable one is null.
+export function structuredData(html: string): Array<Record<string, unknown> | null> {
+  return [...html.matchAll(/<script\b[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script\s*>/gi)].map((m) => {
+    try {
+      return JSON.parse(m[1]) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  });
+}
+
+// What a pasted link of a canonical route shows (Story 5.6): its own title
+// and description in Open Graph, the generated preview image, the site
+// name, a large Twitter card, one Person block, and a canonical link on the
+// live domain naming this route.
+export function previewProblems(path: string, html: string, origin = SITE_ORIGIN): string[] {
+  const problems: string[] = [];
+  const title = pageTitle(html);
+  const description = metaDescription(html);
+  if (metaContent(html, "og:title") !== title) problems.push("og:title is not the page title");
+  if (metaContent(html, "og:description") !== description) problems.push("og:description is not the meta description");
+  const image = metaContent(html, "og:image");
+  let imagePath: string | null = null;
+  try {
+    imagePath = image === null ? null : new URL(image).pathname;
+  } catch {
+    imagePath = null;
+  }
+  if (imagePath !== "/opengraph-image") problems.push("og:image is not the generated /opengraph-image");
+  if (!metaContent(html, "og:site_name")) problems.push("has no og:site_name");
+  if (metaContent(html, "twitter:card") !== "summary_large_image") problems.push("twitter:card is not summary_large_image");
+  const people = structuredData(html).filter((block) => block !== null && block["@type"] === "Person");
+  if (people.length !== 1 || structuredData(html).length !== 1) problems.push(`carries ${people.length} Person structured data block(s), expected exactly one`);
+  const canonical = canonicalLink(html);
+  const expected = new URL(path, origin).href;
+  let actual: string | null = null;
+  try {
+    actual = canonical === null ? null : new URL(canonical).href;
+  } catch {
+    actual = null;
+  }
+  if (actual !== expected) problems.push(`its canonical link is ${canonical === null ? "missing" : "not this route on " + origin}`);
   return problems;
 }
 
@@ -315,7 +452,7 @@ export function pageProblems(page: string, html: string, deps: Pick<Deps, "terms
   const { text, metadata } = readablePage(html);
   const rules = new Set<string>();
   for (const [part, values] of [
-    ["text", [text]],
+    ["text", [plain(text)]],
     ["metadata", metadata],
   ] as const) {
     for (const value of values) {
@@ -361,6 +498,7 @@ export async function checkContent(baseUrl: string, deps: Deps): Promise<Result>
       if (noindex) failures.push({ page: page.path, rule: "a canonical route carries a robots noindex" });
       if (!pageTitle(page.body)) failures.push({ page: page.path, rule: "a canonical route without a <title>" });
       if (!metaDescription(page.body)) failures.push({ page: page.path, rule: "a canonical route without a meta description" });
+      for (const problem of previewProblems(page.path, page.body)) failures.push({ page: page.path, rule: `link preview: ${problem}` });
     } else if (!noindex) {
       failures.push({ page: page.path, rule: "is indexable but is not a canonical route; give it a robots noindex or add it to canonicalRoutes and the sitemap" });
     }
@@ -379,11 +517,20 @@ export async function checkContent(baseUrl: string, deps: Deps): Promise<Result>
       failures.push({ page: "/sitemap.xml", rule: `answered ${sitemap.status}, expected 200` });
     } else {
       const listed = sitemapPaths(sitemap.body);
+      for (const path of sitemapDuplicates(listed)) failures.push({ page: "/sitemap.xml", rule: `lists ${path} more than once` });
       for (const path of canonical) if (!listed.includes(path)) failures.push({ page: path, rule: "a canonical route missing from /sitemap.xml" });
       for (const path of listed) if (!canonical.includes(path)) failures.push({ page: "/sitemap.xml", rule: `lists ${path}, which is not a canonical route` });
     }
   } catch {
     failures.push({ page: "/sitemap.xml", rule: "did not answer" });
+  }
+  // The preview image every canonical route names answers as a PNG.
+  try {
+    const image = await deps.http(new URL("/opengraph-image", origin).href, { follow: false });
+    if (image.status !== 200) failures.push({ page: "/opengraph-image", rule: `answered ${image.status}, expected 200` });
+    else if (!(image.contentType ?? "").startsWith("image/png")) failures.push({ page: "/opengraph-image", rule: "is not served as image/png" });
+  } catch {
+    failures.push({ page: "/opengraph-image", rule: "did not answer" });
   }
   try {
     const robots = await deps.http(new URL("/robots.txt", origin).href, { follow: false });

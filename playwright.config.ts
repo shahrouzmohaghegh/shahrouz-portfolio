@@ -11,8 +11,15 @@ export default defineConfig({
   retries: 0,
   workers: 1,
   reporter: "list",
+  // A phone, as UJ-1's recruiter holds one: the iPhone SE profile (mobile
+  // user agent, touch, 2x pixels, isMobile) on Chromium, the one browser the
+  // gate installs, with the viewport set to UX-DR47's 375 x 550 fold.
   use: {
-    ...devices["Desktop Chrome"],
+    ...devices["iPhone SE"],
+    browserName: "chromium",
+    viewport: { width: 375, height: 550 },
+    isMobile: true,
+    hasTouch: true,
     baseURL: process.env.BASE_URL ?? "http://localhost:3000",
   },
 });

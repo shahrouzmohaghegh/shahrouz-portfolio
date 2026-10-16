@@ -192,7 +192,7 @@ describe("the /projects listing", async () => {
   });
 
   test("the cards sit in the shared card grid, and the route lists no item itself", () => {
-    expect(main.split(`<ul class="${gridStyles.grid}">`)).toHaveLength(2);
+    expect(main.split(`<ul class="${gridStyles.grid}" data-card-grid="">`)).toHaveLength(2);
     const page = source("app/projects/page.tsx");
     expect(page).toMatch(/<FilteredListing\s+kind="project"\s+selection=\{selection\}\s+items=\{projectItems\}/);
     expect(source("components/capability-filter.tsx")).toMatch(/<CardGrid\s+items=\{shown\}[^>]*headingLevel=\{2\}/);

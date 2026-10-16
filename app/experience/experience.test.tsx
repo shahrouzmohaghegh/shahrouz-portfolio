@@ -114,7 +114,7 @@ describe("the /experience listing", () => {
   });
 
   test("the cards sit in the shared card grid, one list item each", () => {
-    expect(main.split(`<ul class="${gridStyles.grid}">`), "one card grid").toHaveLength(2);
+    expect(main.split(`<ul class="${gridStyles.grid}" data-card-grid="">`), "one card grid").toHaveLength(2);
     expect(main.split(`<li class="${gridStyles.item}"><article`), "one grid item per card").toHaveLength(caseStudyItems.length + 1);
   });
 

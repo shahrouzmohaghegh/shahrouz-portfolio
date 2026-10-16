@@ -10,7 +10,9 @@ import {
   FAILING_IMPACTS,
   MIN_RING_CONTRAST,
   WIDTHS,
+  composite,
   contrastRatio,
+  effectiveGround,
   failingViolations,
   focusProblems,
   headingProblems,
@@ -48,6 +50,8 @@ describe("landmarks", () => {
     assert.deepEqual(landmarkProblems("/experience/a", { ...ONE, nav: 2, navInMain: 1 }), []);
     assert.equal(landmarkProblems("/experience/a", ONE).length, 1);
     assert.equal(landmarkProblems("/projects/b", { ...ONE, nav: 3, navInMain: 2 }).length, 1);
+    // A not-found answer under a detail prefix has no rail, and is not held to it.
+    assert.deepEqual(landmarkProblems("/experience/unwritten", ONE, 404), []);
   });
 
   test("a missing or doubled landmark fails, naming it", () => {
@@ -82,7 +86,7 @@ describe("the focus ring", () => {
     outlineStyle: "solid",
     outlineWidth: 2,
     outlineColour,
-    ground,
+    grounds: [ground],
     ...extra,
   });
 
@@ -95,6 +99,26 @@ describe("the focus ring", () => {
 
   test("the on-deep ring on the deep ground passes", () => {
     assert.deepEqual(focusProblems([stop("rgb(227, 165, 126)", "rgb(36, 29, 24)")]), []);
+  });
+
+  test("an opaque rgb() ground is read as opaque: its blue channel is never taken for alpha", () => {
+    // rgb(36, 29, 24): a ring that passes on paper fails here, so the deep ground was read.
+    assert.equal(focusProblems([stop("rgb(126, 46, 22)", "rgb(36, 29, 24)")]).length, 1);
+    assert.deepEqual(effectiveGround(["rgb(36, 29, 0)"]), { r: 36, g: 29, b: 0, a: 1 });
+  });
+
+  test("transparent and translucent grounds are composited down to the nearest opaque one", () => {
+    assert.deepEqual(effectiveGround(["rgba(0, 0, 0, 0)", "transparent", "rgb(10, 20, 30)", "rgb(255, 0, 0)"]), { r: 10, g: 20, b: 30, a: 1 });
+    const half = effectiveGround(["rgba(0, 0, 0, 0.5)", "rgb(255, 255, 255)"]);
+    assert.ok(half !== null && Math.round(half.r) === 128 && half.a === 1);
+    assert.deepEqual(effectiveGround([]), { r: 255, g: 255, b: 255, a: 1 });
+    assert.equal(effectiveGround(["not a colour"]), null);
+  });
+
+  test("a translucent ring is judged as it composites over its ground", () => {
+    // The light ring at 20% opacity over paper is far below 3:1.
+    assert.equal(focusProblems([stop("rgba(126, 46, 22, 0.2)", "rgb(251, 247, 241)")]).length, 1);
+    assert.deepEqual(composite({ r: 0, g: 0, b: 0, a: 1 }, { r: 255, g: 255, b: 255, a: 1 }), { r: 0, g: 0, b: 0, a: 1 });
   });
 
   test("no outline fails", () => {

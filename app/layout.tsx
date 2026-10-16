@@ -30,7 +30,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="en-AU">
       <body className={styles.body}>
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: personJson() }} />
         {children}

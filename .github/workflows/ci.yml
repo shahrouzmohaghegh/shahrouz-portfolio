@@ -119,10 +119,13 @@ jobs:
       # The one server stage. Starts the build with next start on a local
       # port, in the background, waits until it answers and checks the
       # process is still alive, then leaves it running: every step below,
-      # up to "Stop the built site", reads this one server. The deterministic
+      # up to "Stop the built site", reads this one server. Each server check
+      # runs whenever the server started, even after another one failed, so
+      # one run reports them all. The deterministic
       # checks above never depend on it, so a browser or network hiccup here
       # never stops them from running.
       - name: Start the built site (next start)
+        id: site
         run: |
           nohup ./node_modules/.bin/next start --port 3000 > "$RUNNER_TEMP/next-start.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/next-start.pid"
@@ -149,6 +152,7 @@ jobs:
       # description, and a sitemap or robots.txt that drifts. Failures name
       # the page and the rule, never the term.
       - name: Content check (every page rendered, confidentiality and metadata)
+        if: always() && steps.site.outcome == 'success'
         run: npm run check:content -- http://localhost:3000
 
       # Story 5.3 and 5.5: Chromium with axe-core on every crawled page; any
@@ -156,18 +160,21 @@ jobs:
       # skipped heading level, a focus ring under 3:1 against its ground, or
       # sideways scroll at 320, 375, 768 or 1440 fails.
       - name: Accessibility and width check (axe, landmarks, focus, four widths)
+        if: always() && steps.site.outcome == 'success'
         run: npm run check:a11y -- http://localhost:3000
 
       # Story 5.1: the one Playwright test (AD-18), Home at 375 x 550.
       - name: End-to-end test (UJ-1 skim at 375 x 550)
+        if: always() && steps.site.outcome == 'success'
         env:
           BASE_URL: http://localhost:3000
         run: npm run test:e2e
 
-      # Story 5.4: Lighthouse on five pages, mobile and desktop, median of
+      # Story 5.4: Lighthouse on six pages, mobile and desktop, median of
       # three runs; every category at least 90 and Home's mobile LCP under
       # 2.0s; the AD-12 portrait rules and the NFR-7 client code budget.
-      - name: Lighthouse check (five pages, mobile and desktop)
+      - name: Lighthouse check (six pages, mobile and desktop)
+        if: always() && steps.site.outcome == 'success'
         run: npm run check:lighthouse -- http://localhost:3000
 
       # Every internal page answers 200 (404 for the not-found pages and
@@ -178,6 +185,7 @@ jobs:
       # repositories. Launch-blocking. It runs last of the server checks,
       # because it is the only step that depends on other sites.
       - name: Link check (every page and external link)
+        if: always() && steps.site.outcome == 'success'
         run: npm run check:links -- http://localhost:3000
 
       - name: Stop the built site

@@ -8,6 +8,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
+import { site } from "../content/site.ts";
 import type { Http, HttpResponse } from "./check-links.mts";
 import {
   EXEMPT_PHRASES,
@@ -23,6 +24,12 @@ import {
   numberValue,
   pageProblems,
   pageTitle,
+  previewProblems,
+  SITE_ORIGIN,
+  sitemapDuplicates,
+  withoutHidden,
+  attributeNames,
+  BLOCK,
   parseTerms,
   qualifierProblems,
   readablePage,
@@ -94,10 +101,10 @@ describe("the rules beyond the list", () => {
   const named = (text: string) => ruleHits(text);
 
   test("departure language fails; the same word about something else passes", () => {
-    for (const text of ["He resigned in March.", "I was laid off.", "after my departure", "the role was eliminated", "they let him go", "made redundant last year"]) {
+    for (const text of ["He resigned in March.", "I was laid off.", "after my departure", "the role was eliminated", "they let him go", "made redundant last year", "his contract was terminated", "we parted ways in May"]) {
       assert.deepEqual(named(text), ["departure language"], text);
     }
-    for (const text of ["a departure from the requirement", "the release departed from plan", "let the build go green"]) {
+    for (const text of ["a departure from the requirement", "the release departed from plan", "let the build go green", "moved on from the old pipeline", "parted the work into stages"]) {
       assert.deepEqual(named(text), [], text);
     }
   });
@@ -116,7 +123,7 @@ describe("the rules beyond the list", () => {
 
 describe("the headcount rule", () => {
   test("condition: a headcount above 38 fails, in digits or words", () => {
-    for (const text of ["a team of 64", "64 engineers", "a 64-person function", "sixty-four people", "an organisation of over 120", "50 developers", "2,500 staff"]) {
+    for (const text of ["a team of 64", "64 engineers", "a 64-person function", "sixty-four people", "an organisation of over 120", "50 developers", "2,500 staff", "40+ engineers", "two hundred engineers", "one thousand two hundred and fifty staff", "a hundred people", "45 teams", "a group of 40+"]) {
       assert.equal(headcountProblem(text), true, text);
     }
   });
@@ -133,6 +140,10 @@ describe("the headcount rule", () => {
     assert.equal(numberValue("sixty-four"), 64);
     assert.equal(numberValue("thirty eight"), 38);
     assert.equal(numberValue("lots"), null);
+    assert.equal(numberValue("40+"), 40);
+    assert.equal(numberValue("two hundred"), 200);
+    assert.equal(numberValue("one thousand two hundred and fifty"), 1250);
+    assert.equal(numberValue("a hundred"), 100);
   });
 });
 
@@ -162,6 +173,13 @@ describe("the qualifier rule", () => {
     assert.equal(qualifierProblems("Defects down 50% across the pilot teams. Defects down 50%.", metrics).length, 1);
   });
 
+  test("a block boundary ends the sentence: a qualifier in the next paragraph does not count", () => {
+    const text = readablePage(html("<p>Defects down 50%</p><p>across the pilot teams</p>")).text;
+    assert.equal(qualifierProblems(text, metrics).length, 1);
+    const same = readablePage(html("<p>Defects down 50% <strong>across</strong> the pilot teams</p>")).text;
+    assert.deepEqual(qualifierProblems(same, metrics), []);
+  });
+
   test("a sentence ends at a full stop before a capital, not inside .NET", () => {
     assert.equal(restOfSentence("up on .NET 10 here. Next one", 0), "up on .NET 10 here");
   });
@@ -174,8 +192,25 @@ describe("reading a page", () => {
       `<title>T</title><meta name="description" content="D"/><meta name="viewport" content="initial-scale=1"/>`,
     );
     const { text, metadata } = readablePage(page);
-    assert.equal(text, "Seen x");
+    assert.equal(text.split(BLOCK).join(" ").replace(/\s+/g, " ").trim(), "Seen x");
+    assert.ok(text.includes(BLOCK), "block boundaries are marked");
     assert.deepEqual(metadata, ["T", "D", "initial-scale=1", "A portrait", "Open it", '{"name":"Person"}']);
+  });
+
+  test("hidden is read only as an attribute name: a class or value that says hidden is still scanned", () => {
+    assert.equal(readablePage(html('<p class="a hidden">Seen</p><p data-x="hidden">Also</p>')).text.split(BLOCK).join(" ").replace(/\s+/g, " ").trim(), "Seen Also");
+    assert.deepEqual(attributeNames(' class="a hidden" data-note=\'x hidden\' hidden'), ["class", "data-note", "hidden"]);
+  });
+
+  test("a hidden element is dropped whole, nested children of the same name included", () => {
+    const text = readablePage(html('<div hidden><div>inner</div>still hidden</div><p>Seen</p><template><p>t</p></template>')).text;
+    assert.doesNotMatch(text, /inner|still hidden|\bt\b/);
+    assert.match(text, /Seen/);
+    assert.equal(withoutHidden('<span hidden="">x</span>y<img hidden alt="z"/>w').replace(/\s+/g, " ").trim(), "y w");
+  });
+
+  test("the document title is read from the head only", () => {
+    assert.equal(pageTitle("<html><head></head><body><svg><title>Icon</title></svg></body></html>"), null);
   });
 
   test("two neighbouring metadata values never read as one phrase", () => {
@@ -233,16 +268,26 @@ describe("sitemap and robots", () => {
 type Site = Record<string, HttpResponse>;
 // A detail page on the real written list, so the crawl expects it to answer 200.
 const DETAIL = "/experience/offshore-delivery-turnaround";
-const DESCRIBED = '<title>P | Site</title><meta name="description" content="A described page."/>';
+// A canonical route's head as the root layout and the route emit it: its
+// own title and description, the preview tags, one Person block and the
+// canonical link on the live domain.
+const PERSON = '<script type="application/ld+json">{"@context":"https://schema.org","@type":"Person","name":"N"}</script>';
+const described = (path: string, extra = ""): string =>
+  '<title>P | Site</title><meta name="description" content="A described page."/>' +
+  `<link rel="canonical" href="https://shahrouzmohaghegh.com${path === "/" ? "" : path}"/>` +
+  '<meta property="og:title" content="P | Site"/><meta property="og:description" content="A described page."/>' +
+  '<meta property="og:site_name" content="Site"/><meta property="og:image" content="https://shahrouzmohaghegh.com/opengraph-image?abc"/>' +
+  `<meta name="twitter:card" content="summary_large_image"/>${PERSON}${extra}`;
 const NOINDEX = '<title>F | Site</title><meta name="robots" content="noindex"/>';
 function fakeSite(overrides: Site = {}): Site {
   const nav = '<a href="/experience">E</a><a href="/experience?capability=leadership">L</a><a href="/contact">C</a><a href="/experience/offshore-delivery-turnaround">A</a>';
   return {
-    "/": { status: 200, body: html(`${nav}<p>Defects down 50% across the pilot teams</p>`, DESCRIBED) },
-    "/experience": { status: 200, body: html(nav, DESCRIBED) },
+    "/": { status: 200, body: html(`${nav}<p>Defects down 50% across the pilot teams</p>`, described("/")) },
+    "/experience": { status: 200, body: html(nav, described("/experience")) },
     "/experience?capability=leadership": { status: 200, body: html(nav, NOINDEX) },
-    "/contact": { status: 200, body: html(nav, DESCRIBED) },
-    [DETAIL]: { status: 200, body: html(nav, DESCRIBED) },
+    "/contact": { status: 200, body: html(nav, described("/contact")) },
+    [DETAIL]: { status: 200, body: html(nav, described(DETAIL)) },
+    "/opengraph-image": { status: 200, body: "PNG", contentType: "image/png" },
     "/case-study-not-available": { status: 404, body: html("", NOINDEX) },
     "/project-not-available": { status: 404, body: html("", NOINDEX) },
     "/sitemap.xml": {
@@ -282,7 +327,10 @@ describe("checkContent over a crawl", () => {
 
   test("a canonical route that carries noindex or lacks a description fails", async () => {
     const site = fakeSite({
-      "/contact": { status: 200, body: html('<a href="/">H</a>', '<title>C</title><meta name="robots" content="noindex"/>') },
+      "/contact": {
+        status: 200,
+        body: html('<a href="/">H</a>', described("/contact").replace(/<meta (name|property)="(og:)?description"[^>]*>/g, "") + '<meta name="robots" content="noindex"/>'),
+      },
     });
     const result = await checkContent("http://localhost:3000", deps(site));
     assert.deepEqual(result.failures, [
@@ -293,7 +341,7 @@ describe("checkContent over a crawl", () => {
 
   test("an indexable page that is not canonical fails, and so does a sitemap that drifts", async () => {
     const site = fakeSite({
-      "/experience?capability=leadership": { status: 200, body: html("", DESCRIBED) },
+      "/experience?capability=leadership": { status: 200, body: html("", described("/experience?capability=leadership")) },
       "/sitemap.xml": { status: 200, body: "<url><loc>https://shahrouzmohaghegh.com/</loc></url><url><loc>https://shahrouzmohaghegh.com/experience?capability=leadership</loc></url>" },
     });
     const rules = (await checkContent("http://localhost:3000", deps(site))).failures.map((failure) => `${failure.page}: ${failure.rule}`);
@@ -303,7 +351,7 @@ describe("checkContent over a crawl", () => {
   });
 
   test("a Headline Metric that renders nowhere, or bare, fails", async () => {
-    const bare = fakeSite({ "/": { status: 200, body: html('<a href="/experience">E</a><a href="/contact">C</a><a href="/experience/offshore-delivery-turnaround">A</a><a href="/experience?capability=leadership">L</a><p>Defects down 50%.</p>', DESCRIBED) } });
+    const bare = fakeSite({ "/": { status: 200, body: html('<a href="/experience">E</a><a href="/contact">C</a><a href="/experience/offshore-delivery-turnaround">A</a><a href="/experience?capability=leadership">L</a><p>Defects down 50%.</p>', described("/")) } });
     assert.deepEqual((await checkContent("http://localhost:3000", deps(bare))).failures, [
       { page: "/", rule: "the Headline Metric of scoped renders without its qualifier in the same sentence" },
     ]);
@@ -322,6 +370,56 @@ describe("checkContent over a crawl", () => {
       { page: "/sitemap.xml", rule: "answered 404, expected 200" },
       { page: "/robots.txt", rule: "answered 404, expected 200" },
     ]);
+  });
+});
+
+describe("link previews and the sitemap, rendered", () => {
+  test("a canonical route whose preview drifts fails, rule by rule", async () => {
+    const drifted = html(
+      '<a href="/">H</a>',
+      '<title>C | Site</title><meta name="description" content="Contact."/><link rel="canonical" href="https://example.com/contact"/>' +
+        '<meta property="og:title" content="Other"/><meta property="og:description" content="Other."/><meta property="og:image" content="https://shahrouzmohaghegh.com/portrait.png"/>' +
+        `<meta name="twitter:card" content="summary"/>${PERSON}${PERSON}`,
+    );
+    const failures = (await checkContent("http://localhost:3000", deps(fakeSite({ "/contact": { status: 200, body: drifted } })))).failures;
+    assert.deepEqual(
+      failures.map((failure) => failure.rule),
+      [
+        "link preview: og:title is not the page title",
+        "link preview: og:description is not the meta description",
+        "link preview: og:image is not the generated /opengraph-image",
+        "link preview: has no og:site_name",
+        "link preview: twitter:card is not summary_large_image",
+        "link preview: carries 2 Person structured data block(s), expected exactly one",
+        "link preview: its canonical link is not this route on https://shahrouzmohaghegh.com",
+      ],
+    );
+    assert.ok(failures.every((failure) => failure.page === "/contact"));
+  });
+
+  test("previewProblems passes the route's own head and fails a missing canonical link", () => {
+    assert.deepEqual(previewProblems("/contact", html("", described("/contact"))), []);
+    assert.deepEqual(previewProblems("/", html("", described("/"))), []);
+    assert.deepEqual(previewProblems("/contact", html("", described("/contact").replace(/<link rel="canonical"[^>]*>/, ""))), ["its canonical link is missing"]);
+  });
+
+  test("the preview image must answer as a PNG", async () => {
+    const wrong = await checkContent("http://localhost:3000", deps(fakeSite({ "/opengraph-image": { status: 200, body: "<html>", contentType: "text/html" } })));
+    assert.deepEqual(wrong.failures, [{ page: "/opengraph-image", rule: "is not served as image/png" }]);
+    const missing = fakeSite();
+    delete missing["/opengraph-image"];
+    assert.deepEqual((await checkContent("http://localhost:3000", deps(missing))).failures, [{ page: "/opengraph-image", rule: "answered 404, expected 200" }]);
+  });
+
+  test("a sitemap that lists a route twice fails", async () => {
+    const twice = ["/", "/experience", "/contact", DETAIL, "/contact"].map((path) => `<url><loc>https://shahrouzmohaghegh.com${path}</loc></url>`).join("");
+    const failures = (await checkContent("http://localhost:3000", deps(fakeSite({ "/sitemap.xml": { status: 200, body: twice } })))).failures;
+    assert.deepEqual(failures, [{ page: "/sitemap.xml", rule: "lists /contact more than once" }]);
+    assert.deepEqual(sitemapDuplicates(["/a", "/b", "/a", "/a"]), ["/a"]);
+  });
+
+  test("the domain is content/site.ts's", () => {
+    assert.equal(SITE_ORIGIN, new URL(site.url).origin);
   });
 });
 

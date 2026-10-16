@@ -32,8 +32,8 @@ import {
 const all = (score: number) => Object.fromEntries(CATEGORIES.map((c) => [c, score])) as Run["scores"];
 
 describe("what is measured", () => {
-  test("five pages, both profiles, three runs, the thresholds as decided", () => {
-    assert.deepEqual(PAGES, ["/", "/experience", "/experience/offshore-delivery-turnaround", "/projects/this-website", "/contact"]);
+  test("six pages, both profiles, three runs, the thresholds as decided", () => {
+    assert.deepEqual(PAGES, ["/", "/experience", "/projects", "/experience/offshore-delivery-turnaround", "/projects/career-application-system", "/contact"]);
     assert.deepEqual(PROFILES, ["mobile", "desktop"]);
     assert.equal(RUNS, 3);
     assert.equal(MIN_SCORE, 90);
@@ -47,6 +47,8 @@ describe("the median", () => {
     assert.equal(median([91, 70, 99]), 91);
     assert.equal(median([1, 2, 3, 4]), 2.5);
     assert.ok(Number.isNaN(median([])));
+    // One unscored run fails the page rather than hiding behind the others.
+    assert.ok(Number.isNaN(median([100, Number.NaN, 100])));
   });
 
   test("is taken per score, so one noisy run neither passes nor fails", () => {

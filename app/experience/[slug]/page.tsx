@@ -29,7 +29,7 @@ function writtenItem(slug: string) {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const item = writtenItem((await params).slug);
   if (item === undefined) notFound();
-  return { title: item.title, description: item.summary };
+  return { title: item.title, description: item.summary, alternates: { canonical: item.href } };
 }
 
 // The case-study detail (Story 3.2): the header from the Evidence Item, then

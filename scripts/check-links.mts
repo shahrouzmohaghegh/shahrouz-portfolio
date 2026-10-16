@@ -368,7 +368,7 @@ export function writtenProjectOf(path: string, written: readonly string[] = writ
 // ---------------------------------------------------------------- HTTP
 
 // One request. Rejects on a network error or timeout; any status resolves.
-export type HttpResponse = { status: number; body: string };
+export type HttpResponse = { status: number; body: string; contentType?: string };
 export type Http = (url: string, options: { follow: boolean }) => Promise<HttpResponse>;
 export type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
 
@@ -386,7 +386,7 @@ export function makeHttp(fetchImpl: FetchLike = fetch, timeoutMs = TIMEOUT_MS): 
       await response.body?.cancel().catch(() => {});
       return { status: response.status, body: "" };
     }
-    return { status: response.status, body: await response.text() };
+    return { status: response.status, body: await response.text(), contentType: response.headers.get("content-type") ?? "" };
   };
 }
 

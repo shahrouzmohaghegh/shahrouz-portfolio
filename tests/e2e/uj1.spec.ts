@@ -49,6 +49,10 @@ test("UJ-1: at 375 x 550 Home shows the positioning, availability, scale, board 
   await page.setViewportSize(VIEWPORT);
   await page.goto("/");
   await page.waitForLoadState("load");
+  // Measure with the final fonts, so a late font swap cannot move a box.
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+  });
 
   const people = home.figurePair.find((row) => /engineers/.test(row.words));
   const cycle = home.figurePair.find((row) => /cycle time/.test(row.words));

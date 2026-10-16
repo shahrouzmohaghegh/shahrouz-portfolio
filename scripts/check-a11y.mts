@@ -25,14 +25,17 @@
 // 4. Focus (focusProblems): the page is walked with the Tab key; every
 //    element that takes focus draws an outline at least 1px wide whose
 //    colour has at least 3:1 contrast against the ground it sits on, the
-//    nearest ancestor with an opaque background, never its own fill. On a
+//    ancestors' backgrounds composited down to the nearest opaque one (a
+//    translucent ring composited over it too), never the element's own fill. On a
 //    project page the repository call to action must be among them.
 // 5. Widths (WIDTHS): at 320, 375, 768 and 1440 the document never scrolls
 //    sideways (scrollWidth no wider than clientWidth). At 320 the primary nav
 //    holds its items inline on at most two lines, with no disclosure control
 //    (no button, details or aria-expanded in the header). At 768 every card
-//    grid and the section rail sit inside the viewport and do not overflow
-//    their own box. Home's fold at 320 is measured and printed (the bottom of
+//    grid ([data-card-grid]) and the section rail sit inside the viewport and
+//    do not overflow their own box, and each unfiltered listing must show a
+//    grid, so the rule is never vacuous. The rail rule holds only on a
+//    detail page that answered 200. Home's fold at 320 is measured and printed (the bottom of
 //    the hero's text stack against UX-DR47's 550px fold), not enforced: the
 //    fold contract is 375 x 550.
 //
@@ -85,7 +88,9 @@ export type Landmarks = { header: number; primaryNav: number; main: number; foot
 
 export const isDetailRoute = (path: string): boolean => /^\/(experience|projects)\/[^/?]+$/.test(path);
 
-export function landmarkProblems(path: string, found: Landmarks): string[] {
+// status is what the route answered: the rail rule holds only for a written
+// detail page (200), never for a not-found answer under the same prefix.
+export function landmarkProblems(path: string, found: Landmarks, status = 200): string[] {
   const problems: string[] = [];
   for (const [key, label] of [
     ["header", "header"],
@@ -95,7 +100,7 @@ export function landmarkProblems(path: string, found: Landmarks): string[] {
   ] as const) {
     if (found[key] !== 1) problems.push(`has ${found[key]} ${label}, expected exactly one`);
   }
-  if (isDetailRoute(path) && (found.navInMain !== 1 || found.nav !== 2)) {
+  if (isDetailRoute(path) && status === 200 && (found.navInMain !== 1 || found.nav !== 2)) {
     problems.push(`a detail page needs the section rail as a second nav inside main; found ${found.nav} nav, ${found.navInMain} inside main`);
   }
   return problems;
@@ -113,7 +118,38 @@ export function headingProblems(levels: readonly number[]): string[] {
   return problems;
 }
 
-export type FocusStop = { label: string; href?: string; outlineStyle: string; outlineWidth: number; outlineColour: string; ground: string };
+// Each focused element's outline, and the computed background colours of its
+// ancestors, nearest first, as the browser reports them.
+export type FocusStop = { label: string; href?: string; outlineStyle: string; outlineWidth: number; outlineColour: string; grounds: string[] };
+
+// One colour laid over another (source-over); the result is opaque when the
+// bottom one is.
+export function composite(top: Rgba, bottom: Rgba): Rgba {
+  const a = top.a + bottom.a * (1 - top.a);
+  if (a === 0) return { r: 0, g: 0, b: 0, a: 0 };
+  const mix = (t: number, b: number): number => (t * top.a + b * bottom.a * (1 - top.a)) / a;
+  return { r: mix(top.r, bottom.r), g: mix(top.g, bottom.g), b: mix(top.b, bottom.b), a };
+}
+
+export const WHITE: Rgba = { r: 255, g: 255, b: 255, a: 1 };
+
+// The ground an element sits on: its ancestors' backgrounds, nearest first,
+// composited from the nearest opaque one (or the white canvas) up through
+// every translucent layer above it. Null when one cannot be read.
+export function effectiveGround(grounds: readonly string[]): Rgba | null {
+  const layers: Rgba[] = [];
+  for (const text of grounds) {
+    if (text.trim() === "transparent") continue;
+    const colour = parseColour(text);
+    if (colour === null) return null;
+    if (colour.a === 0) continue;
+    layers.push(colour);
+    if (colour.a >= 1) break;
+  }
+  let ground = layers.length > 0 && layers[layers.length - 1].a >= 1 ? layers.pop()! : WHITE;
+  for (const layer of layers.reverse()) ground = composite(layer, ground);
+  return ground;
+}
 
 export function focusProblems(stops: readonly FocusStop[]): string[] {
   const problems: string[] = [];
@@ -122,13 +158,14 @@ export function focusProblems(stops: readonly FocusStop[]): string[] {
       problems.push(`${stop.label} shows no focus outline`);
       continue;
     }
-    const ring = parseColour(stop.outlineColour);
-    const ground = parseColour(stop.ground);
-    if (ring === null || ground === null) {
+    const ringColour = parseColour(stop.outlineColour);
+    const ground = effectiveGround(stop.grounds);
+    if (ringColour === null || ground === null) {
       problems.push(`${stop.label}: the focus ring or its ground could not be read`);
       continue;
     }
-    const ratio = contrastRatio(ring, ground);
+    // A translucent ring is seen as it composites over its ground.
+    const ratio = contrastRatio(composite(ringColour, ground), ground);
     if (ratio < MIN_RING_CONTRAST) problems.push(`${stop.label}: focus ring contrast ${ratio.toFixed(2)}:1 against its ground, below ${MIN_RING_CONTRAST}:1`);
   }
   return problems;
@@ -199,15 +236,10 @@ async function walkFocus(page: Page): Promise<{ stops: FocusStop[]; complete: bo
         path.unshift(`${node.tagName.toLowerCase()}:${parent === null ? 0 : [...parent.children].indexOf(node)}`);
       }
       const style = getComputedStyle(el);
-      let ground = "rgb(255, 255, 255)";
-      for (let node: Element | null = el.parentElement; node !== null; node = node.parentElement) {
-        const background = getComputedStyle(node).backgroundColor;
-        const alpha = /rgba?\([^)]*[,/]\s*([\d.]+)\s*\)$/.exec(background);
-        if (background !== "transparent" && !(alpha !== null && Number(alpha[1]) === 0)) {
-          ground = background;
-          break;
-        }
-      }
+      // Every ancestor's background, nearest first; the colour is worked
+      // out in Node (effectiveGround), where it is tested.
+      const grounds: string[] = [];
+      for (let node: Element | null = el.parentElement; node !== null; node = node.parentElement) grounds.push(getComputedStyle(node).backgroundColor);
       const text = (el.getAttribute("aria-label") ?? el.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 50);
       const href = el.getAttribute("href");
       return {
@@ -217,7 +249,7 @@ async function walkFocus(page: Page): Promise<{ stops: FocusStop[]; complete: bo
         outlineStyle: style.outlineStyle,
         outlineWidth: parseFloat(style.outlineWidth) || 0,
         outlineColour: style.outlineColor,
-        ground,
+        grounds,
       };
     });
     if (stop === null || seen.has(stop.key)) return { stops, complete: true };
@@ -242,7 +274,7 @@ const readWidth = (page: Page): Promise<WidthReading> =>
     const header = document.querySelector("header");
     const navItems = [...document.querySelectorAll('nav[aria-label="Primary"] a')];
     const boxes = [
-      ...[...document.querySelectorAll("main ul")].filter((ul) => getComputedStyle(ul).display === "grid").map((el) => ({ label: "a card grid", el })),
+      ...[...document.querySelectorAll("[data-card-grid]")].map((el) => ({ label: "a card grid", el })),
       ...[...document.querySelectorAll("main nav")].map((el) => ({ label: "the section rail", el })),
     ].map(({ label, el }) => ({ label, right: el.getBoundingClientRect().right, scrollWidth: el.scrollWidth, clientWidth: el.clientWidth }));
     const heroText = document.querySelector("main section[aria-labelledby='home-name'] > div");
@@ -261,7 +293,10 @@ const readWidth = (page: Page): Promise<WidthReading> =>
 export type Failure = { route: string; rule: string };
 export type Result = { routes: number; failures: Failure[]; fold320: number | null; focusStops: number; repositoryCtaChecked: number };
 
-async function auditPage(browser: Browser, url: string, path: string, axeSource: string, result: Result): Promise<void> {
+// The unfiltered listings, each of which must show a card grid at 768px.
+export const LISTINGS = ["/experience", "/projects"] as const;
+
+async function auditPage(browser: Browser, url: string, path: string, status: number, axeSource: string, result: Result): Promise<void> {
   const fail = (rule: string): void => {
     result.failures.push({ route: path, rule });
   };
@@ -270,7 +305,7 @@ async function auditPage(browser: Browser, url: string, path: string, axeSource:
   try {
     await page.goto(url, { waitUntil: "load" });
     for (const v of failingViolations(await runAxe(page, axeSource))) fail(`axe ${v.impact}: ${v.id} (${v.nodes} element(s))`);
-    for (const problem of landmarkProblems(path, await readLandmarks(page))) fail(problem);
+    for (const problem of landmarkProblems(path, await readLandmarks(page), status)) fail(problem);
     for (const problem of headingProblems(await readHeadings(page))) fail(problem);
 
     const walk = await walkFocus(page);
@@ -301,6 +336,7 @@ async function auditPage(browser: Browser, url: string, path: string, axeSource:
         for (const box of reading.boxes) {
           if (box.right > reading.clientWidth + 0.5 || box.scrollWidth > box.clientWidth) fail(`${box.label} does not resolve at 768px`);
         }
+        if ((LISTINGS as readonly string[]).includes(path) && !reading.boxes.some((box) => box.label === "a card grid")) fail("no card grid found at 768px, so the grid rule was not checked");
       }
     }
   } catch (error) {
@@ -323,7 +359,7 @@ export async function checkA11y(baseUrl: string): Promise<Result> {
   const browser = await chromium.launch();
   try {
     for (const page of pages) {
-      await auditPage(browser, page.url, page.path, axeSource, result);
+      await auditPage(browser, page.url, page.path, page.status ?? 0, axeSource, result);
       result.routes += 1;
     }
   } finally {
