@@ -1,3 +1,4 @@
+import { Analytics } from "@vercel/analytics/next";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
@@ -34,6 +35,14 @@ export default function RootLayout({
       <body className={styles.body}>
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: personJson() }} />
         {children}
+        {/* Vercel Analytics (FR-30, Story 6.1): AD-1's one named exemption from
+            the two-island register. It is configuration, not behaviour: it
+            renders nothing and carries no site logic. Page views only, no
+            custom events, no second vendor and no cookie banner. It reports
+            the path without the query string, so a filtered listing counts
+            under its listing, and detail pages group as /experience/[slug]
+            and /projects/[slug] (Story 6.2). */}
+        <Analytics />
       </body>
     </html>
   );
