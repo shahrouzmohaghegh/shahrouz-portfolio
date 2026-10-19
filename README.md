@@ -112,6 +112,7 @@ These five are the only planning files published. The product requirements, the 
 | `react` | The component model Next.js renders. |
 | `react-dom` | Renders React to HTML on the server and hydrates the islands. |
 | `@next/mdx` | Compiles each Evidence Item's `.mdx` prose at build (AD-5), so the prose renders as server components with no runtime MDX. |
+| `@vercel/analytics` | Page views from launch (FR-30), through one `<Analytics />` in `app/layout.tsx`: AD-1's named exemption from the two-island register. No custom events, no second vendor, no cookie banner. |
 | `@mdx-js/loader` | The MDX compiler `@next/mdx` runs as its loader; a required peer of it. |
 | `@mdx-js/react` | The MDX component provider `@next/mdx` names as a required peer; the App Router itself takes components from `mdx-components.tsx`. |
 | `@mdx-js/mdx` | The MDX compiler `@next/mdx` runs at build, called directly by the case-study suite so it renders each written `.mdx` through the real components in Vitest. |
@@ -233,6 +234,23 @@ To prove the alert path end to end, run `gh workflow run production-watch.yml -f
 GitHub disables scheduled workflows in a public repository after 60 days without commits. The watch's last step re-enables itself and the pin review through the API on every run, which resets that clock, so a quiet repository keeps both running. If one is ever disabled anyway, the Actions tab says so: open it, select the workflow and choose "Enable workflow", or run `gh workflow enable production-watch.yml`; then `gh workflow run production-watch.yml` checks it still works.
 
 Both layers look for the exact text `Shahrouz Mohaghegh` on the page (`NAME` in `scripts/production-watch.mts` and the UptimeRobot keyword). A change to how the name appears in the HTML must update both in the same change, or both raise a false alarm. `npm run watch:production` runs the same checks locally and prints the result without touching any issue.
+
+## Analytics
+
+Vercel Web Analytics records page views from launch (FR-30). Its one component, `<Analytics />` in `app/layout.tsx`, renders nothing and is AD-1's named exemption from the two-island register. There are no custom events, no second vendor, no error tracking and no cookie banner, because nothing beyond privacy-preserving page views is collected. It records data only once Web Analytics is enabled for the project in the Vercel dashboard (Project, Analytics, Enable); that is a one-time switch in Shahrouz's account, not in this repository.
+
+**What the data separates (FR-31, Story 6.2).** Each page view carries its path without the query string, and its route with the slug as a parameter:
+
+- `/` is Home.
+- `/experience` and `/projects` are the listings. A filtered view such as `/experience?capability=leadership` counts under `/experience`, so filter states never fragment a listing's total.
+- `/experience/[slug]` and `/projects/[slug]` are the two detail families, one row each when grouped by route, or one row per page when grouped by path.
+
+**Reading SM-3, the share of visitors who reach the evidence.** The dashboard counts visitors per route, not a per-session path, so the share reaching at least one detail page is read as a range rather than one number. With `V` the site's visitors, `C` the visitors to `/experience/[slug]` and `P` the visitors to `/projects/[slug]`, all over the same period:
+
+- the share is at least the larger of `C / V` and `P / V`;
+- and at most `(C + P) / V` (capped at 100%), the gap being visitors who read both a case study and a project.
+
+That limitation is accepted, not hidden: closing it would need custom events or a second tool, which FR-30 rules out. A visitor who opens the site in two browsers counts twice, as in any visitor count.
 
 ## Changing the confidential terms
 
