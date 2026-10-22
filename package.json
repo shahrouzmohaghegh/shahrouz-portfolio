@@ -42,7 +42,7 @@
     "@types/react-dom": "^19",
     "axe-core": "4.14.0",
     "eslint": "^9",
-    "eslint-config-next": "16.4.0",
+    "eslint-config-next": "16.4.2",
     "lighthouse": "13.5.0",
     "typescript": "^5",
     "vitest": "^5.0.3"
